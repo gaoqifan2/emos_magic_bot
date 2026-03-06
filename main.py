@@ -18,7 +18,7 @@ from telegram.ext import (
 from config import Config, BOT_COMMANDS
 from handlers.common import (
     start, menu_command, help_command, cancel_command,
-    button_callback,
+    button_callback, post_init,
     WAITING_REDPACKET_ID, WAITING_LOTTERY_CANCEL_ID
 )
 from handlers.redpacket import (
@@ -30,47 +30,40 @@ from games.lottery import (
     lottery_command, lottery_process,
     WAITING_LOTTERY_NAME, WAITING_LOTTERY_DESC, WAITING_LOTTERY_START,
     WAITING_LOTTERY_END, WAITING_LOTTERY_AMOUNT, WAITING_LOTTERY_NUMBER,
-    WAITING_LOTTERY_RULE_CARROT, WAITING_LOTTERY_RULE_SIGN, WAITING_LOTTERY_PRIZES
+    WAITING_LOTTERY_RULE_CARROT, WAITING_LOTTERY_RULE_SIGN, WAITING_LOTTERY_PRIZES,
+    handle_bodys_choice, get_lottery_bodys, handle_prize_choice
 )
 from games.lottery_cancel import lottery_cancel_command, get_lottery_cancel_id
 from ranks.carrot_rank import rank_carrot_command
 from ranks.upload_rank import rank_upload_command
 from ranks.playing_rank import playing_command
 
-# ===== 创建 logs 文件夹 =====
+# 创建 logs 文件夹
 if not os.path.exists('logs'):
     os.makedirs('logs')
 
-# ===== 生成日志文件名（按日期） =====
+# 生成日志文件名
 log_filename = f"logs/bot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
 
-# ===== 设置日志 =====
+# 设置日志
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO,
     handlers=[
-        logging.StreamHandler(sys.stdout),  # 输出到控制台
-        logging.FileHandler(log_filename, encoding='utf-8')  # 输出到文件
+        logging.StreamHandler(sys.stdout),
+        logging.FileHandler(log_filename, encoding='utf-8')
     ]
 )
 logger = logging.getLogger(__name__)
 
-# ===== 记录启动信息 =====
 logger.info(f"日志文件: {log_filename}")
 logger.info("=" * 60)
-
-async def post_init(application: Application) -> None:
-    """在机器人启动后执行的钩子函数"""
-    # 设置命令菜单
-    commands = [BotCommand(cmd, desc) for cmd, desc in BOT_COMMANDS]
-    await application.bot.set_my_commands(commands)
-    logger.info("✅ 机器人命令菜单已设置")
 
 def main() -> None:
     """主函数"""
     logger.info("正在启动机器人...")
     
-    # 创建应用 - 使用 post_init 钩子
+    # 创建应用
     application = Application.builder() \
         .token(Config.BOT_TOKEN) \
         .post_init(post_init) \
@@ -92,22 +85,22 @@ def main() -> None:
             WAITING_CARROT: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, redpocket_process),
                 MessageHandler(filters.PHOTO, redpocket_process),
-                CallbackQueryHandler(button_callback)
+                CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
             ],
             WAITING_NUMBER: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, redpocket_process),
                 MessageHandler(filters.PHOTO, redpocket_process),
-                CallbackQueryHandler(button_callback)
+                CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
             ],
             WAITING_BLESSING: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, redpocket_process),
                 MessageHandler(filters.PHOTO, redpocket_process),
-                CallbackQueryHandler(button_callback)
+                CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
             ],
             WAITING_PASSWORD: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, redpocket_process),
                 MessageHandler(filters.PHOTO, redpocket_process),
-                CallbackQueryHandler(button_callback)
+                CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
             ],
         },
         fallbacks=[CommandHandler("cancel", cancel_redpacket)]
@@ -123,7 +116,7 @@ def main() -> None:
         states={
             WAITING_REDPACKET_ID: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, get_redpacket_id),
-                CallbackQueryHandler(button_callback)
+                CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
             ],
         },
         fallbacks=[CommandHandler("cancel", cancel_command)]
@@ -139,39 +132,42 @@ def main() -> None:
         states={
             WAITING_LOTTERY_NAME: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, lottery_process),
-                CallbackQueryHandler(button_callback)
+                CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
             ],
             WAITING_LOTTERY_DESC: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, lottery_process),
-                CallbackQueryHandler(button_callback)
+                CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
             ],
             WAITING_LOTTERY_START: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, lottery_process),
-                CallbackQueryHandler(button_callback)
+                CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
             ],
             WAITING_LOTTERY_END: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, lottery_process),
-                CallbackQueryHandler(button_callback)
+                CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
             ],
             WAITING_LOTTERY_AMOUNT: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, lottery_process),
-                CallbackQueryHandler(button_callback)
+                CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
             ],
             WAITING_LOTTERY_NUMBER: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, lottery_process),
-                CallbackQueryHandler(button_callback)
+                CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
             ],
             WAITING_LOTTERY_RULE_CARROT: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, lottery_process),
-                CallbackQueryHandler(button_callback)
+                CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
             ],
             WAITING_LOTTERY_RULE_SIGN: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, lottery_process),
-                CallbackQueryHandler(button_callback)
+                CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
             ],
             WAITING_LOTTERY_PRIZES: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, lottery_process),
-                CallbackQueryHandler(button_callback)
+                CallbackQueryHandler(handle_bodys_choice, pattern="^need_bodys_"),
+                CallbackQueryHandler(handle_prize_choice, pattern="^(add_more_prizes|finish_prizes)$"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, get_lottery_bodys),
+                CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
             ],
         },
         fallbacks=[CommandHandler("cancel", cancel_command)]
@@ -187,7 +183,7 @@ def main() -> None:
         states={
             WAITING_LOTTERY_CANCEL_ID: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, get_lottery_cancel_id),
-                CallbackQueryHandler(button_callback)
+                CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
             ],
         },
         fallbacks=[CommandHandler("cancel", cancel_command)]
@@ -199,7 +195,7 @@ def main() -> None:
     application.add_handler(CommandHandler("rank_carrot", rank_carrot_command))
     application.add_handler(CommandHandler("rank_upload", rank_upload_command))
     
-    # 按钮回调（处理所有未捕获的回调）
+    # 按钮回调（处理所有未被对话捕获的回调）
     application.add_handler(CallbackQueryHandler(button_callback))
     
     # 打印启动信息
@@ -211,12 +207,10 @@ def main() -> None:
         print(f"   /{cmd:<15} - {desc}")
     print("=" * 60)
     print(f"🚀 机器人 @{Config.BOT_USERNAME}")
-    print("=" * 60)
     print(f"📝 日志文件: {log_filename}")
     print("=" * 60)
     
     logger.info(f"🚀 机器人 @{Config.BOT_USERNAME} 启动成功")
-    logger.info(f"📝 日志文件: {log_filename}")
     
     # 启动机器人
     application.run_polling(allowed_updates=Update.ALL_TYPES)

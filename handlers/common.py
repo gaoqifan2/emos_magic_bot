@@ -1,7 +1,6 @@
-# handlers/common.py
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
-from telegram.ext import ContextTypes, ConversationHandler
+from telegram.ext import ContextTypes, ConversationHandler, Application
 
 from config import Config, BOT_COMMANDS, user_tokens
 
@@ -11,9 +10,18 @@ logger = logging.getLogger(__name__)
 WAITING_REDPACKET_ID = 20
 WAITING_LOTTERY_CANCEL_ID = 21
 
+async def post_init(application: Application) -> None:
+    """机器人启动后执行的钩子函数"""
+    commands = [BotCommand(cmd, desc) for cmd, desc in BOT_COMMANDS]
+    await application.bot.set_my_commands(commands)
+    logger.info("✅ 机器人命令菜单已设置")
+
 def add_cancel_button(keyboard=None):
     """添加取消按钮"""
     if keyboard is None:
+        keyboard = []
+    # 确保 keyboard 是可变的列表
+    if not isinstance(keyboard, list):
         keyboard = []
     keyboard.append([InlineKeyboardButton("❌ 取消", callback_data="cancel_operation")])
     return keyboard
@@ -23,6 +31,8 @@ async def cancel_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     await query.edit_message_text("✅ 操作已取消")
+    # 清理用户数据
+    context.user_data.clear()
     return ConversationHandler.END
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -71,7 +81,7 @@ async def show_menu(update, message_text: str):
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    if update.message:
+    if isinstance(update, Update) and update.message:
         await update.message.reply_text(message_text, reply_markup=reply_markup)
     else:
         await update.callback_query.edit_message_text(message_text, reply_markup=reply_markup)
@@ -82,40 +92,66 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     
     data = query.data
+    logger.info(f"按钮回调: {data}")
     
     if data == "cancel_operation":
-        await cancel_callback(update, context)
+        return await cancel_callback(update, context)
+    
+    # 处理返回主菜单
+    if data == "back_to_main":
+        await show_menu(update, "📱 功能菜单\n\n请选择功能：")
         return
     
+    # 红包二级菜单
     if data == "menu_redpacket_main":
         await show_redpacket_menu(update, context)
-    elif data == "menu_lottery_main":
+        return
+    
+    # 抽奖二级菜单
+    if data == "menu_lottery_main":
         await show_lottery_menu(update, context)
-    elif data == "menu_rank_main":
+        return
+    
+    # 排行榜二级菜单
+    if data == "menu_rank_main":
         await show_rank_menu(update, context)
-    elif data == "menu_redpocket":
+        return
+    
+    # 处理具体的功能按钮
+    if data == "menu_redpocket":
         from handlers.redpacket import redpocket_command
-        await redpocket_command(update, context)
+        return await redpocket_command(update, context)
+    
     elif data == "menu_check_redpacket":
         from handlers.redpacket_query import check_redpacket_command
-        await check_redpacket_command(update, context)
+        return await check_redpacket_command(update, context)
+    
     elif data == "menu_lottery":
         from games.lottery import lottery_command
-        await lottery_command(update, context)
+        return await lottery_command(update, context)
+    
     elif data == "menu_lottery_cancel":
         from games.lottery_cancel import lottery_cancel_command
-        await lottery_cancel_command(update, context)
+        return await lottery_cancel_command(update, context)
+    
     elif data == "menu_rank_carrot":
         from ranks.carrot_rank import rank_carrot_command
         await rank_carrot_command(update, context)
+    
     elif data == "menu_rank_upload":
         from ranks.upload_rank import rank_upload_command
         await rank_upload_command(update, context)
+    
     elif data == "menu_playing":
         from ranks.playing_rank import playing_command
         await playing_command(update, context)
+    
     elif data == "help":
         await help_command(update, context)
+    
+    elif data in ["add_more_prizes", "finish_prizes"]:
+        from games.lottery import handle_prize_choice
+        return await handle_prize_choice(update, context)
 
 async def show_redpacket_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """红包二级菜单"""
@@ -176,7 +212,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• /cancel - 取消当前操作"
     )
     
-    if update.message:
+    if isinstance(update, Update) and update.message:
         await update.message.reply_text(help_text, parse_mode="Markdown")
     else:
         await update.callback_query.edit_message_text(help_text, parse_mode="Markdown")
@@ -184,4 +220,14 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """取消操作"""
     await update.message.reply_text("✅ 操作已取消")
+    context.user_data.clear()
+    return ConversationHandler.END
+
+async def return_to_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """返回主菜单"""
+    if update.callback_query:
+        await update.callback_query.answer()
+        await show_menu(update, "📱 功能菜单\n\n请选择功能：")
+    else:
+        await show_menu(update, "📱 功能菜单\n\n请选择功能：")
     return ConversationHandler.END

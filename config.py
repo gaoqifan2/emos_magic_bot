@@ -74,4 +74,5 @@ def init_r2_client():
         return None
 
 # 全局R2客户端
-r2_client = init_r2_client()
+# r2_client = init_r2_client()
+r2_client = None
