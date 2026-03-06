@@ -1,3 +1,944 @@
 2026-03-06 14:43:29,525 - __main__ - INFO - 日志文件: logs/bot_20260306_144329.log
 2026-03-06 14:43:29,526 - __main__ - INFO - ============================================================
 2026-03-06 14:43:29,526 - __main__ - INFO - 正在启动机器人...
+2026-03-06 14:43:32,349 - __main__ - INFO - 🚀 机器人 @emosMagicBox_bot 启动成功
+2026-03-06 14:43:32,349 - __main__ - INFO - 📝 日志文件: logs/bot_20260306_144329.log
+2026-03-06 14:43:36,506 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getMe "HTTP/1.1 200 OK"
+2026-03-06 14:43:37,017 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/setMyCommands "HTTP/1.1 200 OK"
+2026-03-06 14:43:37,018 - __main__ - INFO - ✅ 机器人命令菜单已设置
+2026-03-06 14:43:37,364 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/deleteWebhook "HTTP/1.1 200 OK"
+2026-03-06 14:43:37,365 - telegram.ext.Application - INFO - Application started
+2026-03-06 14:43:49,525 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:43:49,527 - handlers.common - INFO - 用户 7712965941 发送 /start 命令
+2026-03-06 14:43:50,880 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/sendMessage "HTTP/1.1 200 OK"
+2026-03-06 14:43:53,723 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:43:53,724 - handlers.common - INFO - 用户 7712965941 发送 /start 命令
+2026-03-06 14:43:53,724 - handlers.common - INFO - 收到授权Token: 1047_165dG2iOsDU9QCqe
+2026-03-06 14:43:54,244 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/sendMessage "HTTP/1.1 200 OK"
+2026-03-06 14:43:56,373 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:43:56,874 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/answerCallbackQuery "HTTP/1.1 200 OK"
+2026-03-06 14:43:57,417 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/editMessageText "HTTP/1.1 200 OK"
+2026-03-06 14:44:00,952 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:44:00,953 - handlers.redpacket - INFO - 用户 7712965941 开始创建红包
+2026-03-06 14:44:01,580 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/editMessageText "HTTP/1.1 200 OK"
+2026-03-06 14:44:04,646 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:44:04,648 - handlers.redpacket - INFO - ==================================================
+2026-03-06 14:44:04,648 - handlers.redpacket - INFO - 用户 7712965941 触发 redpocket_process
+2026-03-06 14:44:04,649 - handlers.redpacket - INFO - 用户 7712965941 当前步骤: carrot
+2026-03-06 14:44:04,649 - handlers.redpacket - INFO - 消息类型: 文本
+2026-03-06 14:44:04,649 - handlers.redpacket - INFO - 用户 7712965941 发送文本: '100'
+2026-03-06 14:44:04,650 - handlers.redpacket - INFO - 用户 7712965941 设置金额: 100
+2026-03-06 14:44:05,182 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/sendMessage "HTTP/1.1 200 OK"
+2026-03-06 14:44:07,412 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:44:07,412 - handlers.redpacket - INFO - ==================================================
+2026-03-06 14:44:07,413 - handlers.redpacket - INFO - 用户 7712965941 触发 redpocket_process
+2026-03-06 14:44:07,413 - handlers.redpacket - INFO - 用户 7712965941 当前步骤: number
+2026-03-06 14:44:07,413 - handlers.redpacket - INFO - 消息类型: 文本
+2026-03-06 14:44:07,413 - handlers.redpacket - INFO - 用户 7712965941 发送文本: '5'
+2026-03-06 14:44:07,413 - handlers.redpacket - INFO - 用户 7712965941 设置人数: 5
+2026-03-06 14:44:07,953 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/sendMessage "HTTP/1.1 200 OK"
+2026-03-06 14:44:17,759 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:44:21,096 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:44:21,097 - handlers.redpacket - INFO - ==================================================
+2026-03-06 14:44:21,097 - handlers.redpacket - INFO - 用户 7712965941 触发 redpocket_process
+2026-03-06 14:44:21,098 - handlers.redpacket - INFO - 用户 7712965941 当前步骤: blessing
+2026-03-06 14:44:21,098 - handlers.redpacket - INFO - 消息类型: 文本
+2026-03-06 14:44:21,098 - handlers.redpacket - INFO - 用户 7712965941 发送文本: '什么频道？'
+2026-03-06 14:44:21,098 - handlers.redpacket - INFO - 用户 7712965941 设置祝福语: 什么频道？
+2026-03-06 14:44:24,123 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/sendMessage "HTTP/1.1 200 OK"
+2026-03-06 14:44:31,437 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:44:37,439 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:44:37,440 - handlers.redpacket - INFO - ==================================================
+2026-03-06 14:44:37,440 - handlers.redpacket - INFO - 用户 7712965941 触发 redpocket_process
+2026-03-06 14:44:37,440 - handlers.redpacket - INFO - 用户 7712965941 当前步骤: password
+2026-03-06 14:44:37,441 - handlers.redpacket - INFO - 消息类型: 图片
+2026-03-06 14:44:37,441 - handlers.redpacket - INFO - 用户 7712965941 发送了图片
+2026-03-06 14:44:42,443 - telegram.ext.Application - ERROR - No error handlers are registered, logging exception.
+Traceback (most recent call last):
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_transports\default.py", line 101, in map_httpcore_exceptions
+    yield
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_transports\default.py", line 394, in handle_async_request
+    resp = await self._pool.handle_async_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpcore\_async\connection_pool.py", line 256, in handle_async_request
+    raise exc from None
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpcore\_async\connection_pool.py", line 236, in handle_async_request
+    response = await connection.handle_async_request(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        pool_request.request
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpcore\_async\http_proxy.py", line 316, in handle_async_request
+    stream = await stream.start_tls(**kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpcore\_async\http11.py", line 376, in start_tls
+    return await self._stream.start_tls(ssl_context, server_hostname, timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpcore\_backends\anyio.py", line 67, in start_tls
+    with map_exceptions(exc_map):
+         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpcore\_exceptions.py", line 14, in map_exceptions
+    raise to_exc(exc) from exc
+httpcore.ConnectError
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\request\_httpxrequest.py", line 279, in do_request
+    res = await self._client.request(
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_client.py", line 1540, in request
+    return await self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_client.py", line 1629, in send
+    response = await self._send_handling_auth(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_client.py", line 1657, in _send_handling_auth
+    response = await self._send_handling_redirects(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_client.py", line 1694, in _send_handling_redirects
+    response = await self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_client.py", line 1730, in _send_single_request
+    response = await transport.handle_async_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_transports\default.py", line 393, in handle_async_request
+    with map_httpcore_exceptions():
+         ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_transports\default.py", line 118, in map_httpcore_exceptions
+    raise mapped_exc(message) from exc
+httpx.ConnectError
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\ext\_application.py", line 1315, in process_update
+    await coroutine
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\ext\_handlers\conversationhandler.py", line 841, in handle_update
+    new_state: object = await handler.handle_update(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        update, application, handler_check_result, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\ext\_handlers\basehandler.py", line 159, in handle_update
+    return await self.callback(update, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\emos_magic_bot\handlers\redpacket.py", line 81, in redpocket_process
+    return await handle_photo_upload(update, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\emos_magic_bot\handlers\redpacket.py", line 188, in handle_photo_upload
+    loading = await update.message.reply_text("🔄 正在上传图片到云端...")
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\_message.py", line 2068, in reply_text
+    return await self.get_bot().send_message(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<21 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\ext\_extbot.py", line 3115, in send_message
+    return await super().send_message(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<23 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\_bot.py", line 1122, in send_message
+    return await self._send_message(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<21 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\ext\_extbot.py", line 629, in _send_message
+    result = await super()._send_message(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<23 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\_bot.py", line 819, in _send_message
+    result = await self._post(
+             ^^^^^^^^^^^^^^^^^
+    ...<7 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\_bot.py", line 703, in _post
+    return await self._do_post(
+           ^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\ext\_extbot.py", line 369, in _do_post
+    return await super()._do_post(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\_bot.py", line 732, in _do_post
+    result = await request.post(
+             ^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\request\_baserequest.py", line 198, in post
+    result = await self._request_wrapper(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<7 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\request\_baserequest.py", line 305, in _request_wrapper
+    code, payload = await self.do_request(
+                    ^^^^^^^^^^^^^^^^^^^^^^
+    ...<7 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\request\_httpxrequest.py", line 303, in do_request
+    raise NetworkError(f"httpx.{err.__class__.__name__}: {err}") from err
+telegram.error.NetworkError: httpx.ConnectError: 
+2026-03-06 14:44:47,783 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:44:58,128 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:45:00,904 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:45:00,905 - handlers.redpacket - INFO - ==================================================
+2026-03-06 14:45:00,906 - handlers.redpacket - INFO - 用户 7712965941 触发 redpocket_process
+2026-03-06 14:45:00,906 - handlers.redpacket - INFO - 用户 7712965941 当前步骤: password
+2026-03-06 14:45:00,907 - handlers.redpacket - INFO - 消息类型: 文本
+2026-03-06 14:45:00,907 - handlers.redpacket - INFO - 用户 7712965941 发送文本: '超高清频道'
+2026-03-06 14:45:00,907 - handlers.redpacket - INFO - 用户 7712965941 进入口令步骤，输入: '超高清频道'
+2026-03-06 14:45:00,908 - handlers.redpacket - INFO - 用户 7712965941 开始创建红包，数据: {'user_id': 7712965941, 'step': 'password', 'start_time': '2026-03-06T14:44:00.954069', 'carrot': 100, 'number': 5, 'blessing': '什么频道？', 'password': '超高清频道', 'password_text': '超高清频道'}
+2026-03-06 14:45:05,911 - telegram.ext.Application - ERROR - No error handlers are registered, logging exception.
+Traceback (most recent call last):
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_transports\default.py", line 101, in map_httpcore_exceptions
+    yield
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_transports\default.py", line 394, in handle_async_request
+    resp = await self._pool.handle_async_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpcore\_async\connection_pool.py", line 256, in handle_async_request
+    raise exc from None
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpcore\_async\connection_pool.py", line 236, in handle_async_request
+    response = await connection.handle_async_request(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        pool_request.request
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpcore\_async\http_proxy.py", line 316, in handle_async_request
+    stream = await stream.start_tls(**kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpcore\_async\http11.py", line 376, in start_tls
+    return await self._stream.start_tls(ssl_context, server_hostname, timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpcore\_backends\anyio.py", line 67, in start_tls
+    with map_exceptions(exc_map):
+         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpcore\_exceptions.py", line 14, in map_exceptions
+    raise to_exc(exc) from exc
+httpcore.ConnectTimeout
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\request\_httpxrequest.py", line 279, in do_request
+    res = await self._client.request(
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_client.py", line 1540, in request
+    return await self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_client.py", line 1629, in send
+    response = await self._send_handling_auth(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_client.py", line 1657, in _send_handling_auth
+    response = await self._send_handling_redirects(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_client.py", line 1694, in _send_handling_redirects
+    response = await self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_client.py", line 1730, in _send_single_request
+    response = await transport.handle_async_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_transports\default.py", line 393, in handle_async_request
+    with map_httpcore_exceptions():
+         ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_transports\default.py", line 118, in map_httpcore_exceptions
+    raise mapped_exc(message) from exc
+httpx.ConnectTimeout
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\ext\_application.py", line 1315, in process_update
+    await coroutine
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\ext\_handlers\conversationhandler.py", line 841, in handle_update
+    new_state: object = await handler.handle_update(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        update, application, handler_check_result, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\ext\_handlers\basehandler.py", line 159, in handle_update
+    return await self.callback(update, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\emos_magic_bot\handlers\redpacket.py", line 172, in redpocket_process
+    return await create_redpacket(update, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\emos_magic_bot\handlers\redpacket.py", line 267, in create_redpacket
+    loading = await update.message.reply_text("🔄 正在创建红包...")
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\_message.py", line 2068, in reply_text
+    return await self.get_bot().send_message(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<21 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\ext\_extbot.py", line 3115, in send_message
+    return await super().send_message(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<23 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\_bot.py", line 1122, in send_message
+    return await self._send_message(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<21 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\ext\_extbot.py", line 629, in _send_message
+    result = await super()._send_message(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<23 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\_bot.py", line 819, in _send_message
+    result = await self._post(
+             ^^^^^^^^^^^^^^^^^
+    ...<7 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\_bot.py", line 703, in _post
+    return await self._do_post(
+           ^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\ext\_extbot.py", line 369, in _do_post
+    return await super()._do_post(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\_bot.py", line 732, in _do_post
+    result = await request.post(
+             ^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\request\_baserequest.py", line 198, in post
+    result = await self._request_wrapper(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<7 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\request\_baserequest.py", line 305, in _request_wrapper
+    code, payload = await self.do_request(
+                    ^^^^^^^^^^^^^^^^^^^^^^
+    ...<7 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\request\_httpxrequest.py", line 296, in do_request
+    raise TimedOut from err
+telegram.error.TimedOut: Timed out
+2026-03-06 14:45:11,244 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:45:21,585 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:45:31,929 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:45:42,264 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:45:45,489 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:45:45,490 - handlers.redpacket - INFO - ==================================================
+2026-03-06 14:45:45,490 - handlers.redpacket - INFO - 用户 7712965941 触发 redpocket_process
+2026-03-06 14:45:45,491 - handlers.redpacket - INFO - 用户 7712965941 当前步骤: password
+2026-03-06 14:45:45,491 - handlers.redpacket - INFO - 消息类型: 文本
+2026-03-06 14:45:45,491 - handlers.redpacket - INFO - 用户 7712965941 发送文本: '超高清频道'
+2026-03-06 14:45:45,491 - handlers.redpacket - INFO - 用户 7712965941 进入口令步骤，输入: '超高清频道'
+2026-03-06 14:45:45,491 - handlers.redpacket - INFO - 用户 7712965941 开始创建红包，数据: {'user_id': 7712965941, 'step': 'password', 'start_time': '2026-03-06T14:44:00.954069', 'carrot': 100, 'number': 5, 'blessing': '什么频道？', 'password': '超高清频道', 'password_text': '超高清频道'}
+2026-03-06 14:45:50,494 - telegram.ext.Application - ERROR - No error handlers are registered, logging exception.
+Traceback (most recent call last):
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_transports\default.py", line 101, in map_httpcore_exceptions
+    yield
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_transports\default.py", line 394, in handle_async_request
+    resp = await self._pool.handle_async_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpcore\_async\connection_pool.py", line 256, in handle_async_request
+    raise exc from None
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpcore\_async\connection_pool.py", line 236, in handle_async_request
+    response = await connection.handle_async_request(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        pool_request.request
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpcore\_async\http_proxy.py", line 316, in handle_async_request
+    stream = await stream.start_tls(**kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpcore\_async\http11.py", line 376, in start_tls
+    return await self._stream.start_tls(ssl_context, server_hostname, timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpcore\_backends\anyio.py", line 67, in start_tls
+    with map_exceptions(exc_map):
+         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpcore\_exceptions.py", line 14, in map_exceptions
+    raise to_exc(exc) from exc
+httpcore.ConnectError
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\request\_httpxrequest.py", line 279, in do_request
+    res = await self._client.request(
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_client.py", line 1540, in request
+    return await self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_client.py", line 1629, in send
+    response = await self._send_handling_auth(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_client.py", line 1657, in _send_handling_auth
+    response = await self._send_handling_redirects(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_client.py", line 1694, in _send_handling_redirects
+    response = await self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_client.py", line 1730, in _send_single_request
+    response = await transport.handle_async_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_transports\default.py", line 393, in handle_async_request
+    with map_httpcore_exceptions():
+         ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_transports\default.py", line 118, in map_httpcore_exceptions
+    raise mapped_exc(message) from exc
+httpx.ConnectError
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\ext\_application.py", line 1315, in process_update
+    await coroutine
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\ext\_handlers\conversationhandler.py", line 841, in handle_update
+    new_state: object = await handler.handle_update(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        update, application, handler_check_result, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\ext\_handlers\basehandler.py", line 159, in handle_update
+    return await self.callback(update, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\emos_magic_bot\handlers\redpacket.py", line 172, in redpocket_process
+    return await create_redpacket(update, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\emos_magic_bot\handlers\redpacket.py", line 267, in create_redpacket
+    loading = await update.message.reply_text("🔄 正在创建红包...")
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\_message.py", line 2068, in reply_text
+    return await self.get_bot().send_message(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<21 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\ext\_extbot.py", line 3115, in send_message
+    return await super().send_message(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<23 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\_bot.py", line 1122, in send_message
+    return await self._send_message(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<21 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\ext\_extbot.py", line 629, in _send_message
+    result = await super()._send_message(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<23 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\_bot.py", line 819, in _send_message
+    result = await self._post(
+             ^^^^^^^^^^^^^^^^^
+    ...<7 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\_bot.py", line 703, in _post
+    return await self._do_post(
+           ^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\ext\_extbot.py", line 369, in _do_post
+    return await super()._do_post(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\_bot.py", line 732, in _do_post
+    result = await request.post(
+             ^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\request\_baserequest.py", line 198, in post
+    result = await self._request_wrapper(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<7 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\request\_baserequest.py", line 305, in _request_wrapper
+    code, payload = await self.do_request(
+                    ^^^^^^^^^^^^^^^^^^^^^^
+    ...<7 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\request\_httpxrequest.py", line 303, in do_request
+    raise NetworkError(f"httpx.{err.__class__.__name__}: {err}") from err
+telegram.error.NetworkError: httpx.ConnectError: 
+2026-03-06 14:45:54,775 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:46:05,117 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:46:10,564 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:46:16,136 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:46:16,137 - handlers.common - INFO - 用户 7712965941 发送 /start 命令
+2026-03-06 14:46:17,506 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/sendMessage "HTTP/1.1 200 OK"
+2026-03-06 14:46:19,129 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:46:19,643 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/answerCallbackQuery "HTTP/1.1 200 OK"
+2026-03-06 14:46:20,193 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/editMessageText "HTTP/1.1 200 OK"
+2026-03-06 14:46:21,227 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:46:21,745 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/answerCallbackQuery "HTTP/1.1 200 OK"
+2026-03-06 14:46:21,746 - handlers.redpacket - INFO - 用户 7712965941 开始创建红包
+2026-03-06 14:46:22,301 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/editMessageText "HTTP/1.1 200 OK"
+2026-03-06 14:46:26,613 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:46:26,614 - handlers.redpacket - INFO - ==================================================
+2026-03-06 14:46:26,615 - handlers.redpacket - INFO - 用户 7712965941 触发 redpocket_process
+2026-03-06 14:46:26,615 - handlers.redpacket - INFO - 用户 7712965941 当前步骤: carrot
+2026-03-06 14:46:26,615 - handlers.redpacket - INFO - 消息类型: 文本
+2026-03-06 14:46:26,616 - handlers.redpacket - INFO - 用户 7712965941 发送文本: '100'
+2026-03-06 14:46:26,616 - handlers.redpacket - INFO - 用户 7712965941 设置金额: 100
+2026-03-06 14:46:27,159 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/sendMessage "HTTP/1.1 200 OK"
+2026-03-06 14:46:31,123 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:46:31,124 - handlers.redpacket - INFO - ==================================================
+2026-03-06 14:46:31,124 - handlers.redpacket - INFO - 用户 7712965941 触发 redpocket_process
+2026-03-06 14:46:31,124 - handlers.redpacket - INFO - 用户 7712965941 当前步骤: number
+2026-03-06 14:46:31,124 - handlers.redpacket - INFO - 消息类型: 文本
+2026-03-06 14:46:31,124 - handlers.redpacket - INFO - 用户 7712965941 发送文本: '2'
+2026-03-06 14:46:31,125 - handlers.redpacket - INFO - 用户 7712965941 设置人数: 2
+2026-03-06 14:46:31,653 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/sendMessage "HTTP/1.1 200 OK"
+2026-03-06 14:46:41,462 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:46:42,510 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:46:42,511 - handlers.redpacket - INFO - ==================================================
+2026-03-06 14:46:42,511 - handlers.redpacket - INFO - 用户 7712965941 触发 redpocket_process
+2026-03-06 14:46:42,512 - handlers.redpacket - INFO - 用户 7712965941 当前步骤: blessing
+2026-03-06 14:46:42,512 - handlers.redpacket - INFO - 消息类型: 图片
+2026-03-06 14:46:42,512 - handlers.redpacket - INFO - 用户 7712965941 发送了图片
+2026-03-06 14:46:46,891 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/sendMessage "HTTP/1.1 200 OK"
+2026-03-06 14:46:47,237 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getFile "HTTP/1.1 200 OK"
+2026-03-06 14:46:47,660 - httpx - INFO - HTTP Request: GET https://api.telegram.org/file/bot8682707944%3AAAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/photos/file_0.jpg "HTTP/1.1 200 OK"
+2026-03-06 14:46:58,505 - utils.r2_client - INFO - ✅ 文件上传成功: https://pub-1c439b34c477a87f999a32576e8eb.r2.dev/redpacket/7665bcea-56d7-4caf-a212-4d62a32a78e7.jpg
+2026-03-06 14:46:58,505 - handlers.redpacket - INFO - 用户 7712965941 上传新图片: AgACAgUAAxkBAAOaaapl33kQxe0wLqP7-z__ZVhDXQYAAsIQaxt5G1hV8C238UGRG3EBAAMCAAN5AAM6BA
+2026-03-06 14:46:58,506 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:47:03,509 - handlers.redpacket - ERROR - 上传图片失败: httpx.ConnectError: 
+2026-03-06 14:47:07,868 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/editMessageText "HTTP/1.1 200 OK"
+2026-03-06 14:47:08,837 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:47:15,312 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:47:15,313 - handlers.redpacket - INFO - ==================================================
+2026-03-06 14:47:15,313 - handlers.redpacket - INFO - 用户 7712965941 触发 redpocket_process
+2026-03-06 14:47:15,313 - handlers.redpacket - INFO - 用户 7712965941 当前步骤: blessing
+2026-03-06 14:47:15,314 - handlers.redpacket - INFO - 消息类型: 文本
+2026-03-06 14:47:15,314 - handlers.redpacket - INFO - 用户 7712965941 发送文本: '什么频道 数字字母不组合'
+2026-03-06 14:47:15,315 - handlers.redpacket - INFO - 用户 7712965941 设置祝福语: 什么频道 数字字母不组合
+2026-03-06 14:47:16,635 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/sendMessage "HTTP/1.1 200 OK"
+2026-03-06 14:47:25,660 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:47:35,996 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:47:46,337 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:47:56,684 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:48:07,036 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:48:17,395 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:48:17,934 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:48:17,934 - handlers.redpacket - INFO - ==================================================
+2026-03-06 14:48:17,935 - handlers.redpacket - INFO - 用户 7712965941 触发 redpocket_process
+2026-03-06 14:48:17,935 - handlers.redpacket - INFO - 用户 7712965941 当前步骤: password
+2026-03-06 14:48:17,935 - handlers.redpacket - INFO - 消息类型: 图片
+2026-03-06 14:48:17,935 - handlers.redpacket - INFO - 用户 7712965941 发送了图片
+2026-03-06 14:48:22,347 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/sendMessage "HTTP/1.1 200 OK"
+2026-03-06 14:48:22,348 - handlers.redpacket - INFO - 用户 7712965941 使用缓存的图片: AgACAgUAAxkBAAOaaapl33kQxe0wLqP7-z__ZVhDXQYAAsIQaxt5G1hV8C238UGRG3EBAAMCAAN5AAM6BA
+2026-03-06 14:48:22,866 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/editMessageText "HTTP/1.1 200 OK"
+2026-03-06 14:48:23,401 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/sendMessage "HTTP/1.1 200 OK"
+2026-03-06 14:48:28,274 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:48:38,624 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:48:39,045 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:48:39,047 - handlers.redpacket - INFO - ==================================================
+2026-03-06 14:48:39,047 - handlers.redpacket - INFO - 用户 7712965941 触发 redpocket_process
+2026-03-06 14:48:39,047 - handlers.redpacket - INFO - 用户 7712965941 当前步骤: password
+2026-03-06 14:48:39,047 - handlers.redpacket - INFO - 消息类型: 文本
+2026-03-06 14:48:39,047 - handlers.redpacket - INFO - 用户 7712965941 发送文本: '超高清频道'
+2026-03-06 14:48:39,047 - handlers.redpacket - INFO - 用户 7712965941 进入口令步骤，输入: '超高清频道'
+2026-03-06 14:48:39,048 - handlers.redpacket - INFO - 用户 7712965941 开始创建红包，数据: {'user_id': 7712965941, 'step': 'password', 'start_time': '2026-03-06T14:46:21.746772', 'carrot': 100, 'number': 2, 'blessing': '什么频道 数字字母不组合', 'cover_url': 'https://pub-1c439b34c477a87f999a32576e8eb.r2.dev/redpacket/7665bcea-56d7-4caf-a212-4d62a32a78e7.jpg', 'file_id': 'AgACAgUAAxkBAAOaaapl33kQxe0wLqP7-z__ZVhDXQYAAsIQaxt5G1hV8C238UGRG3EBAAMCAAN5AAM6BA', 'password': '超高清频道', 'password_text': '超高清频道'}
+2026-03-06 14:48:43,397 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/sendMessage "HTTP/1.1 200 OK"
+2026-03-06 14:48:43,398 - handlers.redpacket - INFO - 用户 7712965941 发送红包请求: {'type': 'password', 'carrot': 100, 'number': 2, 'blessing': '什么频道 数字字母不组合', 'text': '超高清频道', 'file_id_image': 'AgACAgUAAxkBAAOaaapl33kQxe0wLqP7-z__ZVhDXQYAAsIQaxt5G1hV8C238UGRG3EBAAMCAAN5AAM6BA', 'file_url': 'https://pub-1c439b34c477a87f999a32576e8eb.r2.dev/redpacket/7665bcea-56d7-4caf-a212-4d62a32a78e7.jpg'}
+2026-03-06 14:48:48,402 - handlers.redpacket - ERROR - 用户 7712965941 创建红包失败: ('Connection aborted.', ConnectionResetError(10054, '远程主机强迫关闭了一个现有的连接。', None, 10054, None))
+2026-03-06 14:48:49,406 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:48:53,406 - telegram.ext.Application - ERROR - No error handlers are registered, logging exception.
+Traceback (most recent call last):
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_transports\default.py", line 101, in map_httpcore_exceptions
+    yield
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_transports\default.py", line 394, in handle_async_request
+    resp = await self._pool.handle_async_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpcore\_async\connection_pool.py", line 256, in handle_async_request
+    raise exc from None
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpcore\_async\connection_pool.py", line 236, in handle_async_request
+    response = await connection.handle_async_request(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        pool_request.request
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpcore\_async\http_proxy.py", line 316, in handle_async_request
+    stream = await stream.start_tls(**kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpcore\_async\http11.py", line 376, in start_tls
+    return await self._stream.start_tls(ssl_context, server_hostname, timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpcore\_backends\anyio.py", line 67, in start_tls
+    with map_exceptions(exc_map):
+         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpcore\_exceptions.py", line 14, in map_exceptions
+    raise to_exc(exc) from exc
+httpcore.ConnectError
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\request\_httpxrequest.py", line 279, in do_request
+    res = await self._client.request(
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_client.py", line 1540, in request
+    return await self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_client.py", line 1629, in send
+    response = await self._send_handling_auth(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_client.py", line 1657, in _send_handling_auth
+    response = await self._send_handling_redirects(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_client.py", line 1694, in _send_handling_redirects
+    response = await self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_client.py", line 1730, in _send_single_request
+    response = await transport.handle_async_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_transports\default.py", line 393, in handle_async_request
+    with map_httpcore_exceptions():
+         ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_transports\default.py", line 118, in map_httpcore_exceptions
+    raise mapped_exc(message) from exc
+httpx.ConnectError
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\ext\_application.py", line 1315, in process_update
+    await coroutine
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\ext\_handlers\conversationhandler.py", line 841, in handle_update
+    new_state: object = await handler.handle_update(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        update, application, handler_check_result, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\ext\_handlers\basehandler.py", line 159, in handle_update
+    return await self.callback(update, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\emos_magic_bot\handlers\redpacket.py", line 172, in redpocket_process
+    return await create_redpacket(update, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\emos_magic_bot\handlers\redpacket.py", line 324, in create_redpacket
+    await loading.edit_text("❌ 创建失败，请稍后重试")
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\_message.py", line 4205, in edit_text
+    return await self.get_bot().edit_message_text(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<15 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\ext\_extbot.py", line 1732, in edit_message_text
+    return await super().edit_message_text(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<15 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\_bot.py", line 4543, in edit_message_text
+    return await self._send_message(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<11 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\ext\_extbot.py", line 629, in _send_message
+    result = await super()._send_message(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<23 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\_bot.py", line 819, in _send_message
+    result = await self._post(
+             ^^^^^^^^^^^^^^^^^
+    ...<7 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\_bot.py", line 703, in _post
+    return await self._do_post(
+           ^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\ext\_extbot.py", line 369, in _do_post
+    return await super()._do_post(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\_bot.py", line 732, in _do_post
+    result = await request.post(
+             ^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\request\_baserequest.py", line 198, in post
+    result = await self._request_wrapper(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<7 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\request\_baserequest.py", line 305, in _request_wrapper
+    code, payload = await self.do_request(
+                    ^^^^^^^^^^^^^^^^^^^^^^
+    ...<7 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\request\_httpxrequest.py", line 303, in do_request
+    raise NetworkError(f"httpx.{err.__class__.__name__}: {err}") from err
+telegram.error.NetworkError: httpx.ConnectError: 
+2026-03-06 14:48:59,743 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:49:10,086 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:49:20,424 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:49:25,012 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:49:25,015 - handlers.common - INFO - 用户 7712965941 发送 /start 命令
+2026-03-06 14:49:26,329 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/sendMessage "HTTP/1.1 200 OK"
+2026-03-06 14:49:30,972 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:49:31,527 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/answerCallbackQuery "HTTP/1.1 200 OK"
+2026-03-06 14:49:32,046 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/editMessageText "HTTP/1.1 200 OK"
+2026-03-06 14:49:33,410 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:49:33,931 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/answerCallbackQuery "HTTP/1.1 200 OK"
+2026-03-06 14:49:34,495 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/editMessageText "HTTP/1.1 200 OK"
+2026-03-06 14:49:37,131 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:49:37,131 - handlers.redpacket - INFO - ==================================================
+2026-03-06 14:49:37,131 - handlers.redpacket - INFO - 用户 7712965941 触发 redpocket_process
+2026-03-06 14:49:37,132 - handlers.redpacket - INFO - 用户 7712965941 当前步骤: password
+2026-03-06 14:49:37,132 - handlers.redpacket - INFO - 消息类型: 文本
+2026-03-06 14:49:37,132 - handlers.redpacket - INFO - 用户 7712965941 发送文本: '1'
+2026-03-06 14:49:37,132 - handlers.redpacket - INFO - 用户 7712965941 进入口令步骤，输入: '1'
+2026-03-06 14:49:37,132 - handlers.redpacket - INFO - 用户 7712965941 开始创建红包，数据: {'user_id': 7712965941, 'step': 'password', 'start_time': '2026-03-06T14:46:21.746772', 'carrot': 100, 'number': 2, 'blessing': '什么频道 数字字母不组合', 'cover_url': 'https://pub-1c439b34c477a87f999a32576e8eb.r2.dev/redpacket/7665bcea-56d7-4caf-a212-4d62a32a78e7.jpg', 'file_id': 'AgACAgUAAxkBAAOaaapl33kQxe0wLqP7-z__ZVhDXQYAAsIQaxt5G1hV8C238UGRG3EBAAMCAAN5AAM6BA', 'password': '1', 'password_text': '1'}
+2026-03-06 14:49:37,664 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/sendMessage "HTTP/1.1 200 OK"
+2026-03-06 14:49:37,665 - handlers.redpacket - INFO - 用户 7712965941 发送红包请求: {'type': 'password', 'carrot': 100, 'number': 2, 'blessing': '什么频道 数字字母不组合', 'text': '1', 'file_id_image': 'AgACAgUAAxkBAAOaaapl33kQxe0wLqP7-z__ZVhDXQYAAsIQaxt5G1hV8C238UGRG3EBAAMCAAN5AAM6BA', 'file_url': 'https://pub-1c439b34c477a87f999a32576e8eb.r2.dev/redpacket/7665bcea-56d7-4caf-a212-4d62a32a78e7.jpg'}
+2026-03-06 14:49:39,506 - handlers.redpacket - INFO - 用户 7712965941 红包API响应状态码: 200
+2026-03-06 14:49:39,506 - handlers.redpacket - INFO - 用户 7712965941 红包API响应: {'red_packet_id': 'BLJg3EMJ3Ano'}
+2026-03-06 14:49:40,025 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/editMessageText "HTTP/1.1 200 OK"
+2026-03-06 14:49:47,471 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:49:57,841 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:50:08,186 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:50:18,521 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:50:28,876 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:50:48,897 - telegram.ext.Application - ERROR - No error handlers are registered, logging exception.
+Traceback (most recent call last):
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_transports\default.py", line 101, in map_httpcore_exceptions
+    yield
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_transports\default.py", line 394, in handle_async_request
+    resp = await self._pool.handle_async_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpcore\_async\connection_pool.py", line 256, in handle_async_request
+    raise exc from None
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpcore\_async\connection_pool.py", line 236, in handle_async_request
+    response = await connection.handle_async_request(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        pool_request.request
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpcore\_async\http_proxy.py", line 316, in handle_async_request
+    stream = await stream.start_tls(**kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpcore\_async\http11.py", line 376, in start_tls
+    return await self._stream.start_tls(ssl_context, server_hostname, timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpcore\_backends\anyio.py", line 67, in start_tls
+    with map_exceptions(exc_map):
+         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpcore\_exceptions.py", line 14, in map_exceptions
+    raise to_exc(exc) from exc
+httpcore.ConnectError
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\request\_httpxrequest.py", line 279, in do_request
+    res = await self._client.request(
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_client.py", line 1540, in request
+    return await self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_client.py", line 1629, in send
+    response = await self._send_handling_auth(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_client.py", line 1657, in _send_handling_auth
+    response = await self._send_handling_redirects(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_client.py", line 1694, in _send_handling_redirects
+    response = await self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_client.py", line 1730, in _send_single_request
+    response = await transport.handle_async_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_transports\default.py", line 393, in handle_async_request
+    with map_httpcore_exceptions():
+         ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_transports\default.py", line 118, in map_httpcore_exceptions
+    raise mapped_exc(message) from exc
+httpx.ConnectError
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\ext\_utils\networkloop.py", line 161, in network_retry_loop
+    await do_action()
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\ext\_utils\networkloop.py", line 154, in do_action
+    action_cb_task.result()
+    ~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\ext\_updater.py", line 340, in polling_action_cb
+    updates = await self.bot.get_updates(
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\ext\_extbot.py", line 671, in get_updates
+    updates = await super().get_updates(
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<9 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\_bot.py", line 4860, in get_updates
+    await self._post(
+    ^^^^^^^^^^^^^^^^^
+    ...<7 lines>...
+    ),
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\_bot.py", line 703, in _post
+    return await self._do_post(
+           ^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\ext\_extbot.py", line 369, in _do_post
+    return await super()._do_post(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\_bot.py", line 732, in _do_post
+    result = await request.post(
+             ^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\request\_baserequest.py", line 198, in post
+    result = await self._request_wrapper(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<7 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\request\_baserequest.py", line 305, in _request_wrapper
+    code, payload = await self.do_request(
+                    ^^^^^^^^^^^^^^^^^^^^^^
+    ...<7 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\request\_httpxrequest.py", line 303, in do_request
+    raise NetworkError(f"httpx.{err.__class__.__name__}: {err}") from err
+telegram.error.NetworkError: httpx.ConnectError: 
