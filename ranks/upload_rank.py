@@ -1,0 +1,82 @@
+# ranks/upload_rank.py
+import logging
+import requests
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ContextTypes
+
+from config import user_tokens, Config
+from handlers.common import add_cancel_button
+from utils.helpers import format_size
+
+logger = logging.getLogger(__name__)
+
+async def rank_upload_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """上传量排行榜 - 左右分列版"""
+    user_id = update.effective_user.id
+    token = user_tokens.get(user_id)
+    
+    if not token:
+        if update.message:
+            await update.message.reply_text("❌ 请先登录！发送 /start 登录")
+        else:
+            await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
+        return
+    
+    if update.callback_query:
+        await update.callback_query.answer()
+    
+    if update.callback_query:
+        loading = await update.callback_query.edit_message_text("🔄 正在获取上传排行榜...")
+    else:
+        loading = await update.message.reply_text("🔄 正在获取上传排行榜...")
+    
+    try:
+        headers = {"Authorization": f"Bearer {token}"}
+        
+        response = requests.get(
+            Config.RANK_UPLOAD_URL,
+            headers=headers,
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            
+            if not data:
+                await loading.edit_text("📤 上传排行榜\n\n暂无数据")
+                return
+            
+            message = "📤 上传排行榜 (前30)\n\n"
+            message += "```\n"
+            
+            left_column = []
+            right_column = []
+            
+            for i, item in enumerate(data[:30], 1):
+                username = item.get('username', '未知用户')
+                size = item.get('size', 0)
+                size_str = format_size(size)
+                
+                if len(username) > 12:
+                    username = username[:10] + ".."
+                
+                left_column.append(f"{i}. {username}")
+                right_column.append(size_str)
+            
+            max_left_width = max(len(line) for line in left_column)
+            
+            for left, right in zip(left_column, right_column):
+                message += f"{left:<{max_left_width}}  {right:>8}\n"
+            
+            message += "```"
+            
+            keyboard = [[InlineKeyboardButton("❌ 取消", callback_data="cancel_operation")]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await loading.edit_text(message, parse_mode="Markdown", reply_markup=reply_markup)
+        else:
+            await loading.edit_text(f"❌ 获取失败，状态码：{response.status_code}")
+            
+    except Exception as e:
+        logger.error(f"获取上传排行榜失败: {e}")
+        await loading.edit_text(f"❌ 获取失败：{str(e)}")

@@ -1,0 +1,308 @@
+2026-03-06 14:35:42,400 - __main__ - INFO - 日志文件: logs/bot_20260306_143542.log
+2026-03-06 14:35:42,401 - __main__ - INFO - ============================================================
+2026-03-06 14:35:42,401 - __main__ - INFO - 正在启动机器人...
+2026-03-06 14:35:44,738 - __main__ - INFO - 🚀 机器人 @emosMagicBox_bot 启动成功
+2026-03-06 14:35:44,739 - __main__ - INFO - 📝 日志文件: logs/bot_20260306_143542.log
+2026-03-06 14:35:45,884 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getMe "HTTP/1.1 200 OK"
+2026-03-06 14:35:46,393 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/setMyCommands "HTTP/1.1 200 OK"
+2026-03-06 14:35:46,394 - __main__ - INFO - ✅ 机器人命令菜单已设置
+2026-03-06 14:35:46,727 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/deleteWebhook "HTTP/1.1 200 OK"
+2026-03-06 14:35:46,729 - telegram.ext.Application - INFO - Application started
+2026-03-06 14:35:47,895 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:35:47,896 - handlers.redpacket - INFO - 用户 7712965941 开始创建红包
+2026-03-06 14:35:48,426 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/sendMessage "HTTP/1.1 200 OK"
+2026-03-06 14:35:48,427 - handlers.redpacket - INFO - 用户 7712965941 开始创建红包
+2026-03-06 14:35:48,969 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/sendMessage "HTTP/1.1 200 OK"
+2026-03-06 14:35:48,970 - handlers.common - INFO - 用户 7712965941 发送 /start 命令
+2026-03-06 14:35:49,528 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/sendMessage "HTTP/1.1 200 OK"
+2026-03-06 14:35:49,531 - handlers.common - INFO - 用户 7712965941 发送 /start 命令
+2026-03-06 14:35:50,120 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/sendMessage "HTTP/1.1 200 OK"
+2026-03-06 14:35:53,415 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:35:53,416 - handlers.common - INFO - 用户 7712965941 发送 /start 命令
+2026-03-06 14:35:53,416 - handlers.common - INFO - 收到授权Token: 1047_165dG2iOsDU9QCqe
+2026-03-06 14:35:53,965 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/sendMessage "HTTP/1.1 200 OK"
+2026-03-06 14:35:55,254 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:35:55,772 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/answerCallbackQuery "HTTP/1.1 200 OK"
+2026-03-06 14:35:56,289 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/editMessageText "HTTP/1.1 200 OK"
+2026-03-06 14:35:57,956 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:35:57,956 - handlers.redpacket - INFO - 用户 7712965941 开始创建红包
+2026-03-06 14:35:58,502 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/editMessageText "HTTP/1.1 200 OK"
+2026-03-06 14:36:00,682 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:36:00,683 - handlers.redpacket - INFO - ==================================================
+2026-03-06 14:36:00,683 - handlers.redpacket - INFO - 用户 7712965941 触发 redpocket_process
+2026-03-06 14:36:00,684 - handlers.redpacket - INFO - 用户 7712965941 当前步骤: carrot
+2026-03-06 14:36:00,684 - handlers.redpacket - INFO - 消息类型: 文本
+2026-03-06 14:36:00,685 - handlers.redpacket - INFO - 用户 7712965941 发送文本: '1'
+2026-03-06 14:36:00,685 - handlers.redpacket - INFO - 用户 7712965941 设置金额: 1
+2026-03-06 14:36:01,220 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/sendMessage "HTTP/1.1 200 OK"
+2026-03-06 14:36:03,001 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:36:03,002 - handlers.redpacket - INFO - ==================================================
+2026-03-06 14:36:03,002 - handlers.redpacket - INFO - 用户 7712965941 触发 redpocket_process
+2026-03-06 14:36:03,002 - handlers.redpacket - INFO - 用户 7712965941 当前步骤: number
+2026-03-06 14:36:03,002 - handlers.redpacket - INFO - 消息类型: 文本
+2026-03-06 14:36:03,003 - handlers.redpacket - INFO - 用户 7712965941 发送文本: '1'
+2026-03-06 14:36:03,003 - handlers.redpacket - INFO - 用户 7712965941 设置人数: 1
+2026-03-06 14:36:03,534 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/sendMessage "HTTP/1.1 200 OK"
+2026-03-06 14:36:04,286 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:36:04,287 - handlers.redpacket - INFO - ==================================================
+2026-03-06 14:36:04,287 - handlers.redpacket - INFO - 用户 7712965941 触发 redpocket_process
+2026-03-06 14:36:04,287 - handlers.redpacket - INFO - 用户 7712965941 当前步骤: blessing
+2026-03-06 14:36:04,288 - handlers.redpacket - INFO - 消息类型: 文本
+2026-03-06 14:36:04,288 - handlers.redpacket - INFO - 用户 7712965941 发送文本: '1'
+2026-03-06 14:36:04,288 - handlers.redpacket - INFO - 用户 7712965941 设置祝福语: 1
+2026-03-06 14:36:04,822 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/sendMessage "HTTP/1.1 200 OK"
+2026-03-06 14:36:06,096 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:36:13,321 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:36:13,323 - handlers.redpacket - INFO - ==================================================
+2026-03-06 14:36:13,323 - handlers.redpacket - INFO - 用户 7712965941 触发 redpocket_process
+2026-03-06 14:36:13,323 - handlers.redpacket - INFO - 用户 7712965941 当前步骤: password
+2026-03-06 14:36:13,324 - handlers.redpacket - INFO - 消息类型: 文本
+2026-03-06 14:36:13,324 - handlers.redpacket - INFO - 用户 7712965941 发送文本: 'skip'
+2026-03-06 14:36:13,324 - handlers.redpacket - INFO - 用户 7712965941 发送了跳过命令，强制进入口令处理
+2026-03-06 14:36:13,324 - handlers.redpacket - INFO - 用户 7712965941 强制进入口令步骤，将创建红包
+2026-03-06 14:36:13,325 - handlers.redpacket - INFO - 用户 7712965941 开始创建红包，数据: {'user_id': 7712965941, 'step': 'password', 'start_time': '2026-03-06T14:35:57.957145', 'carrot': 1, 'number': 1, 'blessing': '1', 'password': None, 'password_text': '随机生成'}
+2026-03-06 14:36:18,331 - telegram.ext.Application - ERROR - No error handlers are registered, logging exception.
+Traceback (most recent call last):
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_transports\default.py", line 101, in map_httpcore_exceptions
+    yield
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_transports\default.py", line 394, in handle_async_request
+    resp = await self._pool.handle_async_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpcore\_async\connection_pool.py", line 256, in handle_async_request
+    raise exc from None
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpcore\_async\connection_pool.py", line 236, in handle_async_request
+    response = await connection.handle_async_request(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        pool_request.request
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpcore\_async\http_proxy.py", line 316, in handle_async_request
+    stream = await stream.start_tls(**kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpcore\_async\http11.py", line 376, in start_tls
+    return await self._stream.start_tls(ssl_context, server_hostname, timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpcore\_backends\anyio.py", line 67, in start_tls
+    with map_exceptions(exc_map):
+         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpcore\_exceptions.py", line 14, in map_exceptions
+    raise to_exc(exc) from exc
+httpcore.ConnectError
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\request\_httpxrequest.py", line 279, in do_request
+    res = await self._client.request(
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_client.py", line 1540, in request
+    return await self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_client.py", line 1629, in send
+    response = await self._send_handling_auth(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_client.py", line 1657, in _send_handling_auth
+    response = await self._send_handling_redirects(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_client.py", line 1694, in _send_handling_redirects
+    response = await self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_client.py", line 1730, in _send_single_request
+    response = await transport.handle_async_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_transports\default.py", line 393, in handle_async_request
+    with map_httpcore_exceptions():
+         ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\httpx\_transports\default.py", line 118, in map_httpcore_exceptions
+    raise mapped_exc(message) from exc
+httpx.ConnectError
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\ext\_application.py", line 1315, in process_update
+    await coroutine
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\ext\_handlers\conversationhandler.py", line 841, in handle_update
+    new_state: object = await handler.handle_update(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        update, application, handler_check_result, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\ext\_handlers\basehandler.py", line 159, in handle_update
+    return await self.callback(update, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\emos_magic_bot\handlers\redpacket.py", line 113, in redpocket_process
+    return await create_redpacket(update, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\emos_magic_bot\handlers\redpacket.py", line 284, in create_redpacket
+    loading = await update.message.reply_text("🔄 正在创建红包...")
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\_message.py", line 2068, in reply_text
+    return await self.get_bot().send_message(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<21 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\ext\_extbot.py", line 3115, in send_message
+    return await super().send_message(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<23 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\_bot.py", line 1122, in send_message
+    return await self._send_message(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<21 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\ext\_extbot.py", line 629, in _send_message
+    result = await super()._send_message(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<23 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\_bot.py", line 819, in _send_message
+    result = await self._post(
+             ^^^^^^^^^^^^^^^^^
+    ...<7 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\_bot.py", line 703, in _post
+    return await self._do_post(
+           ^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\ext\_extbot.py", line 369, in _do_post
+    return await super()._do_post(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\_bot.py", line 732, in _do_post
+    result = await request.post(
+             ^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\request\_baserequest.py", line 198, in post
+    result = await self._request_wrapper(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<7 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\request\_baserequest.py", line 305, in _request_wrapper
+    code, payload = await self.do_request(
+                    ^^^^^^^^^^^^^^^^^^^^^^
+    ...<7 lines>...
+    )
+    ^
+  File "C:\Users\FAN\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\telegram\request\_httpxrequest.py", line 303, in do_request
+    raise NetworkError(f"httpx.{err.__class__.__name__}: {err}") from err
+telegram.error.NetworkError: httpx.ConnectError: 
+2026-03-06 14:36:23,674 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:36:34,017 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:36:44,361 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:36:54,702 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:37:05,055 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:37:15,391 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:37:25,728 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:37:36,079 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:37:46,423 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:37:56,753 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:38:07,094 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:38:17,441 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:38:27,802 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:38:38,156 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:38:42,833 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:38:42,834 - handlers.common - INFO - 用户 7712965941 发送 /start 命令
+2026-03-06 14:38:47,985 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/sendMessage "HTTP/1.1 200 OK"
+2026-03-06 14:38:51,662 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:38:52,163 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/answerCallbackQuery "HTTP/1.1 200 OK"
+2026-03-06 14:38:52,697 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/editMessageText "HTTP/1.1 200 OK"
+2026-03-06 14:38:54,501 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:38:55,033 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/answerCallbackQuery "HTTP/1.1 200 OK"
+2026-03-06 14:38:55,034 - handlers.redpacket - INFO - 用户 7712965941 开始创建红包
+2026-03-06 14:38:55,732 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/editMessageText "HTTP/1.1 200 OK"
+2026-03-06 14:38:58,072 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:38:58,073 - handlers.redpacket - INFO - ==================================================
+2026-03-06 14:38:58,073 - handlers.redpacket - INFO - 用户 7712965941 触发 redpocket_process
+2026-03-06 14:38:58,073 - handlers.redpacket - INFO - 用户 7712965941 当前步骤: carrot
+2026-03-06 14:38:58,073 - handlers.redpacket - INFO - 消息类型: 文本
+2026-03-06 14:38:58,073 - handlers.redpacket - INFO - 用户 7712965941 发送文本: '1'
+2026-03-06 14:38:58,074 - handlers.redpacket - INFO - 用户 7712965941 设置金额: 1
+2026-03-06 14:38:58,429 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:38:58,613 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/sendMessage "HTTP/1.1 200 OK"
+2026-03-06 14:38:58,614 - handlers.redpacket - INFO - ==================================================
+2026-03-06 14:38:58,614 - handlers.redpacket - INFO - 用户 7712965941 触发 redpocket_process
+2026-03-06 14:38:58,614 - handlers.redpacket - INFO - 用户 7712965941 当前步骤: number
+2026-03-06 14:38:58,614 - handlers.redpacket - INFO - 消息类型: 文本
+2026-03-06 14:38:58,614 - handlers.redpacket - INFO - 用户 7712965941 发送文本: '1'
+2026-03-06 14:38:58,615 - handlers.redpacket - INFO - 用户 7712965941 设置人数: 1
+2026-03-06 14:38:59,140 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/sendMessage "HTTP/1.1 200 OK"
+2026-03-06 14:39:00,374 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:39:00,375 - handlers.redpacket - INFO - ==================================================
+2026-03-06 14:39:00,376 - handlers.redpacket - INFO - 用户 7712965941 触发 redpocket_process
+2026-03-06 14:39:00,376 - handlers.redpacket - INFO - 用户 7712965941 当前步骤: blessing
+2026-03-06 14:39:00,376 - handlers.redpacket - INFO - 消息类型: 文本
+2026-03-06 14:39:00,376 - handlers.redpacket - INFO - 用户 7712965941 发送文本: '1'
+2026-03-06 14:39:00,377 - handlers.redpacket - INFO - 用户 7712965941 设置祝福语: 1
+2026-03-06 14:39:00,947 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/sendMessage "HTTP/1.1 200 OK"
+2026-03-06 14:39:04,134 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:39:04,136 - handlers.redpacket - INFO - ==================================================
+2026-03-06 14:39:04,137 - handlers.redpacket - INFO - 用户 7712965941 触发 redpocket_process
+2026-03-06 14:39:04,138 - handlers.redpacket - INFO - 用户 7712965941 当前步骤: password
+2026-03-06 14:39:04,138 - handlers.redpacket - INFO - 消息类型: 文本
+2026-03-06 14:39:04,139 - handlers.redpacket - INFO - 用户 7712965941 发送文本: 'skip'
+2026-03-06 14:39:04,139 - handlers.redpacket - INFO - 用户 7712965941 发送了跳过命令，强制进入口令处理
+2026-03-06 14:39:04,140 - handlers.redpacket - INFO - 用户 7712965941 强制进入口令步骤，将创建红包
+2026-03-06 14:39:04,140 - handlers.redpacket - INFO - 用户 7712965941 开始创建红包，数据: {'user_id': 7712965941, 'step': 'password', 'start_time': '2026-03-06T14:38:55.034729', 'carrot': 1, 'number': 1, 'blessing': '1', 'password': None, 'password_text': '随机生成'}
+2026-03-06 14:39:04,684 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/sendMessage "HTTP/1.1 200 OK"
+2026-03-06 14:39:04,685 - handlers.redpacket - INFO - 用户 7712965941 发送红包请求: {'type': 'password', 'carrot': 1, 'number': 1, 'blessing': '1', 'text': None, 'file_id_image': None, 'file_url': None}
+2026-03-06 14:39:08,643 - handlers.redpacket - INFO - 用户 7712965941 红包API响应状态码: 422
+2026-03-06 14:39:09,159 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/editMessageText "HTTP/1.1 200 OK"
+2026-03-06 14:39:14,490 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:39:23,876 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:39:33,246 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:39:40,279 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:39:50,624 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:40:00,960 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:40:11,309 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:40:21,652 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:40:31,998 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:40:42,335 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:40:52,683 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:41:03,030 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:41:13,378 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:41:23,721 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:41:34,060 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:41:44,861 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:41:55,208 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:42:05,550 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:42:15,897 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:42:26,243 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:42:36,584 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:42:46,919 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:42:57,276 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:43:07,616 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:43:17,958 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:43:22,964 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E/getUpdates "HTTP/1.1 200 OK"
+2026-03-06 14:43:22,964 - telegram.ext.Application - INFO - Application is stopping. This might take a moment.
+2026-03-06 14:43:22,965 - telegram.ext.Application - INFO - Application.stop() complete
