@@ -10,7 +10,7 @@ class Config:
     BOT_USERNAME: str = "emosMagicBox_bot"
     
     # API地址
-    API_BASE_URL: str = "https://emos.best/api"
+    API_BASE_URL: str = "http://localhost:8000/api"
     
     # 红包相关
     REDPACKET_CREATE_URL: str = f"{API_BASE_URL}/redPacket/create"

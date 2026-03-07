@@ -39,7 +39,7 @@ async def lottery_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         'prizes': []
     }
     
-    keyboard = add_cancel_button([[]])
+    keyboard = add_cancel_button([[]], show_back=True)
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     if update.callback_query:
@@ -67,7 +67,7 @@ async def lottery_process(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     lottery_data = context.user_data['lottery']
     current_step = lottery_data.get('step', 'name')
     
-    keyboard = add_cancel_button([[]])
+    keyboard = add_cancel_button([[]], show_back=True)
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     if current_step == 'name':
@@ -231,7 +231,7 @@ async def handle_prize_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     current_prize = lottery_data.get('current_prize', {})
     prize_index = len(lottery_data['prizes']) + 1
     
-    keyboard = add_cancel_button([[]])
+    keyboard = add_cancel_button([[]], show_back=True)
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     if prize_step == 'name':
@@ -423,7 +423,7 @@ async def handle_prize_choice(update: Update, context: ContextTypes.DEFAULT_TYPE
         lottery_data['prize_step'] = 'name'
         context.user_data['lottery'] = lottery_data
         
-        keyboard = add_cancel_button([[]])
+        keyboard = add_cancel_button([[]], show_back=True)
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         await query.edit_message_text(

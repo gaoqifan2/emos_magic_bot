@@ -1,7 +1,7 @@
 import logging
 import requests
 from datetime import datetime
-from telegram import Update, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes, ConversationHandler
 
 from config import user_tokens, Config
@@ -37,7 +37,7 @@ async def redpocket_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if 'uploaded_files' not in context.user_data:
         context.user_data['uploaded_files'] = {}
     
-    keyboard = add_cancel_button([[]])
+    keyboard = add_cancel_button([[]], show_back=True)
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     message_text = (
@@ -82,7 +82,7 @@ async def redpocket_process(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     logger.info(f"用户 {user_id} 发送文本: '{text}'")
     
-    keyboard = add_cancel_button([[]])
+    keyboard = add_cancel_button([[]], show_back=True)
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     if current_step == 'carrot':
@@ -187,7 +187,7 @@ async def handle_photo_upload(update: Update, context: ContextTypes.DEFAULT_TYPE
             'password': "🔑 请继续输入口令："
         }
         
-        keyboard = add_cancel_button([[]])
+        keyboard = add_cancel_button([[]], show_back=True)
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(step_messages.get(current_step, "请继续"), reply_markup=reply_markup)
         

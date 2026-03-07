@@ -1,0 +1,225 @@
+import logging
+import httpx
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ContextTypes
+
+from config import user_tokens, Config
+
+logger = logging.getLogger(__name__)
+
+async def show_shop_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """商城主菜单"""
+    keyboard = [
+        [InlineKeyboardButton("🏪 店铺管理", callback_data="shop_manage")],
+        [InlineKeyboardButton("📁 商品分类", callback_data="shop_category")],
+        [InlineKeyboardButton("🛍️ 商品管理", callback_data="shop_product")],
+        [InlineKeyboardButton("📋 订单管理", callback_data="shop_order")],
+        [InlineKeyboardButton("🔙 返回主菜单", callback_data="back_to_main")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.callback_query.edit_message_text(
+        "🛒 商城管理\n\n请选择操作：",
+        reply_markup=reply_markup
+    )
+
+async def shop_manage(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """店铺管理"""
+    user_id = update.effective_user.id
+    token = user_tokens.get(user_id)
+    
+    if not token:
+        await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
+        return
+    
+    loading = await update.callback_query.edit_message_text("🔄 正在获取店铺信息...")
+    
+    try:
+        headers = {"Authorization": f"Bearer {token}"}
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{Config.API_BASE_URL}/shop/seller/base",
+                headers=headers,
+                timeout=10
+            )
+        
+        if response.status_code == 200:
+            shop_info = response.json()
+            status = shop_info.get('status', 'default')
+            status_text = {
+                'default': '未申请',
+                'examine': '审核中',
+                'pass': '已通过',
+                'disable': '已禁用'
+            }
+            
+            message = f"🏪 店铺信息\n\n"
+            message += f"状态：{status_text.get(status, status)}\n"
+            if 'name' in shop_info:
+                message += f"店铺名称：{shop_info.get('name')}\n"
+            if 'description' in shop_info:
+                message += f"店铺描述：{shop_info.get('description')}\n"
+            
+            await loading.edit_text(message)
+        else:
+            # 可能还没有店铺，显示申请开店选项
+            await loading.edit_text("🏪 您还没有店铺，是否申请开店？")
+            
+            keyboard = [
+                [InlineKeyboardButton("✅ 申请开店", callback_data="shop_apply")],
+                [InlineKeyboardButton("🔙 返回商城菜单", callback_data="menu_shop")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.callback_query.message.reply_text("店铺管理", reply_markup=reply_markup)
+    except Exception as e:
+        logger.error(f"获取店铺信息失败: {e}")
+        await loading.edit_text("❌ 获取店铺信息失败，请稍后重试")
+
+async def shop_apply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """申请开店"""
+    user_id = update.effective_user.id
+    token = user_tokens.get(user_id)
+    
+    if not token:
+        await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
+        return
+    
+    # 提示用户输入店铺名称
+    await update.callback_query.edit_message_text("🏪 请输入店铺名称（30字以内）：")
+    
+    # 存储当前状态，等待用户输入
+    context.user_data['current_operation'] = 'shop_apply_name'
+    context.user_data['token'] = token
+
+async def shop_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """商品分类管理"""
+    user_id = update.effective_user.id
+    token = user_tokens.get(user_id)
+    
+    if not token:
+        await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
+        return
+    
+    loading = await update.callback_query.edit_message_text("🔄 正在获取分类列表...")
+    
+    try:
+        headers = {"Authorization": f"Bearer {token}"}
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{Config.API_BASE_URL}/shop/category/list",
+                headers=headers,
+                timeout=10
+            )
+        
+        if response.status_code == 200:
+            categories = response.json()
+            message = "📁 商品分类列表\n\n"
+            if categories:
+                for i, category in enumerate(categories, 1):
+                    message += f"{i}. {category.get('name')} (ID: {category.get('category_id')})\n"
+            else:
+                message += "暂无分类\n"
+            
+            await loading.edit_text(message)
+        else:
+            await loading.edit_text(f"❌ 获取分类列表失败，状态码：{response.status_code}")
+    except Exception as e:
+        logger.error(f"获取分类列表失败: {e}")
+        await loading.edit_text("❌ 获取分类列表失败，请稍后重试")
+    
+    # 显示操作菜单
+    keyboard = [
+        [InlineKeyboardButton("➕ 新增分类", callback_data="shop_category_add")],
+        [InlineKeyboardButton("🔙 返回商城菜单", callback_data="menu_shop")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.callback_query.message.reply_text("分类管理", reply_markup=reply_markup)
+
+async def shop_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """商品管理"""
+    user_id = update.effective_user.id
+    token = user_tokens.get(user_id)
+    
+    if not token:
+        await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
+        return
+    
+    loading = await update.callback_query.edit_message_text("🔄 正在获取商品列表...")
+    
+    try:
+        headers = {"Authorization": f"Bearer {token}"}
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{Config.API_BASE_URL}/shop/product/list",
+                headers=headers,
+                timeout=10
+            )
+        
+        if response.status_code == 200:
+            products = response.json()
+            message = "🛍️ 商品列表\n\n"
+            if products:
+                for i, product in enumerate(products, 1):
+                    message += f"{i}. {product.get('name')} - {product.get('price')} 萝卜\n"
+            else:
+                message += "暂无商品\n"
+            
+            await loading.edit_text(message)
+        else:
+            await loading.edit_text(f"❌ 获取商品列表失败，状态码：{response.status_code}")
+    except Exception as e:
+        logger.error(f"获取商品列表失败: {e}")
+        await loading.edit_text("❌ 获取商品列表失败，请稍后重试")
+    
+    # 显示操作菜单
+    keyboard = [
+        [InlineKeyboardButton("➕ 新增商品", callback_data="shop_product_add")],
+        [InlineKeyboardButton("🔙 返回商城菜单", callback_data="menu_shop")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.callback_query.message.reply_text("商品管理", reply_markup=reply_markup)
+
+async def shop_order(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """订单管理"""
+    user_id = update.effective_user.id
+    token = user_tokens.get(user_id)
+    
+    if not token:
+        await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
+        return
+    
+    loading = await update.callback_query.edit_message_text("🔄 正在获取订单列表...")
+    
+    try:
+        headers = {"Authorization": f"Bearer {token}"}
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{Config.API_BASE_URL}/shop/order/list",
+                headers=headers,
+                timeout=10
+            )
+        
+        if response.status_code == 200:
+            orders = response.json()
+            message = "📋 订单列表\n\n"
+            if orders:
+                for i, order in enumerate(orders, 1):
+                    message += f"{i}. 订单号：{order.get('order_no')}\n"
+                    message += f"   商品：{order.get('product_name')}\n"
+                    message += f"   价格：{order.get('price')} 萝卜\n"
+                    message += f"   状态：{order.get('status')}\n\n"
+            else:
+                message += "暂无订单\n"
+            
+            await loading.edit_text(message)
+        else:
+            await loading.edit_text(f"❌ 获取订单列表失败，状态码：{response.status_code}")
+    except Exception as e:
+        logger.error(f"获取订单列表失败: {e}")
+        await loading.edit_text("❌ 获取订单列表失败，请稍后重试")
+    
+    # 显示操作菜单
+    keyboard = [
+        [InlineKeyboardButton("🔙 返回商城菜单", callback_data="menu_shop")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.callback_query.message.reply_text("订单管理", reply_markup=reply_markup)
