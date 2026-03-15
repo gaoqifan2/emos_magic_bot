@@ -9,18 +9,67 @@ logger = logging.getLogger(__name__)
 
 async def show_service_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """服务商主菜单"""
-    keyboard = [
-        [InlineKeyboardButton("👥 用户管理", callback_data="service_user_manage")],
-        [InlineKeyboardButton("� 充值中心", callback_data="service_recharge")],
-        [InlineKeyboardButton("� 提现专区", callback_data="service_withdraw")],
-        [InlineKeyboardButton("🎮 游戏中心", callback_data="service_game_center")],
-        [InlineKeyboardButton("🔙 返回主菜单", callback_data="back_to_main")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.callback_query.edit_message_text(
-        "🛠️ 服务商管理\n\n请选择操作：",
-        reply_markup=reply_markup
-    )
+    user_id = update.effective_user.id
+    token = user_tokens.get(user_id)
+    
+    if not token:
+        await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
+        return
+    
+    # 检查用户是否为服务商
+    is_service = False
+    try:
+        headers = {"Authorization": f"Bearer {token}"}
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{Config.API_BASE_URL}/pay/base",
+                headers=headers,
+                timeout=10
+            )
+        
+        if response.status_code == 200:
+            is_service = True
+    except Exception as e:
+        logger.error(f"检查服务商状态失败: {e}")
+    
+    if is_service:
+        # 服务商界面
+        keyboard = [
+            [
+                InlineKeyboardButton("🏢 服务商中心", callback_data="service_manage"),
+                InlineKeyboardButton("➕ 创建订单", callback_data="service_pay_create")
+            ],
+            [
+                InlineKeyboardButton("💸 转账给用户", callback_data="service_fund_transfer"),
+                InlineKeyboardButton("🔍 订单查询", callback_data="service_pay_query")
+            ],
+            [
+                InlineKeyboardButton("❌ 关闭订单", callback_data="service_pay_close"),
+                InlineKeyboardButton("🔙 返回主菜单", callback_data="back_to_main")
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.callback_query.edit_message_text(
+            "💳 支付中心\n\n✅ 您是服务商\n\n请选择操作：",
+            reply_markup=reply_markup
+        )
+    else:
+        # 普通用户界面
+        keyboard = [
+            [
+                InlineKeyboardButton("💰 支付订单", callback_data="service_pay_query"),
+                InlineKeyboardButton("🔍 订单查询", callback_data="service_pay_query")
+            ],
+            [
+                InlineKeyboardButton("🏢 成为服务商", callback_data="service_apply"),
+                InlineKeyboardButton("🔙 返回主菜单", callback_data="back_to_main")
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.callback_query.edit_message_text(
+            "💳 支付中心\n\n👤 您是普通用户\n\n请选择操作：",
+            reply_markup=reply_markup
+        )
 
 async def service_manage(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """服务商管理"""
@@ -60,21 +109,47 @@ async def service_manage(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 message += f"总收入：{service_info.get('total_revenue')} 萝卜\n"
             if 'total_expenditure' in service_info:
                 message += f"总支出：{service_info.get('total_expenditure')} 萝卜\n"
+            if 'notify_url' in service_info:
+                message += f"回调地址：{service_info.get('notify_url', '未设置')}\n"
             
-            await loading.edit_text(message)
+            # 显示操作菜单
+            keyboard = []
+            if status == 'pass':
+                # 审核通过的服务商可以更新信息
+                keyboard.append([InlineKeyboardButton("✏️ 更新服务商信息", callback_data="service_update")])
+            keyboard.append([InlineKeyboardButton("🔙 返回支付中心", callback_data="menu_service")])
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await loading.edit_text(message, reply_markup=reply_markup)
         else:
             # 可能还没有服务商资格，显示申请成为服务商选项
             await loading.edit_text("🏢 您还没有服务商资格，是否申请成为服务商？")
             
             keyboard = [
                 [InlineKeyboardButton("✅ 申请成为服务商", callback_data="service_apply")],
-                [InlineKeyboardButton("🔙 返回服务商菜单", callback_data="menu_service")]
+                [InlineKeyboardButton("🔙 返回支付中心", callback_data="menu_service")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             await update.callback_query.message.reply_text("服务商管理", reply_markup=reply_markup)
     except Exception as e:
         logger.error(f"获取服务商信息失败: {e}")
         await loading.edit_text("❌ 获取服务商信息失败，请稍后重试")
+
+async def service_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """更新服务商信息"""
+    user_id = update.effective_user.id
+    token = user_tokens.get(user_id)
+    
+    if not token:
+        await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
+        return
+    
+    # 提示用户输入服务商名称
+    await update.callback_query.edit_message_text("🏢 请输入服务商名称（10字以内）：")
+    
+    # 存储当前状态，等待用户输入
+    context.user_data['current_operation'] = 'service_update_name'
+    context.user_data['token'] = token
 
 async def service_apply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """申请成为服务商"""

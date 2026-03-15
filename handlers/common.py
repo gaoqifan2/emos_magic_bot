@@ -86,21 +86,35 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 user_id_api = user_data.get('user_id', '未知')
                 await show_menu(update, f"👋 欢迎回来 {username}！\n\n你的ID是\n`{user_id_api}`\n\n请选择功能：")
             else:
-                await show_menu(update, "👋 欢迎回来！\n\n请选择功能：")
+                # token可能已过期，提示用户重新登录
+                await update.message.reply_text("❌ 登录已过期，请重新登录！")
+                # 移除过期的token
+                del user_tokens[user_id]
+                # 显示登录选项
+                await show_login_options(update)
         except Exception as e:
             logger.error(f"获取用户信息失败: {e}")
-            await show_menu(update, "👋 欢迎回来！\n\n请选择功能：")
+            # 移除可能无效的token
+            if user_id in user_tokens:
+                del user_tokens[user_id]
+            # 显示登录选项
+            await show_login_options(update)
     else:
-        auth_link = f"https://t.me/emospg_bot?start=link_e0E446ZE6s-{Config.BOT_USERNAME}"
-        keyboard = [
-            [InlineKeyboardButton("🔐 一键登录", url=auth_link)],
-            [InlineKeyboardButton("❌ 取消", callback_data="cancel_operation")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text(
-            "👋 欢迎使用综合机器人！\n\n使用前请先登录EMOS账号：",
-            reply_markup=reply_markup
-        )
+        # 显示登录选项
+        await show_login_options(update)
+
+async def show_login_options(update: Update):
+    """显示登录选项"""
+    auth_link = f"https://t.me/emospg_bot?start=link_e0E446ZE6s-{Config.BOT_USERNAME}"
+    keyboard = [
+        [InlineKeyboardButton("🔐 一键登录", url=auth_link)],
+        [InlineKeyboardButton("❌ 取消", callback_data="cancel_operation")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text(
+        "👋 欢迎使用综合机器人！\n\n使用前请先登录EMOS账号：",
+        reply_markup=reply_markup
+    )
 
 async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """处理/menu命令"""
@@ -115,8 +129,11 @@ async def show_menu(update, message_text: str):
     keyboard = [
         [
             InlineKeyboardButton("👤 我的信息", callback_data="menu_user_main"),
-            InlineKeyboardButton("💸 转增", callback_data="menu_transfer"),
             InlineKeyboardButton("📝 签到", callback_data="menu_user_sign")
+        ],
+        [
+            InlineKeyboardButton("💸 普通转增", callback_data="menu_transfer"),
+            InlineKeyboardButton("🏢 服务商转账", callback_data="menu_service_transfer")
         ],
         [
             InlineKeyboardButton("🧧 红包", callback_data="menu_redpacket_main"),
@@ -201,6 +218,43 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data['token'] = token
         return 102  # 自定义状态码，用于处理转赠用户ID输入
     
+    # 服务商转账功能
+    if data == "menu_service_transfer":
+        user_id = update.effective_user.id
+        token = user_tokens.get(user_id)
+        
+        if not token:
+            await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
+            return
+        
+        # 检查用户是否为服务商
+        is_service = False
+        try:
+            import httpx
+            headers = {"Authorization": f"Bearer {token}"}
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{Config.API_BASE_URL}/pay/base",
+                    headers=headers,
+                    timeout=10
+                )
+            
+            if response.status_code == 200:
+                is_service = True
+        except Exception as e:
+            logger.error(f"检查服务商状态失败: {e}")
+        
+        if is_service:
+            # 提示用户输入对方用户ID
+            await update.callback_query.edit_message_text("🏢 请输入对方用户ID（10位字符串，以e开头s结尾）：")
+            
+            # 存储当前状态，等待用户输入
+            context.user_data['current_operation'] = 'service_fund_transfer_user_id'
+            context.user_data['token'] = token
+            return 107  # 自定义状态码，用于处理服务商转账用户ID输入
+        else:
+            await update.callback_query.edit_message_text("❌ 只有服务商才能使用此功能！")
+    
     # 服务商功能
     if data == "menu_service":
         from services.service_main import show_service_menu
@@ -215,13 +269,9 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # 邀请功能
     if data == "menu_invite":
-        await update.callback_query.edit_message_text("📨 邀请功能开发中，敬请期待！")
-        # 显示返回菜单
-        keyboard = [
-            [InlineKeyboardButton("🔙 返回主菜单", callback_data="back_to_main")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.callback_query.message.reply_text("邀请功能", reply_markup=reply_markup)
+        # 跳转到个人信息的邀请功能
+        from user.user_info import user_invite
+        await user_invite(update, context)
         return
     
     # 猜拳功能
@@ -303,6 +353,112 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "service_game_center":
         from services.service_main import service_game_center
         await service_game_center(update, context)
+    
+    elif data == "service_manage":
+        from services.service_main import service_manage
+        await service_manage(update, context)
+    
+    elif data == "service_apply":
+        from services.service_main import service_apply
+        await service_apply(update, context)
+    
+    elif data == "service_update":
+        from services.service_main import service_update
+        await service_update(update, context)
+    
+    elif data == "service_pay_create":
+        from services.service_main import service_pay_create
+        await service_pay_create(update, context)
+    
+    elif data == "service_pay_query":
+        from services.service_main import service_pay_query
+        await service_pay_query(update, context)
+    
+    elif data == "service_pay_close":
+        from services.service_main import service_pay_close
+        await service_pay_close(update, context)
+    
+    elif data == "service_fund_transfer":
+        from services.service_main import service_fund_transfer
+        await service_fund_transfer(update, context)
+    
+    elif data == "service_pay_create_telegram_bot":
+        # 处理Telegram机器人支付方式选择
+        user_id = update.effective_user.id
+        token = user_tokens.get(user_id)
+        if token:
+            # 获取存储的数据
+            amount = context.user_data.get('amount')
+            name = context.user_data.get('name')
+            
+            loading = await update.callback_query.edit_message_text("🔄 正在创建订单...")
+            
+            try:
+                import httpx
+                headers = {"Authorization": f"Bearer {token}"}
+                data = {"pay_way": "telegram_bot", "price": amount, "name": name}
+                async with httpx.AsyncClient() as client:
+                    response = await client.post(
+                        f"{Config.API_BASE_URL}/pay/create",
+                        headers=headers,
+                        json=data,
+                        timeout=10
+                    )
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    order_no = result.get('no', '未知')
+                    await loading.edit_text(f"✅ 订单创建成功！\n订单号：{order_no}")
+                else:
+                    await loading.edit_text(f"❌ 创建失败，状态码：{response.status_code}")
+            except Exception as e:
+                logger.error(f"创建订单失败: {e}")
+                await loading.edit_text("❌ 创建失败，请稍后重试")
+            
+            # 清理用户数据
+            context.user_data.clear()
+        else:
+            await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
+    
+    elif data == "service_pay_create_web":
+        # 处理网页支付方式选择
+        user_id = update.effective_user.id
+        token = user_tokens.get(user_id)
+        if token:
+            amount = context.user_data.get('amount')
+            name = context.user_data.get('name')
+            
+            loading = await update.callback_query.edit_message_text("🔄 正在创建订单...")
+            
+            try:
+                import httpx
+                headers = {"Authorization": f"Bearer {token}"}
+                data = {"pay_way": "web", "price": amount, "name": name}
+                async with httpx.AsyncClient() as client:
+                    response = await client.post(
+                        f"{Config.API_BASE_URL}/pay/create",
+                        headers=headers,
+                        json=data,
+                        timeout=10
+                    )
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    order_no = result.get('no', '未知')
+                    pay_url = f"https://emos.best/pay/{order_no}"
+                    keyboard = [[InlineKeyboardButton("🌐 前往支付", url=pay_url)]]
+                    reply_markup = InlineKeyboardMarkup(keyboard)
+                    await loading.edit_text(f"✅ 订单创建成功！\n订单号：{order_no}", reply_markup=reply_markup)
+                else:
+                    await loading.edit_text(f"❌ 创建失败，状态码：{response.status_code}")
+            except Exception as e:
+                logger.error(f"创建订单失败: {e}")
+                await loading.edit_text("❌ 创建失败，请稍后重试")
+            
+            # 清理用户数据
+            context.user_data.clear()
+        else:
+            await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
     
     # 游戏选择回调
     elif data.startswith("service_game_select_"):

@@ -10,6 +10,12 @@ from utils.helpers import format_size
 
 logger = logging.getLogger(__name__)
 
+def to_unicode(text):
+    """将文本转换为Unicode格式"""
+    if text is None:
+        return ""
+    return str(text)
+
 async def rank_upload_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """上传量排行榜 - 左右分列版"""
     user_id = update.effective_user.id
@@ -53,7 +59,7 @@ async def rank_upload_command(update: Update, context: ContextTypes.DEFAULT_TYPE
             right_column = []
             
             for i, item in enumerate(data[:30], 1):
-                username = item.get('username', '未知用户')
+                username = to_unicode(item.get('username', '未知用户'))
                 size = item.get('size', 0)
                 size_str = format_size(size)
                 
@@ -70,7 +76,10 @@ async def rank_upload_command(update: Update, context: ContextTypes.DEFAULT_TYPE
             
             message += "```"
             
-            keyboard = [[InlineKeyboardButton("❌ 取消", callback_data="cancel_operation")]]
+            keyboard = [
+                [InlineKeyboardButton("🔙 返回排行榜菜单", callback_data="menu_rank_main")],
+                [InlineKeyboardButton("❌ 取消", callback_data="cancel_operation")]
+            ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
             await loading.edit_text(message, parse_mode="Markdown", reply_markup=reply_markup)

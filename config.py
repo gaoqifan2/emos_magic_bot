@@ -5,12 +5,19 @@ import boto3
 
 @dataclass
 class Config:
-    # Bot配置
-    BOT_TOKEN: str = "8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E"
-    BOT_USERNAME: str = "emosMagicBox_bot"
+    # 正式Bot配置
+    # BOT_TOKEN: str = "8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E"
+    # BOT_USERNAME: str = "emosMagicBox_bot"
+
+    #测试bot
+    BOT_TOKEN: str = "8269931184:AAEUOExcBkipGwTxOFbeyw-JDdXlQzD2OXs"
+    BOT_USERNAME: str = "emosCeshi_bot"
     
     # API地址
+    # 生产环境地址
     API_BASE_URL: str = "https://emos.best/api"
+    # 测试环境地址
+    # API_BASE_URL: str = "https://dev.emos.best/api"
     
     # 红包相关
     REDPACKET_CREATE_URL: str = f"{API_BASE_URL}/redPacket/create"
@@ -35,14 +42,13 @@ class Config:
 # 机器人命令菜单
 BOT_COMMANDS = [
     ("start", "开始/登录"),
-    ("menu", "打开功能菜单"),
-    ("redpocket", "创建红包"),
-    ("check_redpacket", "查询红包"),
-    ("lottery", "创建抽奖"),
-    ("lottery_cancel", "取消抽奖"),
-    ("rank_carrot", "萝卜榜"),
-    ("rank_upload", "上传榜"),
     ("playing", "正在播放"),
+    ("rank_carrot", "萝卜榜"),
+    ("redpocket", "创建红包"),
+    ("lottery", "创建抽奖"),
+    ("check_redpacket", "查询红包"),
+    ("lottery_cancel", "取消抽奖"),
+    ("rank_upload", "上传榜"),
     ("cancel", "取消操作"),
     ("help", "帮助")
 ]

@@ -5,14 +5,15 @@ import logging
 import sys
 import os
 from datetime import datetime
-from telegram import Update, BotCommand
+from telegram import Update, BotCommand, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
     CommandHandler,
     MessageHandler,
     CallbackQueryHandler,
     ConversationHandler,
-    filters
+    filters,
+    ContextTypes
 )
 
 # 确保只有一个实例运行
@@ -329,6 +330,7 @@ def main() -> None:
                     await update.message.reply_text("💸 请输入转赠萝卜数量（2-6000之间）：")
                     # 更新操作状态
                     context.user_data['current_operation'] = 'transfer_amount'
+                    return 103  # 继续等待金额输入
                 else:
                     await update.message.reply_text("❌ 请先登录！发送 /start 登录")
             
@@ -497,8 +499,272 @@ def main() -> None:
                     context.user_data.clear()
                 else:
                     await update.message.reply_text("❌ 请先登录！发送 /start 登录")
+            
+            elif operation == 'service_apply_name':
+                # 处理服务商名称输入
+                if token:
+                    # 存储服务商名称
+                    context.user_data['service_name'] = input_text
+                    # 提示用户输入服务商描述
+                    await update.message.reply_text("🏢 请输入服务商描述（200字以内）：")
+                    # 更新操作状态
+                    context.user_data['current_operation'] = 'service_apply_description'
+                else:
+                    await update.message.reply_text("❌ 请先登录！发送 /start 登录")
+            
+            elif operation == 'service_apply_description':
+                # 处理服务商描述输入
+                if token:
+                    service_name = context.user_data.get('service_name')
+                    service_description = input_text
+                    
+                    loading = await update.message.reply_text("🔄 正在申请成为服务商...")
+                    
+                    try:
+                        import httpx
+                        headers = {"Authorization": f"Bearer {token}"}
+                        data = {"name": service_name, "description": service_description}
+                        async with httpx.AsyncClient() as client:
+                            response = await client.post(
+                                f"{Config.API_BASE_URL}/pay/apply",
+                                headers=headers,
+                                json=data,
+                                timeout=10
+                            )
+                        
+                        if response.status_code == 200:
+                            await loading.edit_text("✅ 申请成功！请等待审核结果")
+                        else:
+                            await loading.edit_text(f"❌ 申请失败，状态码：{response.status_code}")
+                    except Exception as e:
+                        logger.error(f"申请成为服务商失败: {e}")
+                        await loading.edit_text("❌ 申请失败，请稍后重试")
+                    
+                    # 清理用户数据
+                    context.user_data.clear()
+                else:
+                    await update.message.reply_text("❌ 请先登录！发送 /start 登录")
+            
+            elif operation == 'service_update_name':
+                # 处理服务商名称输入
+                if token:
+                    # 存储服务商名称
+                    context.user_data['service_name'] = input_text
+                    # 提示用户输入服务商描述
+                    await update.message.reply_text("🏢 请输入服务商描述（200字以内）：")
+                    # 更新操作状态
+                    context.user_data['current_operation'] = 'service_update_description'
+                else:
+                    await update.message.reply_text("❌ 请先登录！发送 /start 登录")
+            
+            elif operation == 'service_update_description':
+                # 处理服务商描述输入
+                if token:
+                    service_name = context.user_data.get('service_name')
+                    service_description = input_text
+                    # 提示用户输入回调地址
+                    await update.message.reply_text("🏢 请输入回调地址（可为空）：")
+                    # 更新操作状态
+                    context.user_data['current_operation'] = 'service_update_notify_url'
+                    context.user_data['service_name'] = service_name
+                    context.user_data['service_description'] = service_description
+                else:
+                    await update.message.reply_text("❌ 请先登录！发送 /start 登录")
+            
+            elif operation == 'service_update_notify_url':
+                # 处理服务商回调地址输入
+                if token:
+                    service_name = context.user_data.get('service_name')
+                    service_description = context.user_data.get('service_description')
+                    service_notify_url = input_text if input_text else None
+                    
+                    loading = await update.message.reply_text("🔄 正在更新服务商信息...")
+                    
+                    try:
+                        import httpx
+                        headers = {"Authorization": f"Bearer {token}"}
+                        data = {"name": service_name, "description": service_description, "notify_url": service_notify_url}
+                        async with httpx.AsyncClient() as client:
+                            response = await client.post(
+                                f"{Config.API_BASE_URL}/pay/update",
+                                headers=headers,
+                                json=data,
+                                timeout=10
+                            )
+                        
+                        if response.status_code == 200:
+                            await loading.edit_text("✅ 更新成功！")
+                        else:
+                            await loading.edit_text(f"❌ 更新失败，状态码：{response.status_code}")
+                    except Exception as e:
+                        logger.error(f"更新服务商信息失败: {e}")
+                        await loading.edit_text("❌ 更新失败，请稍后重试")
+                    
+                    # 清理用户数据
+                    context.user_data.clear()
+                else:
+                    await update.message.reply_text("❌ 请先登录！发送 /start 登录")
+            
+            elif operation == 'service_fund_transfer_user_id':
+                # 处理转账用户ID输入
+                if token:
+                    # 存储对方用户ID
+                    context.user_data['target_user_id'] = input_text
+                    # 提示用户输入转账金额
+                    await update.message.reply_text("💸 请输入转账萝卜数量（1-50000之间）：")
+                    # 更新操作状态
+                    context.user_data['current_operation'] = 'service_fund_transfer_amount'
+                    return 107  # 继续等待金额输入
+                else:
+                    await update.message.reply_text("❌ 请先登录！发送 /start 登录")
+            
+            elif operation == 'service_fund_transfer_amount':
+                # 处理转账金额输入
+                if token:
+                    target_user_id = context.user_data.get('target_user_id')
+                    try:
+                        amount = int(input_text)
+                        if 1 <= amount <= 50000:
+                            loading = await update.message.reply_text("🔄 正在转账...")
+                            
+                            try:
+                                import httpx
+                                headers = {"Authorization": f"Bearer {token}"}
+                                data = {"user_id": target_user_id, "carrot": amount}
+                                async with httpx.AsyncClient() as client:
+                                    response = await client.post(
+                                        f"{Config.API_BASE_URL}/pay/transfer",
+                                        headers=headers,
+                                        json=data,
+                                        timeout=10
+                                    )
+                                
+                                if response.status_code == 200:
+                                    result = response.json()
+                                    deduct = result.get('deduct', 0)
+                                    carrot = result.get('carrot', 0)
+                                    await loading.edit_text(f"✅ 转账成功！\n消耗萝卜：{deduct}\n剩余萝卜：{carrot}")
+                                else:
+                                    await loading.edit_text(f"❌ 转账失败，状态码：{response.status_code}")
+                            except Exception as e:
+                                logger.error(f"转账失败: {e}")
+                                await loading.edit_text("❌ 转账失败，请稍后重试")
+                        else:
+                            await update.message.reply_text("❌ 转账金额必须在1-50000之间，请重新输入：")
+                            return 107  # 继续等待金额输入
+                    except ValueError:
+                        await update.message.reply_text("❌ 请输入有效的数字，请重新输入：")
+                        return 107  # 继续等待金额输入
+                    
+                    # 清理用户数据
+                    context.user_data.clear()
+                else:
+                    await update.message.reply_text("❌ 请先登录！发送 /start 登录")
+            
+            elif operation == 'service_pay_create_amount':
+                # 处理创建订单金额输入
+                if token:
+                    try:
+                        amount = int(input_text)
+                        if 1 <= amount <= 50000:
+                            # 提示用户输入商品名称
+                            await update.message.reply_text("💳 请输入商品名称（100字以内）：")
+                            # 更新操作状态
+                            context.user_data['current_operation'] = 'service_pay_create_name'
+                            context.user_data['amount'] = amount
+                        else:
+                            await update.message.reply_text("❌ 订单金额必须在1-50000之间，请重新输入：")
+                            return 108  # 继续等待金额输入
+                    except ValueError:
+                        await update.message.reply_text("❌ 请输入有效的数字，请重新输入：")
+                        return 108  # 继续等待金额输入
+                else:
+                    await update.message.reply_text("❌ 请先登录！发送 /start 登录")
+            
+            elif operation == 'service_pay_create_name':
+                # 处理创建订单商品名称输入
+                if token:
+                    amount = context.user_data.get('amount')
+                    name = input_text
+                    # 提示用户选择支付方式
+                    keyboard = [
+                        [InlineKeyboardButton("🤖 Telegram机器人支付", callback_data="service_pay_create_telegram_bot")],
+                        [InlineKeyboardButton("🌐 网页支付", callback_data="service_pay_create_web")]
+                    ]
+                    reply_markup = InlineKeyboardMarkup(keyboard)
+                    await update.message.reply_text("💳 请选择支付方式：", reply_markup=reply_markup)
+                    # 存储数据
+                    context.user_data['amount'] = amount
+                    context.user_data['name'] = name
+                else:
+                    await update.message.reply_text("❌ 请先登录！发送 /start 登录")
+            
+            elif operation == 'service_pay_query_no':
+                # 处理查询订单号输入
+                if token:
+                    order_no = input_text
+                    loading = await update.message.reply_text("🔄 正在查询订单...")
+                    
+                    try:
+                        import httpx
+                        headers = {"Authorization": f"Bearer {token}"}
+                        async with httpx.AsyncClient() as client:
+                            response = await client.get(
+                                f"{Config.API_BASE_URL}/pay/query?no={order_no}",
+                                headers=headers,
+                                timeout=10
+                            )
+                        
+                        if response.status_code == 200:
+                            order_info = response.json()
+                            message = f"📋 订单信息\n\n"
+                            message += f"订单号：{order_info.get('no', '未知')}\n"
+                            message += f"状态：{order_info.get('status', '未知')}\n"
+                            message += f"金额：{order_info.get('price', 0)} 萝卜\n"
+                            message += f"商品名称：{order_info.get('name', '未知')}\n"
+                            message += f"创建时间：{order_info.get('created_at', '未知')}\n"
+                            await loading.edit_text(message)
+                        else:
+                            await loading.edit_text(f"❌ 查询失败，状态码：{response.status_code}")
+                    except Exception as e:
+                        logger.error(f"查询订单失败: {e}")
+                        await loading.edit_text("❌ 查询失败，请稍后重试")
+                    
+                    # 清理用户数据
+                    context.user_data.clear()
+                else:
+                    await update.message.reply_text("❌ 请先登录！发送 /start 登录")
+            
+            elif operation == 'service_pay_close_no':
+                # 处理关闭订单号输入
+                if token:
+                    order_no = input_text
+                    loading = await update.message.reply_text("🔄 正在关闭订单...")
+                    
+                    try:
+                        import httpx
+                        headers = {"Authorization": f"Bearer {token}"}
+                        async with httpx.AsyncClient() as client:
+                            response = await client.put(
+                                f"{Config.API_BASE_URL}/pay/close?no={order_no}",
+                                headers=headers,
+                                timeout=10
+                            )
+                        
+                        if response.status_code == 200:
+                            await loading.edit_text("✅ 订单关闭成功！")
+                        else:
+                            await loading.edit_text(f"❌ 关闭失败，状态码：{response.status_code}")
+                    except Exception as e:
+                        logger.error(f"关闭订单失败: {e}")
+                        await loading.edit_text("❌ 关闭失败，请稍后重试")
+                    
+                    # 清理用户数据
+                    context.user_data.clear()
+                else:
+                    await update.message.reply_text("❌ 请先登录！发送 /start 登录")
         
-        return ConversationHandler.END
+        return
     
     # 添加用户输入处理器
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_user_input))

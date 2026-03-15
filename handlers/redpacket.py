@@ -80,7 +80,9 @@ async def redpocket_process(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return WAITING_CARROT
     
     text = update.message.text.strip()
-    logger.info(f"用户 {user_id} 发送文本: '{text}'")
+    # 不记录口令相关的日志
+    if current_step != 'password':
+        logger.info(f"用户 {user_id} 发送文本: '{text}'")
     
     keyboard = add_cancel_button([[]], show_back=True)
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -247,6 +249,7 @@ async def create_redpacket(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "file_url": data.get('cover_url')
         }
         
+        # 不记录口令相关的日志
         logger.info(f"创建红包: type={redpacket_type}, carrot={data['carrot']}, number={data['number']}")
         
         response = requests.post(
@@ -266,8 +269,9 @@ async def create_redpacket(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"👥 人数: {data['number']}\n"
                 f"💬 祝福语: {data['blessing']}\n"
             )
+            # 不显示口令，确保用户自己也不知道
             if redpacket_type == "password":
-                message += f"🔑 口令: {data['password']}\n"
+                message += "🔑 口令: ******\n"
             if data.get('cover_url'):
                 message += f"🖼️ 封面: 已上传 ✓\n"
             if result.get('red_packet_id'):

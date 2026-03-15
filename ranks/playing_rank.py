@@ -24,6 +24,12 @@ def safe_int(value, default=0):
     except:
         return default
 
+def to_unicode(text):
+    """将文本转换为Unicode格式"""
+    if text is None:
+        return ""
+    return str(text)
+
 async def playing_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """正在播放排行榜 - 修复Markdown格式"""
     user_id = update.effective_user.id
@@ -63,8 +69,8 @@ async def playing_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # 按视频标题分组
             videos = {}
             for item in data:
-                video_title = safe_str(item.get('video_title'), '未知视频')
-                uploader = safe_str(item.get('upload_pseudonym'), 'emos')
+                video_title = to_unicode(item.get('video_title', '未知视频'))
+                uploader = to_unicode(item.get('upload_pseudonym', 'emos'))
                 
                 video_key = f"{video_title}|{uploader}"
                 if video_key not in videos:
@@ -74,7 +80,7 @@ async def playing_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         'users': []
                     }
                 
-                username = safe_str(item.get('username'), '未知用户')
+                username = to_unicode(item.get('username', '未知用户'))
                 season = safe_int(item.get('season_number'), 1)
                 episode = safe_int(item.get('episode_number'), 1)
                 play_seconds = safe_int(item.get('play_seconds'), 0)
@@ -109,7 +115,10 @@ async def playing_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             message += f"总计 {video_count} 个视频正在播放"
             
-            keyboard = [[InlineKeyboardButton("❌ 取消", callback_data="cancel_operation")]]
+            keyboard = [
+                [InlineKeyboardButton("🔙 返回排行榜菜单", callback_data="menu_rank_main")],
+                [InlineKeyboardButton("❌ 取消", callback_data="cancel_operation")]
+            ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
             # 移除 parse_mode="Markdown"，使用纯文本
