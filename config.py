@@ -6,12 +6,12 @@ import boto3
 @dataclass
 class Config:
     # 正式Bot配置
-    # BOT_TOKEN: str = "8682707944:AAExhJTlXyryFaHdfu6ZgBsjiuOpX_9Jm-E"
-    # BOT_USERNAME: str = "emosMagicBox_bot"
+    BOT_TOKEN: str = "8682707944:AAGvauAZxz8BRxwFd2piaG3adi01zGQtydY"
+    BOT_USERNAME: str = "emosMagicBox_bot"
 
     #测试bot
-    BOT_TOKEN: str = "8269931184:AAEUOExcBkipGwTxOFbeyw-JDdXlQzD2OXs"
-    BOT_USERNAME: str = "emosCeshi_bot"
+    # BOT_TOKEN: str = "8269931184:AAEUOExcBkipGwTxOFbeyw-JDdXlQzD2OXs"
+    # BOT_USERNAME: str = "emosCeshi_bot"
     
     # API地址
     # 生产环境地址
@@ -36,7 +36,7 @@ class Config:
     R2_ACCESS_KEY: str = "6418f1afb056eaefe68b38294e9666a9"
     R2_SECRET_KEY: str = "9dfa529c359c8b1439c7564f0a41f03b35ae8b8b88cf59786cce43bb06e57035"
     R2_BUCKET_NAME: str = "redpacket-images"
-    R2_PUBLIC_URL: str = "https://pub-1c439b34c477a87f999a32576e8eb.r2.dev"
+    R2_PUBLIC_URL: str = "https://red.030518.xyz"
     R2_ENDPOINT: str = "https://41fcfa149618e3923fb20db2212713dd.r2.cloudflarestorage.com"
 
 # 机器人命令菜单
@@ -55,6 +55,19 @@ BOT_COMMANDS = [
 
 # 全局变量 - 存储用户token
 user_tokens = {}
+
+# 服务商token（用于为所有用户创建支付订单）
+SERVICE_PROVIDER_TOKEN = "1047_ow2NHeo3HyzDSxvl"
+
+# MySQL数据库配置
+DB_CONFIG = {
+    "host": "23.148.20.15",
+    "port": 3306,
+    "user": "root",
+    "password": "H_fans200109~",
+    "database": "game_db",
+    "charset": "utf8mb4"
+}
 
 # 初始化R2客户端
 def init_r2_client():
@@ -81,4 +94,3 @@ def init_r2_client():
 
 # 全局R2客户端
 # r2_client = init_r2_client()
-r2_client = None

@@ -58,25 +58,22 @@ async def get_lottery_cancel_id(update: Update, context: ContextTypes.DEFAULT_TY
     
     try:
         headers = {"Authorization": f"Bearer {token}"}
-        payload = {"lottery_id": lottery_id}
         
-        response = requests.post(
-            Config.LOTTERY_CANCEL_URL,
-            json=payload,
+        response = requests.put(
+            f"{Config.LOTTERY_CANCEL_URL}?lottery_id={lottery_id}",
             headers=headers,
             timeout=10
         )
         
         if response.status_code == 200:
             result = response.json()
-            if result.get("code") == 200 or result.get("success"):
+            if result.get("is_success"):
                 await loading_msg.edit_text(
                     f"✅ 抽奖取消成功！\n\n"
                     f"抽奖ID: {lottery_id}"
                 )
             else:
-                error_msg = result.get('message', '未知错误')
-                await loading_msg.edit_text(f"❌ 取消失败：{error_msg}")
+                await loading_msg.edit_text(f"❌ 取消失败：操作未成功")
         elif response.status_code == 401:
             if user_id in user_tokens:
                 del user_tokens[user_id]

@@ -43,8 +43,8 @@ async def redpocket_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message_text = (
         "🧧 创建红包\n\n"
         "💰 请输入红包总金额（萝卜）：\n"
-        "（1 - 50000 之间）\n\n"
-        "📸 提示：您可以发送图片作为红包封面，我们会自动上传到云端\n\n"
+        "（1 - 60000 之间）\n\n"
+        "📸 提示：您可以随时发送图片作为红包封面，我们会自动上传到云端\n\n"
         "💡 使用 /cancel 可以随时取消"
     )
     
@@ -90,14 +90,14 @@ async def redpocket_process(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if current_step == 'carrot':
         try:
             carrot = int(text)
-            if carrot <= 0 or carrot > 50000:
-                await update.message.reply_text("❌ 金额必须在1-50000之间，请重新输入：", reply_markup=reply_markup)
+            if carrot <= 0 or carrot > 60000:
+                await update.message.reply_text("❌ 金额必须在1-60000之间，请重新输入：", reply_markup=reply_markup)
                 return WAITING_CARROT
             redpacket_data['carrot'] = carrot
             redpacket_data['step'] = 'number'
             context.user_data['redpacket'] = redpacket_data
             await update.message.reply_text(
-                "👥 请输入可领人数：\n（1 - 1000 之间）",
+                "👥 请输入可领人数：\n（1 - 10000 之间）",
                 reply_markup=reply_markup
             )
             return WAITING_NUMBER
@@ -108,8 +108,8 @@ async def redpocket_process(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif current_step == 'number':
         try:
             number = int(text)
-            if number <= 0 or number > 1000:
-                await update.message.reply_text("❌ 人数必须在1-1000之间，请重新输入：", reply_markup=reply_markup)
+            if number <= 0 or number > 10000:
+                await update.message.reply_text("❌ 人数必须在1-10000之间，请重新输入：", reply_markup=reply_markup)
                 return WAITING_NUMBER
             redpacket_data['number'] = number
             redpacket_data['step'] = 'blessing'
@@ -142,12 +142,11 @@ async def redpocket_process(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ 登录已过期，请重新发送 /start 登录")
             return ConversationHandler.END
         
-        if text == "":
-            await update.message.reply_text("❌ 口令不能为空，请重新输入：", reply_markup=reply_markup)
-            return WAITING_PASSWORD
+        # 如果用户没有输入内容，默认设置为0（手气红包）
+        if not text.strip():
+            text = '0'
         
         redpacket_data['password'] = text
-        redpacket_data['password_text'] = text
         context.user_data['redpacket'] = redpacket_data
         
         return await create_redpacket(update, context)
@@ -172,14 +171,31 @@ async def handle_photo_upload(update: Update, context: ContextTypes.DEFAULT_TYPE
             cover_url = context.user_data['uploaded_files'][file_id]
             await loading.edit_text("✅ 使用已上传的图片！")
         else:
+            # 检查R2客户端状态
+            if not r2_client:
+                logger.error("R2客户端未初始化")
+                await loading.edit_text("❌ 图片上传服务未初始化，请稍后重试")
+                return WAITING_CARROT
+            
+            # 检查R2客户端内部状态
+            if not hasattr(r2_client, 'client') or not r2_client.client:
+                logger.error("R2客户端内部client未初始化")
+                await loading.edit_text("❌ 图片上传服务未就绪，请稍后重试")
+                return WAITING_CARROT
+            
             file = await context.bot.get_file(file_id)
             file_data = await file.download_as_bytearray()
             file_name = f"redpacket_{user_id}_{file_id}.jpg"
+            
+            logger.info(f"开始上传图片: {file_name}, 大小: {len(file_data)} bytes")
             cover_url = r2_client.upload_file(bytes(file_data), file_name, "redpacket")
+            logger.info(f"图片上传成功: {cover_url}")
+            
             context.user_data['uploaded_files'][file_id] = cover_url
             await loading.edit_text("✅ 图片上传成功！")
         
         context.user_data['redpacket']['cover_url'] = cover_url
+        # 不设置file_id_image，让它默认为null
         
         current_step = context.user_data['redpacket'].get('step', 'carrot')
         step_messages = {
@@ -195,6 +211,8 @@ async def handle_photo_upload(update: Update, context: ContextTypes.DEFAULT_TYPE
         
     except Exception as e:
         logger.error(f"上传图片失败: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         await loading.edit_text("❌ 图片上传失败，请稍后重试")
     
     step_to_state = {
@@ -229,12 +247,15 @@ async def create_redpacket(update: Update, context: ContextTypes.DEFAULT_TYPE):
     loading = await update.message.reply_text("🔄 正在创建红包...")
     
     try:
-        headers = {"Authorization": f"Bearer {token}"}
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json"
+        }
         
         # 判断红包类型：口令为0则是手气红包
         if data['password'] == '0':
             redpacket_type = "random"
-            redpacket_text = ""  # 手气红包不需要口令
+            redpacket_text = None  # 手气红包不需要口令
         else:
             redpacket_type = "password"
             redpacket_text = data['password']
@@ -245,12 +266,12 @@ async def create_redpacket(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "number": data['number'],
             "blessing": data['blessing'],
             "text": redpacket_text,
-            "file_id_image": None,
-            "file_url": data.get('cover_url')
+            "file_url": data.get('cover_url', None)
         }
         
         # 不记录口令相关的日志
         logger.info(f"创建红包: type={redpacket_type}, carrot={data['carrot']}, number={data['number']}")
+        logger.info(f"红包参数: {payload}")
         
         response = requests.post(
             Config.REDPACKET_CREATE_URL,
@@ -261,6 +282,7 @@ async def create_redpacket(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         if response.status_code == 200:
             result = response.json()
+            logger.info(f"API返回结果: {result}")
             redpacket_type_display = "🎲 手气红包" if redpacket_type == "random" else "🔐 口令红包"
             message = (
                 f"✅ 红包创建成功！\n\n"
@@ -286,9 +308,15 @@ async def create_redpacket(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await loading.edit_text(f"❌ 创建失败，状态码：{response.status_code}")
             if response.text:
                 logger.error(f"API返回: {response.text}")
+                # 处理口令重复的错误
+                if "红包口令重复" in response.text:
+                    await update.message.reply_text("❌ 红包口令重复，请重新输入新的口令：")
+                    return WAITING_PASSWORD
             
     except Exception as e:
         logger.error(f"创建红包失败: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         await loading.edit_text("❌ 创建失败，请稍后重试")
     
     # 清理数据

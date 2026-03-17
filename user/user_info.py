@@ -68,20 +68,6 @@ async def get_user_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             # 构建用户信息消息（宽体显示）
             user_id = user_data.get('user_id', '未知')
-            # 从token中提取实际的token值
-            import re
-            token = user_data.get('token', '未知')
-            # 尝试从Authorization头中提取token
-            import requests
-            try:
-                api_url = f"{Config.API_BASE_URL}/user"
-                headers = {"Authorization": f"Bearer {user_tokens.get(update.effective_user.id, '')}"}
-                response = requests.get(api_url, headers=headers, timeout=10)
-                if response.status_code == 200:
-                    # 这里我们已经有了user_data，所以不需要再次请求
-                    pass
-            except:
-                pass
             
             # 转义MarkdownV2特殊字符
             def escape_markdown(text):

@@ -2,7 +2,8 @@ import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
 from telegram.ext import ContextTypes, ConversationHandler, Application
 
-from config import Config, BOT_COMMANDS, user_tokens
+from config import Config, BOT_COMMANDS, user_tokens, SERVICE_PROVIDER_TOKEN
+from utils.db_helper import update_recharge_order_status
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +15,7 @@ async def post_init(application: Application) -> None:
     """机器人启动后执行的钩子函数"""
     commands = [BotCommand(cmd, desc) for cmd, desc in BOT_COMMANDS]
     await application.bot.set_my_commands(commands)
-    logger.info("✅ 机器人命令菜单已设置")
+    logger.info("机器人命令菜单已设置")
 
 def add_cancel_button(keyboard=None, show_back=False):
     """添加取消按钮"""
@@ -50,9 +51,285 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.info(f"用户 {user_id} 发送 /start 命令")
     
     text = update.message.text
-    if text.startswith('/start emosLinkAgree-'):
-        token = text.replace('/start emosLinkAgree-', '').strip()
+    logger.info(f"完整的start命令文本: {text}")
+    
+    # 处理OAuth回调
+    if text.startswith('/start oauth_callback'):
+        # 提取回调参数
+        callback_params = text.split('oauth_callback', 1)[1].strip()
+        logger.info(f"OAuth回调参数: {callback_params}")
+        
+        # 解析参数
+        params = {}
+        if callback_params:
+            # 移除开头的?
+            if callback_params.startswith('?'):
+                callback_params = callback_params[1:]
+            # 分割参数
+            param_pairs = callback_params.split('&')
+            for pair in param_pairs:
+                if '=' in pair:
+                    key, value = pair.split('=', 1)
+                    params[key] = value
+        
+        logger.info(f"解析后的参数: {params}")
+        
+        # 提取token
+        token = params.get('token')
+        if token:
+            logger.info(f"收到授权Token: {token}")
+            logger.info(f"Token长度: {len(token)}")
+            # Token完整性检查
+            if len(token) < 10:
+                logger.error(f"Token不完整，长度: {len(token)}")
+                await update.message.reply_text(f"❌ Token不完整，请重新尝试登录。")
+                return
+            # 确保token被完整存储
+            user_tokens[user_id] = token
+            logger.info(f"Token已存储到user_tokens: {user_tokens[user_id]}")
+            
+            # 获取用户信息
+            import requests
+            try:
+                api_url = f"{Config.API_BASE_URL}/user"
+                headers = {"Authorization": f"Bearer {token}"}
+                logger.info(f"API请求头: {headers}")
+                response = requests.get(api_url, headers=headers, timeout=10)
+                logger.info(f"API响应状态码: {response.status_code}")
+                if response.status_code == 200:
+                    user_data = response.json()
+                    logger.info(f"用户数据: {user_data}")
+                    username = user_data.get('username', '用户')
+                    user_id_api = user_data.get('user_id', '未知')
+                    
+                    # 确保用户存在于数据库中
+                    from utils.db_helper import ensure_user_exists
+                    ensure_user_exists(
+                        emos_user_id=user_id_api,
+                        token=token,
+                        username=username,
+                        first_name=update.effective_user.first_name,
+                        last_name=update.effective_user.last_name
+                    )
+                    
+                    await show_menu(update, f"✅ 授权成功！\n\n欢迎 {username} 使用综合机器人，你的ID是\n`{user_id_api}`\n\n请选择功能：")
+                else:
+                    logger.info(f"API响应内容: {response.text}")
+                    await show_menu(update, "✅ 授权成功！\n\n欢迎使用综合机器人，请选择功能：")
+            except Exception as e:
+                logger.error(f"获取用户信息失败: {e}")
+                await show_menu(update, "✅ 授权成功！\n\n欢迎使用综合机器人，请选择功能：")
+        else:
+            logger.error("OAuth回调中没有token参数")
+            await update.message.reply_text("❌ 授权失败，请重新尝试登录。")
+        return
+    # 处理用户同意授权的情况
+    elif text.startswith('/start emosLinkAgree-'):
+        # 提取完整的token，确保不会被截断
+        token = text.split('/start emosLinkAgree-', 1)[1].strip()
         logger.info(f"收到授权Token: {token}")
+        logger.info(f"Token长度: {len(token)}")
+        # Token完整性检查
+        if len(token) < 10:
+            logger.error(f"Token不完整，长度: {len(token)}")
+            await update.message.reply_text(f"❌ Token不完整，请重新尝试登录。")
+            return
+        # 确保token被完整存储
+        user_tokens[user_id] = token
+        logger.info(f"Token已存储到user_tokens: {user_tokens[user_id]}")
+        # 获取用户信息
+        import requests
+        try:
+            api_url = f"{Config.API_BASE_URL}/user"
+            headers = {"Authorization": f"Bearer {token}"}
+            logger.info(f"API请求头: {headers}")
+            response = requests.get(api_url, headers=headers, timeout=10)
+            logger.info(f"API响应状态码: {response.status_code}")
+            if response.status_code == 200:
+                user_data = response.json()
+                logger.info(f"用户数据: {user_data}")
+                username = user_data.get('username', '用户')
+                user_id_api = user_data.get('user_id', '未知')
+                
+                # 确保用户存在于数据库中
+                from utils.db_helper import ensure_user_exists
+                ensure_user_exists(
+                    emos_user_id=user_id_api,
+                    token=token,
+                    telegram_id=user_id,
+                    username=username,
+                    first_name=update.effective_user.first_name,
+                    last_name=update.effective_user.last_name
+                )
+                
+                await show_menu(update, f"✅ 授权成功！\n\n欢迎 {username} 使用综合机器人，你的ID是\n`{user_id_api}`\n\n请选择功能：")
+            else:
+                logger.info(f"API响应内容: {response.text}")
+                await show_menu(update, "✅ 授权成功！\n\n欢迎使用综合机器人，请选择功能：")
+        except Exception as e:
+            logger.error(f"获取用户信息失败: {e}")
+            await show_menu(update, "✅ 授权成功！\n\n欢迎使用综合机器人，请选择功能：")
+        return
+    # 处理用户拒绝授权的情况
+    elif text.startswith('/start emosLinkRefuse-'):
+        # 提取Telegram ID
+        telegram_id = text.split('/start emosLinkRefuse-', 1)[1].strip()
+        logger.info(f"用户 {user_id} 拒绝授权，Telegram ID: {telegram_id}")
+        await update.message.reply_text("❌ 授权已拒绝，您可以稍后重新尝试登录。")
+        return
+    # 处理支付成功回调
+    elif text.startswith('/start emosPayAgree-'):
+        # 解析回调参数：emosPayAgree-订单号-参数-TgId
+        callback_parts = text.split('/start emosPayAgree-', 1)[1].strip().split('-')
+        order_no = callback_parts[0] if len(callback_parts) > 0 else ''
+        param = callback_parts[1] if len(callback_parts) > 1 else ''
+        tg_id = callback_parts[2] if len(callback_parts) > 2 else ''
+        
+        logger.info(f"收到支付成功回调 - 订单号: {order_no}, 参数: {param}, TgId: {tg_id}")
+        
+        loading = await update.message.reply_text("🔄 正在核实订单...")
+        
+        try:
+            import httpx
+            from utils.db_helper import get_order_by_platform_no
+            
+            # 首先从本地数据库查询订单信息
+            order_info_db = get_order_by_platform_no(order_no)
+            if not order_info_db:
+                await loading.edit_text(f"❌ 找不到订单信息：{order_no}")
+                return
+            
+            local_user_id = order_info_db.get('user_id')
+            logger.info(f"订单归属用户ID: {local_user_id}")
+            
+            # 使用服务商token查询平台订单状态
+            service_headers = {"Authorization": f"Bearer {SERVICE_PROVIDER_TOKEN}"}
+            
+            # 查询订单状态
+            logger.info(f"查询订单状态: {order_no}")
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{Config.API_BASE_URL}/pay/query?no={order_no}",
+                    headers=service_headers,
+                    timeout=10
+                )
+            
+            logger.info(f"订单查询响应状态码: {response.status_code}")
+            logger.info(f"订单查询响应内容: {response.text}")
+            
+            if response.status_code == 200:
+                order_info = response.json()
+                status = order_info.get('pay_status')
+                
+                if status == 'success':
+                    # 支付成功，从本地数据库获取用户token
+                    # 需要从users表获取用户的token
+                    from utils.db_helper import get_db_connection
+                    conn = get_db_connection()
+                    user_token = None
+                    actual_user_id = None
+                    try:
+                        with conn.cursor() as cursor:
+                            cursor.execute(
+                                "SELECT id, token, telegram_id FROM users WHERE id = %s",
+                                (local_user_id,)
+                            )
+                            user_result = cursor.fetchone()
+                            if user_result:
+                                actual_user_id = user_result[0]
+                                user_token = user_result[1]
+                                user_telegram_id = user_result[2]
+                    finally:
+                        conn.close()
+                    
+                    if not user_token:
+                        await loading.edit_text("❌ 找不到用户token，请先登录")
+                        return
+                    
+                    price = order_info.get('price_order', 0)
+                    
+                    logger.info(f"支付成功，开始兑换游戏币，金额: {price}, 用户ID: {actual_user_id}")
+                    
+                    # 调用游戏充值API（使用订单归属用户的token）
+                    user_headers = {"Authorization": f"Bearer {user_token}"}
+                    game_recharge_data = {"game_id": "1", "carrot_amount": price}
+                    async with httpx.AsyncClient() as client:
+                        game_response = await client.post(
+                            f"{Config.API_BASE_URL}/game/recharge",
+                            headers=user_headers,
+                            json=game_recharge_data,
+                            timeout=10
+                        )
+                    
+                    logger.info(f"游戏充值API响应状态码: {game_response.status_code}")
+                    logger.info(f"游戏充值API响应内容: {game_response.text}")
+                    
+                    # 无论游戏充值API是否成功，只要支付成功就标记订单为成功
+                    # 计算游戏币（1萝卜=10游戏币）
+                    game_coin = price * 10
+                    
+                    # 更新本地数据库订单状态
+                    try:
+                        update_recharge_order_status(
+                            platform_order_no=order_no,
+                            status='success',
+                            game_coin_amount=game_coin
+                        )
+                    except Exception as db_error:
+                        logger.error(f"更新本地订单失败: {db_error}")
+                    
+                    if game_response.status_code == 200:
+                        game_result = game_response.json()
+                        actual_game_coin = game_result.get('game_coin', game_coin)
+                        
+                        message = f"✅ 充值成功！\n\n"
+                        message += f"订单号：{order_no}\n"
+                        message += f"支付萝卜：{price}\n"
+                        message += f"兑换游戏币：{actual_game_coin}"
+                        
+                        logger.info(f"用户 {actual_user_id} 充值成功，订单号：{order_no}")
+                    else:
+                        message = f"✅ 充值成功！\n\n"
+                        message += f"订单号：{order_no}\n"
+                        message += f"支付萝卜：{price}\n"
+                        message += f"兑换游戏币：{game_coin}\n"
+                        message += f"（系统自动计算，实际到账以平台为准）"
+                        
+                        logger.warning(f"订单 {order_no} 支付成功，但游戏币兑换API调用失败，状态码：{game_response.status_code}")
+                    
+                    await loading.edit_text(message)
+                else:
+                    await loading.edit_text(f"❌ 订单状态：{status}，支付可能未完成")
+            else:
+                await loading.edit_text(f"❌ 查询订单失败，状态码：{response.status_code}")
+        except Exception as e:
+            logger.error(f"处理支付回调失败: {e}")
+            await loading.edit_text(f"❌ 处理支付回调失败，请稍后重试\n错误：{str(e)}")
+        return
+    
+    # 处理支付失败回调
+    elif text.startswith('/start emosPayRefuse-'):
+        # 解析回调参数：emosPayRefuse-订单号-参数-TgId
+        callback_parts = text.split('/start emosPayRefuse-', 1)[1].strip().split('-')
+        order_no = callback_parts[0] if len(callback_parts) > 0 else ''
+        
+        logger.info(f"收到支付失败回调 - 订单号: {order_no}")
+        
+        await update.message.reply_text(f"❌ 支付已取消\n订单号：{order_no}")
+        return
+    
+    # 处理直接的token链接（兼容旧格式）
+    elif text.startswith('/start link_e0E446ZE6s-'):
+        # 提取完整的token，确保不会被截断
+        token = text.split('/start link_e0E446ZE6s-', 1)[1].strip()
+        logger.info(f"收到授权Token: {token}")
+        logger.info(f"Token长度: {len(token)}")
+        # Token完整性检查
+        if len(token) < 10:
+            logger.error(f"Token不完整，长度: {len(token)}")
+            await update.message.reply_text(f"❌ Token不完整，请重新尝试登录。")
+            return
+        # 确保token被完整存储
         user_tokens[user_id] = token
         # 获取用户信息
         import requests
@@ -64,6 +341,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 user_data = response.json()
                 username = user_data.get('username', '用户')
                 user_id_api = user_data.get('user_id', '未知')
+                
+                # 确保用户存在于数据库中
+                from utils.db_helper import ensure_user_exists
+                ensure_user_exists(
+                    emos_user_id=user_id_api,
+                    token=token,
+                    telegram_id=user_id,
+                    username=username,
+                    first_name=update.effective_user.first_name,
+                    last_name=update.effective_user.last_name
+                )
+                
                 await show_menu(update, f"✅ 授权成功！\n\n欢迎 {username} 使用综合机器人，你的ID是\n`{user_id_api}`\n\n请选择功能：")
             else:
                 await show_menu(update, "✅ 授权成功！\n\n欢迎使用综合机器人，请选择功能：")
@@ -100,14 +389,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             # 显示登录选项
             await show_login_options(update)
     else:
-        # 显示登录选项
+        # 显示登录选项，要求用户使用正式token登录
         await show_login_options(update)
 
 async def show_login_options(update: Update):
     """显示登录选项"""
-    auth_link = f"https://t.me/emospg_bot?start=link_e0E446ZE6s-{Config.BOT_USERNAME}"
+    # 使用开发者的emos user_id来生成登录链接
+    developer_emos_id = "e0E446ZE6s"
+    auth_link_bot = f"https://t.me/emospg_bot?start=link_{developer_emos_id}-{Config.BOT_USERNAME}"
     keyboard = [
-        [InlineKeyboardButton("🔐 一键登录", url=auth_link)],
+        [InlineKeyboardButton("🤖 机器人授权登录", url=auth_link_bot)],
         [InlineKeyboardButton("❌ 取消", callback_data="cancel_operation")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -477,6 +768,12 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data['current_operation'] = 'service_game_recharge_amount'
         context.user_data['token'] = token
         context.user_data['game_id'] = game_id
+    
+    # 处理充值取消
+    elif data == "cancel_recharge":
+        await update.callback_query.edit_message_text("✅ 充值已取消")
+        # 清理用户数据
+        context.user_data.clear()
 
 async def show_redpacket_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """红包二级菜单"""
