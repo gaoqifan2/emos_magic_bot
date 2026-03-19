@@ -196,8 +196,23 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             # 首先从本地数据库查询订单信息
             order_info_db = get_order_by_platform_no(order_no)
             if not order_info_db:
-                await loading.edit_text(f"❌ 找不到订单信息：{order_no}")
-                return
+                # 尝试在order_no字段中查询
+                from utils.db_helper import get_db_connection
+                conn = get_db_connection()
+                if conn:
+                    try:
+                        with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+                            cursor.execute(
+                                "SELECT * FROM recharge_orders WHERE order_no = %s",
+                                (order_no,)
+                            )
+                            order_info_db = cursor.fetchone()
+                    finally:
+                        conn.close()
+                
+                if not order_info_db:
+                    await loading.edit_text(f"❌ 找不到订单信息：{order_no}")
+                    return
             
             local_user_id = order_info_db.get('user_id')
             logger.info(f"订单归属用户ID: {local_user_id}")
@@ -250,22 +265,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     
                     logger.info(f"支付成功，开始兑换游戏币，金额: {price}, 用户ID: {actual_user_id}")
                     
-                    # 调用游戏充值API（使用订单归属用户的token）
-                    user_headers = {"Authorization": f"Bearer {user_token}"}
-                    game_recharge_data = {"game_id": "1", "carrot_amount": price}
-                    async with httpx.AsyncClient() as client:
-                        game_response = await client.post(
-                            f"{Config.API_BASE_URL}/game/recharge",
-                            headers=user_headers,
-                            json=game_recharge_data,
-                            timeout=10
-                        )
-                    
-                    logger.info(f"游戏充值API响应状态码: {game_response.status_code}")
-                    logger.info(f"游戏充值API响应内容: {game_response.text}")
-                    
-                    # 无论游戏充值API是否成功，只要支付成功就标记订单为成功
-                    # 计算游戏币（1萝卜=10游戏币）
+                    # 直接计算游戏币（1萝卜=10游戏币）
                     game_coin = price * 10
                     
                     # 更新本地数据库订单状态
@@ -278,26 +278,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     except Exception as db_error:
                         logger.error(f"更新本地订单失败: {db_error}")
                     
-                    if game_response.status_code == 200:
-                        game_result = game_response.json()
-                        actual_game_coin = game_result.get('game_coin', game_coin)
-                        
-                        message = f"✅ 充值成功！\n\n"
-                        message += f"订单号：{order_no}\n"
-                        message += f"支付萝卜：{price}\n"
-                        message += f"兑换游戏币：{actual_game_coin}"
-                        
-                        logger.info(f"用户 {actual_user_id} 充值成功，订单号：{order_no}")
-                    else:
-                        message = f"✅ 充值成功！\n\n"
-                        message += f"订单号：{order_no}\n"
-                        message += f"支付萝卜：{price}\n"
-                        message += f"兑换游戏币：{game_coin}\n"
-                        message += f"（系统自动计算，实际到账以平台为准）"
-                        
-                        logger.warning(f"订单 {order_no} 支付成功，但游戏币兑换API调用失败，状态码：{game_response.status_code}")
+                    message = f"✅ 充值成功！\n\n"
+                    message += f"订单号：\n```\n{order_no}\n```\n"
+                    message += f"支付萝卜：{price} 🥕\n"
+                    message += f"兑换游戏币：{game_coin} 🎮"
                     
-                    await loading.edit_text(message)
+                    logger.info(f"用户 {actual_user_id} 充值成功，订单号：{order_no}")
+                    await loading.edit_text(message, parse_mode="Markdown")
                 else:
                     await loading.edit_text(f"❌ 订单状态：{status}，支付可能未完成")
             else:
@@ -315,7 +302,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         
         logger.info(f"收到支付失败回调 - 订单号: {order_no}")
         
-        await update.message.reply_text(f"❌ 支付已取消\n订单号：{order_no}")
+        await update.message.reply_text(f"❌ 支付已取消\n订单号：\n```\n{order_no}\n```\n", parse_mode="Markdown")
         return
     
     # 处理直接的token链接（兼容旧格式）
@@ -447,7 +434,7 @@ async def show_menu(update, message_text: str):
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     # 检查消息中是否包含Markdown格式
-    has_markdown = '`' in message_text
+    has_markdown = '`' in message_text or '```' in message_text
     parse_mode = "Markdown" if has_markdown else None
     
     if isinstance(update, Update) and update.message:
@@ -703,7 +690,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if response.status_code == 200:
                     result = response.json()
                     order_no = result.get('no', '未知')
-                    await loading.edit_text(f"✅ 订单创建成功！\n订单号：{order_no}")
+                    await loading.edit_text(f"✅ 订单创建成功！\n订单号：\n```\n{order_no}\n```\n", parse_mode="Markdown")
                 else:
                     await loading.edit_text(f"❌ 创建失败，状态码：{response.status_code}")
             except Exception as e:
@@ -743,7 +730,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     pay_url = f"https://emos.best/pay/{order_no}"
                     keyboard = [[InlineKeyboardButton("🌐 前往支付", url=pay_url)]]
                     reply_markup = InlineKeyboardMarkup(keyboard)
-                    await loading.edit_text(f"✅ 订单创建成功！\n订单号：{order_no}", reply_markup=reply_markup)
+                    await loading.edit_text(f"✅ 订单创建成功！\n订单号：\n```\n{order_no}\n```\n", reply_markup=reply_markup, parse_mode="Markdown")
                 else:
                     await loading.edit_text(f"❌ 创建失败，状态码：{response.status_code}")
             except Exception as e:

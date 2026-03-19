@@ -1,8 +1,11 @@
 import logging
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes, ConversationHandler
+
+# 北京时间 UTC+8
+beijing_tz = timezone(timedelta(hours=8))
 
 from config import user_tokens, Config
 from handlers.common import add_cancel_button
@@ -30,7 +33,7 @@ async def redpocket_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['redpacket'] = {
         'user_id': user_id,
         'step': 'carrot',
-        'start_time': datetime.now().isoformat()
+        'start_time': datetime.now(beijing_tz).isoformat()
     }
     
     # 初始化上传文件缓存
@@ -277,7 +280,11 @@ async def create_redpacket(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # 不记录口令相关的日志
         logger.info(f"创建红包: type={redpacket_type}, carrot={data['carrot']}, number={data['number']}")
-        logger.info(f"红包参数: {payload}")
+        # 创建不包含口令的payload副本用于日志
+        payload_for_log = payload.copy()
+        if 'text' in payload_for_log:
+            payload_for_log['text'] = '******'  # 隐藏口令
+        logger.info(f"红包参数: {payload_for_log}")
         
         response = requests.post(
             Config.REDPACKET_CREATE_URL,
@@ -288,7 +295,11 @@ async def create_redpacket(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         if response.status_code == 200:
             result = response.json()
-            logger.info(f"API返回结果: {result}")
+            # 创建不包含口令的result副本用于日志
+            result_for_log = result.copy()
+            if 'text' in result_for_log:
+                result_for_log['text'] = '******'  # 隐藏口令
+            logger.info(f"API返回结果: {result_for_log}")
             redpacket_type_display = "🎲 手气红包" if redpacket_type == "random" else "🔐 口令红包"
             message = (
                 f"✅ 红包创建成功！\n\n"

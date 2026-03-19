@@ -69,25 +69,16 @@ async def get_user_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # 构建用户信息消息（宽体显示）
             user_id = user_data.get('user_id', '未知')
             
-            # 转义MarkdownV2特殊字符
-            def escape_markdown(text):
-                if not text:
-                    return text
-                special_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
-                for char in special_chars:
-                    text = text.replace(char, f'\\{char}')
-                return text
-            
-            # 获取并转义各个字段
-            username = escape_markdown(str(user_data.get('username', '未知')))
+            # 获取各个字段
+            username = str(user_data.get('username', '未知'))
             token = user_tokens.get(update.effective_user.id, '未知')
-            emya_password = escape_markdown(str(user_data.get('emya_password', '未知')))
-            emya_url = escape_markdown(str(user_data.get('emya_url', '未知')))
-            pseudonym = escape_markdown(str(user_data.get('pseudonym', '未设置')))
+            emya_password = str(user_data.get('emya_password', '未知'))
+            emya_url = str(user_data.get('emya_url', '未知'))
+            pseudonym = str(user_data.get('pseudonym', '未设置'))
             
             message = (
                 f"📋 个人信息\n\n"
-                f"👤 用户名：{username}\n\n"
+                f"👤 用户名：`{username}`\n\n"
                 f"🔑 Token：\n```\n{token}\n```\n\n"
                 f"🆔 ID：```\n{user_id}\n```\n\n"
                 f"🎭 笔名：{pseudonym}\n\n"
@@ -95,8 +86,8 @@ async def get_user_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"📤 上传总量：{size_display}\n\n"
                 f"🎁 邀请剩余：{user_data.get('invite_remaining', 0)}\n\n"
                 f"🎬 片单剩余：{user_data.get('watch_slot_remaining', 0)}\n\n"
-                f"🔐 Emby密码：{emya_password}\n\n"
-                f"🚪 Emby地址：{emya_url}\n"
+                f"🔐 Emby密码：`{emya_password}`\n\n"
+                f"🚪 Emby地址：`{emya_url}`\n"
             )
             
             # 显示签到信息

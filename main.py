@@ -4,10 +4,13 @@
 import logging
 import sys
 import os
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 # 兼容 Python 3.12+，替换已被移除的 imghdr 模块
 sys.modules['imghdr'] = __import__('utils.imghdr_compat')
+
+# 北京时间 UTC+8
+beijing_tz = timezone(timedelta(hours=8))
 
 from telegram import Update, BotCommand, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -102,7 +105,7 @@ if not os.path.exists('logs'):
     os.makedirs('logs')
 
 # 生成日志文件名
-log_filename = f"logs/bot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+log_filename = f"logs/bot_{datetime.now(beijing_tz).strftime('%Y%m%d_%H%M%S')}.log"
 
 # 设置日志
 logging.basicConfig(
@@ -461,7 +464,7 @@ def main() -> None:
                                                 
                                                 if local_user_id:
                                                     # 生成本地订单号
-                                                    local_order_no = f"R{datetime.now().strftime('%Y%m%d')}{str(uuid.uuid4())[:8].upper()}"
+                                                    local_order_no = f"R{datetime.now(beijing_tz).strftime('%Y%m%d')}{str(uuid.uuid4())[:8].upper()}"
                                                     
                                                     # 解析过期时间
                                                     expire_time = None
@@ -494,9 +497,9 @@ def main() -> None:
                                         }
                                         
                                         message = f"📋 充值订单已创建\n\n"
-                                        message += f"订单号：{order_no}\n"
-                                        message += f"充值金额：{amount} 萝卜\n"
-                                        message += f"预计兑换：{amount * 10} 游戏币\n"
+                                        message += f"订单号：\n```\n{order_no}\n```\n"
+                                        message += f"充值金额：{amount} 🥕\n"
+                                        message += f"预计兑换：{amount * 10} 🎮\n"
                                         message += f"过期时间：{expired}\n\n"
                                         message += "请点击下方按钮完成支付："
                                         
@@ -505,7 +508,7 @@ def main() -> None:
                                             [InlineKeyboardButton("❌ 取消", callback_data="cancel_recharge")]
                                         ]
                                         reply_markup = InlineKeyboardMarkup(keyboard)
-                                        await loading.edit_text(message, reply_markup=reply_markup)
+                                        await loading.edit_text(message, reply_markup=reply_markup, parse_mode="Markdown")
                                     else:
                                         await loading.edit_text("❌ 创建订单失败，没有返回支付链接")
                                 else:
@@ -523,15 +526,21 @@ def main() -> None:
                     await update.message.reply_text("❌ 请先登录！发送 /start 登录")
             
             elif operation == 'service_withdraw_amount':
-                # 处理提现金额输入
+                # 处理提现萝卜数量输入
                 if token:
                     try:
-                        amount = int(input_text)
+                        carrot_amount = int(input_text)
                         game_balance = context.user_data.get('game_balance', 0)
                         local_user_id = context.user_data.get('local_user_id')
                         user_id = update.effective_user.id
                         
-                        if 10 <= amount <= 50000 and amount % 10 == 0 and amount <= game_balance:
+                        # 计算需要的游戏币数量（10游戏币=1萝卜）
+                        # 10%手续费
+                        base_game_coin = carrot_amount * 10
+                        fee_game_coin = int(base_game_coin * 0.1)
+                        amount = base_game_coin + fee_game_coin
+                        
+                        if 1 <= carrot_amount <= 5000 and amount <= game_balance:
                             loading = await update.message.reply_text("🔄 正在处理提现...")
                             
                             try:
@@ -541,10 +550,10 @@ def main() -> None:
                                 from utils.db_helper import create_withdraw_order, update_withdraw_order_status
                                 
                                 # 生成提现订单号
-                                order_no = f"W{datetime.now().strftime('%Y%m%d')}{str(uuid.uuid4())[:8].upper()}"
+                                order_no = f"W{datetime.now(beijing_tz).strftime('%Y%m%d')}{str(uuid.uuid4())[:8].upper()}"
                                 
                                 # 1. 创建提现订单
-                                carrot_amount = amount  # 1游戏币=1萝卜
+                                # 手续费已从游戏币中扣除，萝卜数量保持不变
                                 create_withdraw_order(
                                     order_no=order_no,
                                     user_id=local_user_id,
@@ -553,29 +562,9 @@ def main() -> None:
                                     carrot_amount=carrot_amount
                                 )
                                 
-                                # 2. 尝试调用游戏提现API扣除游戏币
-                                game_success = False
-                                try:
-                                    game_headers = {"Authorization": f"Bearer {token}"}
-                                    game_data = {"game_coin_amount": amount}
-                                    async with httpx.AsyncClient() as client:
-                                        game_response = await client.post(
-                                            f"{Config.API_BASE_URL}/game/withdraw",
-                                            headers=game_headers,
-                                            json=game_data,
-                                            timeout=10
-                                        )
-                                    
-                                    if game_response.status_code == 200:
-                                        game_success = True
-                                    else:
-                                        # API不存在或失败，使用本地数据库扣除游戏币
-                                        logger.warning(f"游戏提现API调用失败，状态码：{game_response.status_code}，使用本地数据库扣除游戏币")
-                                        game_success = True  # 即使API失败，也继续执行
-                                except Exception as e:
-                                    # API调用失败，使用本地数据库扣除游戏币
-                                    logger.warning(f"游戏提现API调用异常：{str(e)}，使用本地数据库扣除游戏币")
-                                    game_success = True  # 即使API失败，也继续执行
+                                # 直接使用本地数据库扣除游戏币（withdraw API不存在）
+                                game_success = True
+                                logger.info(f"使用本地数据库扣除游戏币：{amount}")
                                 
                                 if game_success:
                                     # 3. 使用服务商token给用户转账萝卜
@@ -609,9 +598,11 @@ def main() -> None:
                                                 update_withdraw_order_status(
                                                     order_no=order_no,
                                                     status='success',
-                                                    transfer_result=f"转账成功，金额：{carrot_amount}萝卜"
+                                                    transfer_result=f"转账成功，金额：{carrot_amount}萝卜，手续费：{fee_game_coin}游戏币"
                                                 )
-                                                await loading.edit_text(f"✅ 提现成功！\n\n订单号：{order_no}\n游戏币扣除：{amount}\n兑换萝卜：{carrot_amount}\n已转入您的账号")
+                                                # 计算剩余游戏币余额
+                                                remaining_balance = game_balance - amount
+                                                await loading.edit_text(f"✅ 提现成功！\n\n订单号：\n```\n{order_no}\n```\n🎮 游戏币扣除：{amount}\n🥕 兑换萝卜：{carrot_amount}\n💸 手续费：{fee_game_coin}游戏币\n💰 实际到账：{carrot_amount}萝卜\n🎮 剩余游戏币：{remaining_balance}\n已转入您的账号", parse_mode="Markdown")
                                             else:
                                                 # 更新提现订单状态为失败
                                                 update_withdraw_order_status(
@@ -619,7 +610,7 @@ def main() -> None:
                                                     status='failed',
                                                     transfer_result=f"转账失败，状态码：{transfer_response.status_code}"
                                                 )
-                                                await loading.edit_text(f"❌ 转账失败，状态码：{transfer_response.status_code}\n订单号：{order_no}")
+                                                await loading.edit_text(f"❌ 转账失败，状态码：{transfer_response.status_code}\n订单号：\n```\n{order_no}\n```\n", parse_mode="Markdown")
                                         else:
                                             # 更新提现订单状态为失败
                                             update_withdraw_order_status(
@@ -627,7 +618,7 @@ def main() -> None:
                                                 status='failed',
                                                 transfer_result="获取用户信息失败"
                                             )
-                                            await loading.edit_text(f"❌ 获取用户信息失败\n订单号：{order_no}")
+                                            await loading.edit_text(f"❌ 获取用户信息失败\n订单号：\n```\n{order_no}\n```\n", parse_mode="Markdown")
                                     else:
                                         # 更新提现订单状态为失败
                                         update_withdraw_order_status(
@@ -635,7 +626,7 @@ def main() -> None:
                                             status='failed',
                                             transfer_result=f"获取用户信息失败，状态码：{user_response.status_code}"
                                         )
-                                        await loading.edit_text(f"❌ 获取用户信息失败，状态码：{user_response.status_code}\n订单号：{order_no}")
+                                        await loading.edit_text(f"❌ 获取用户信息失败，状态码：{user_response.status_code}\n订单号：\n```\n{order_no}\n```\n", parse_mode="Markdown")
                                 else:
                                     # 更新提现订单状态为失败
                                     update_withdraw_order_status(
@@ -643,7 +634,7 @@ def main() -> None:
                                         status='failed',
                                         transfer_result=f"游戏币扣除失败，状态码：{game_response.status_code}"
                                     )
-                                    await loading.edit_text(f"❌ 游戏币扣除失败，状态码：{game_response.status_code}\n订单号：{order_no}")
+                                    await loading.edit_text(f"❌ 游戏币扣除失败，状态码：{game_response.status_code}\n订单号：\n```\n{order_no}\n```\n", parse_mode="Markdown")
                             except Exception as e:
                                 logger.error(f"提现失败: {e}")
                                 # 更新提现订单状态为失败
@@ -652,13 +643,14 @@ def main() -> None:
                                     status='failed',
                                     transfer_result=f"提现失败：{str(e)}"
                                 )
-                                await loading.edit_text(f"❌ 提现失败，请稍后重试\n错误：{str(e)}\n订单号：{order_no}")
+                                await loading.edit_text(f"❌ 提现失败，请稍后重试\n错误：{str(e)}\n订单号：\n```\n{order_no}\n```\n", parse_mode="Markdown")
                         else:
                             if amount > game_balance:
-                                await update.message.reply_text(f"❌ 提现金额不能超过游戏余额（{game_balance}游戏币），请重新输入：")
+                                max_carrot = game_balance // 10
+                                await update.message.reply_text(f"❌ 提现萝卜数不能超过可兑换上限（{max_carrot}萝卜），请重新输入：")
                             else:
-                                await update.message.reply_text("❌ 提现金额必须在10-50000之间且为10的倍数，请重新输入：")
-                            return 105  # 继续等待金额输入
+                                await update.message.reply_text("❌ 提现萝卜数量必须在1-5000之间，请重新输入：")
+                            return 104  # 继续等待金额输入
                     except ValueError:
                         await update.message.reply_text("❌ 请输入有效的数字，请重新输入：")
                         return 105  # 继续等待金额输入
@@ -925,15 +917,49 @@ def main() -> None:
                                 timeout=10
                             )
                         
+                        logger.info(f"订单查询响应状态码: {response.status_code}")
+                        logger.info(f"订单查询响应内容: {response.text}")
+                        
                         if response.status_code == 200:
                             order_info = response.json()
                             message = f"📋 订单信息\n\n"
                             message += f"订单号：{order_info.get('no', '未知')}\n"
-                            message += f"状态：{order_info.get('status', '未知')}\n"
-                            message += f"金额：{order_info.get('price', 0)} 萝卜\n"
-                            message += f"商品名称：{order_info.get('name', '未知')}\n"
-                            message += f"创建时间：{order_info.get('created_at', '未知')}\n"
+                            message += f"状态：{order_info.get('pay_status', '未知')}\n"
+                            message += f"金额：{order_info.get('price_order', 0)} 萝卜\n"
+                            message += f"商品名称：{order_info.get('order_name', '未知')}\n"
+                            message += f"支付时间：{order_info.get('time_payed', '未知')}\n"
                             await loading.edit_text(message)
+                        elif response.status_code == 404:
+                            # 订单不存在，先检查本地数据库
+                            from utils.db_helper import get_order_by_platform_no
+                            order_info_db = get_order_by_platform_no(order_no)
+                            if not order_info_db:
+                                # 尝试在order_no字段中查询
+                                from utils.db_helper import get_db_connection
+                                conn = get_db_connection()
+                                if conn:
+                                    try:
+                                        import pymysql
+                                        with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+                                            cursor.execute(
+                                                "SELECT * FROM recharge_orders WHERE order_no = %s",
+                                                (order_no,)
+                                            )
+                                            order_info_db = cursor.fetchone()
+                                    finally:
+                                        conn.close()
+                                
+                            if order_info_db:
+                                message = f"📋 本地订单信息\n\n"
+                                message += f"订单号：{order_info_db.get('order_no')}\n"
+                                message += f"平台订单号：{order_info_db.get('platform_order_no', '未知')}\n"
+                                message += f"状态：{order_info_db.get('status')}\n"
+                                message += f"萝卜数量：{order_info_db.get('carrot_amount')}\n"
+                                message += f"游戏币数量：{order_info_db.get('game_coin_amount')}\n"
+                                message += f"创建时间：{order_info_db.get('created_at')}\n"
+                                await loading.edit_text(message)
+                            else:
+                                await loading.edit_text("❌ 订单不存在，请检查订单号是否正确")
                         else:
                             await loading.edit_text(f"❌ 查询失败，状态码：{response.status_code}")
                     except Exception as e:

@@ -13,4 +13,8 @@ env/
 
 # IDE 配置
 .vscode/
-.idea/
+.idea/"__pycache__/" 
+"*.pyc" 
+"bot.lock" 
+".env" 
+"logs/" 

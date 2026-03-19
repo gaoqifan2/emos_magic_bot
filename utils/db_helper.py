@@ -52,7 +52,7 @@ def ensure_user_exists(emos_user_id: str, token: str, telegram_id: Optional[int]
                 
                 # 创建余额记录
                 cursor.execute(
-                    "INSERT INTO balances (user_id, balance) VALUES (%s, 10000)",
+                    "INSERT INTO balances (user_id, balance) VALUES (%s, 0)",
                     (user_id,)
                 )
                 

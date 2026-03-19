@@ -387,8 +387,34 @@ async def service_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
         game_balance = get_user_balance(local_user_id)
         
         if game_balance is not None:
-            # 提示用户输入提现金额
-            await loading.edit_text(f"💎 您的游戏余额：{game_balance} 游戏币\n\n请输入提现金额（10-50000游戏币，必须是10的倍数）：")
+            # 计算最大可提现萝卜数
+            max_carrot = game_balance // 11  # 11游戏币=1萝卜（包含10%手续费）
+            if max_carrot > 0:
+                base_game_coin = max_carrot * 10
+                fee_game_coin = int(base_game_coin * 0.1)
+                total_game_coin = base_game_coin + fee_game_coin
+            else:
+                base_game_coin = 0
+                fee_game_coin = 0
+                total_game_coin = 0
+            
+            # 计算建议提现萝卜数
+            suggested_carrots = [10, 50, 100, 500]
+            valid_suggestions = [carrot for carrot in suggested_carrots if carrot <= max_carrot]
+            
+            # 提示用户输入提现萝卜数
+            message = f"💎 您的游戏余额：{game_balance} 游戏币\n"
+            message += f"💰 可兑换萝卜：{max_carrot} 萝卜\n"
+            message += f"💸 手续费：{fee_game_coin} 游戏币\n"
+            message += f"🎮 总计扣除：{total_game_coin} 游戏币\n"
+            message += f"🎁 实际到账：{max_carrot} 萝卜\n\n"
+            message += "请输入提现萝卜数量（1-5000萝卜）："
+            
+            if valid_suggestions:
+                message += "\n💡 建议金额："
+                message += ", ".join(map(str, valid_suggestions))
+            
+            await loading.edit_text(message)
             
             # 存储当前状态，等待用户输入
             context.user_data['current_operation'] = 'service_withdraw_amount'
@@ -459,7 +485,9 @@ async def create_recharge_order(user_id, carrot_amount, game_id="1"):
     """
     try:
         # 生成唯一订单号
-        order_no = f"R{datetime.now().strftime('%Y%m%d')}{str(uuid.uuid4())[:8].upper()}"
+        from datetime import datetime, timedelta, timezone
+        beijing_tz = timezone(timedelta(hours=8))
+        order_no = f"R{datetime.now(beijing_tz).strftime('%Y%m%d')}{str(uuid.uuid4())[:8].upper()}"
         
         # 调用平台API
         token = user_tokens.get(user_id)
@@ -505,7 +533,9 @@ async def process_withdraw_order(user_id, game_coin_amount):
     """
     try:
         # 生成提现订单号
-        order_no = f"W{datetime.now().strftime('%Y%m%d')}{str(uuid.uuid4())[:8].upper()}"
+        from datetime import datetime, timedelta, timezone
+        beijing_tz = timezone(timedelta(hours=8))
+        order_no = f"W{datetime.now(beijing_tz).strftime('%Y%m%d')}{str(uuid.uuid4())[:8].upper()}"
         
         # 调用转账API
         token = user_tokens.get(user_id)
@@ -513,8 +543,8 @@ async def process_withdraw_order(user_id, game_coin_amount):
             return {"success": False, "error": "用户未登录"}
         
         headers = {"Authorization": f"Bearer {token}"}
-        # 假设1游戏币=1萝卜
-        carrot_amount = game_coin_amount
+        # 10游戏币=1萝卜
+        carrot_amount = game_coin_amount // 10
         data = {"user_id": user_id, "carrot": carrot_amount}
         
         async with httpx.AsyncClient() as client:

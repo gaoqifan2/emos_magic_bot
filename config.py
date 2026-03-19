@@ -6,12 +6,12 @@ import boto3
 @dataclass
 class Config:
     # 正式Bot配置
-    BOT_TOKEN: str = "8682707944:AAGvauAZxz8BRxwFd2piaG3adi01zGQtydY"
-    BOT_USERNAME: str = "emosMagicBox_bot"
+    # BOT_TOKEN: str = "8682707944:AAGvauAZxz8BRxwFd2piaG3adi01zGQtydY"
+    # BOT_USERNAME: str = "emosMagicBox_bot"
 
     #测试bot
-    # BOT_TOKEN: str = "8269931184:AAEUOExcBkipGwTxOFbeyw-JDdXlQzD2OXs"
-    # BOT_USERNAME: str = "emosCeshi_bot"
+    BOT_TOKEN: str = "8714100893:AAFxkl8zL2bpdNzgEBJ9fIseNsAG8D-mSjI"
+    BOT_USERNAME: str = "emosCheShiBox_bot"
     
     # API地址
     # 生产环境地址
@@ -61,11 +61,11 @@ SERVICE_PROVIDER_TOKEN = "1047_ow2NHeo3HyzDSxvl"
 
 # MySQL数据库配置
 DB_CONFIG = {
-    "host": "23.148.20.15",
+    "host": "66.235.105.125",
     "port": 3306,
     "user": "root",
     "password": "H_fans200109~",
-    "database": "game_db",
+    "database": "game_db_test",
     "charset": "utf8mb4"
 }
 
