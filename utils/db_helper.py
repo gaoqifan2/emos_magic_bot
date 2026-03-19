@@ -30,7 +30,10 @@ def ensure_user_exists(emos_user_id: str, token: str, telegram_id: Optional[int]
     try:
         with conn.cursor() as cursor:
             # 检查用户是否存在
-            cursor.execute("SELECT id FROM users WHERE user_id = %s OR telegram_id = %s", (emos_user_id, telegram_id))
+            if telegram_id:
+                cursor.execute("SELECT id FROM users WHERE user_id = %s OR telegram_id = %s", (emos_user_id, telegram_id))
+            else:
+                cursor.execute("SELECT id FROM users WHERE user_id = %s", (emos_user_id,))
             result = cursor.fetchone()
             
             if result:
@@ -69,29 +72,38 @@ def create_recharge_order(order_no: str, local_user_id: int, telegram_user_id: i
                          carrot_amount: int, platform_order_no: Optional[str] = None,
                          pay_url: Optional[str] = None, expire_time: Optional[datetime] = None) -> bool:
     """创建充值订单"""
+    logger.info(f"开始创建充值订单: order_no={order_no}, platform_order_no={platform_order_no}")
     conn = get_db_connection()
     if not conn:
+        logger.error("数据库连接失败")
         return False
     
     try:
         with conn.cursor() as cursor:
+            logger.info(f"执行SQL插入: order_no={order_no}, platform_order_no={platform_order_no}, user_id={local_user_id}")
             cursor.execute(
                 """INSERT INTO recharge_orders 
                    (order_no, user_id, telegram_user_id, carrot_amount, game_coin_amount, 
-                    status, platform_order_no, pay_url, expire_time)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                    status, platform_order_no, pay_url, expire_time, created_at, updated_at)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())""",
                 (order_no, local_user_id, telegram_user_id, carrot_amount, 
                  carrot_amount * 10, 'pending', platform_order_no, pay_url, expire_time)
             )
+            logger.info(f"SQL执行成功，影响行数: {cursor.rowcount}")
             conn.commit()
-            logger.info(f"充值订单已创建: {order_no}")
+            logger.info(f"事务提交成功")
+            logger.info(f"充值订单已创建: {order_no}, platform_order_no={platform_order_no}")
             return True
     except Exception as e:
         logger.error(f"创建充值订单失败: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         conn.rollback()
         return False
     finally:
-        conn.close()
+        if conn:
+            conn.close()
+            logger.info("数据库连接已关闭")
 
 def update_recharge_order_status(platform_order_no: str, status: str, 
                                 game_coin_amount: Optional[int] = None) -> bool:
@@ -169,22 +181,34 @@ def get_user_by_telegram_id(telegram_user_id: int) -> Optional[Dict[str, Any]]:
 
 def get_order_by_platform_no(platform_order_no: str) -> Optional[Dict[str, Any]]:
     """根据平台订单号获取订单信息"""
+    logger.info(f"开始查询订单: platform_order_no={platform_order_no}")
     conn = get_db_connection()
     if not conn:
+        logger.error("数据库连接失败")
         return None
     
     try:
         with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+            logger.info(f"执行SQL查询: SELECT * FROM recharge_orders WHERE platform_order_no = '{platform_order_no}'")
             cursor.execute(
                 "SELECT * FROM recharge_orders WHERE platform_order_no = %s",
                 (platform_order_no,)
             )
-            return cursor.fetchone()
+            result = cursor.fetchone()
+            if result:
+                logger.info(f"✅ 订单找到: {result}")
+            else:
+                logger.info(f"❌ 订单未找到: platform_order_no={platform_order_no}")
+            return result
     except Exception as e:
         logger.error(f"查询订单失败: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         return None
     finally:
-        conn.close()
+        if conn:
+            conn.close()
+            logger.info("数据库连接已关闭")
 
 def get_pending_orders() -> list:
     """获取所有待处理订单"""

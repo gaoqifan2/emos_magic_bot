@@ -1,4 +1,5 @@
 import logging
+import pymysql
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
 from telegram.ext import ContextTypes, ConversationHandler, Application
 
@@ -104,13 +105,15 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     
                     # 确保用户存在于数据库中
                     from utils.db_helper import ensure_user_exists
-                    ensure_user_exists(
+                    local_user_id = ensure_user_exists(
                         emos_user_id=user_id_api,
                         token=token,
+                        telegram_id=user_id,
                         username=username,
                         first_name=update.effective_user.first_name,
                         last_name=update.effective_user.last_name
                     )
+                    logger.info(f"用户 {user_id} 数据库操作结果: local_user_id={local_user_id}")
                     
                     await show_menu(update, f"✅ 授权成功！\n\n欢迎 {username} 使用综合机器人，你的ID是\n`{user_id_api}`\n\n请选择功能：")
                 else:
@@ -153,7 +156,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 
                 # 确保用户存在于数据库中
                 from utils.db_helper import ensure_user_exists
-                ensure_user_exists(
+                local_user_id = ensure_user_exists(
                     emos_user_id=user_id_api,
                     token=token,
                     telegram_id=user_id,
@@ -161,6 +164,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     first_name=update.effective_user.first_name,
                     last_name=update.effective_user.last_name
                 )
+                logger.info(f"用户 {user_id} 数据库操作结果: local_user_id={local_user_id}")
                 
                 await show_menu(update, f"✅ 授权成功！\n\n欢迎 {username} 使用综合机器人，你的ID是\n`{user_id_api}`\n\n请选择功能：")
             else:
@@ -331,7 +335,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 
                 # 确保用户存在于数据库中
                 from utils.db_helper import ensure_user_exists
-                ensure_user_exists(
+                local_user_id = ensure_user_exists(
                     emos_user_id=user_id_api,
                     token=token,
                     telegram_id=user_id,
@@ -339,6 +343,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     first_name=update.effective_user.first_name,
                     last_name=update.effective_user.last_name
                 )
+                logger.info(f"用户 {user_id} 数据库操作结果: local_user_id={local_user_id}")
                 
                 await show_menu(update, f"✅ 授权成功！\n\n欢迎 {username} 使用综合机器人，你的ID是\n`{user_id_api}`\n\n请选择功能：")
             else:
@@ -360,6 +365,19 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 user_data = response.json()
                 username = user_data.get('username', '用户')
                 user_id_api = user_data.get('user_id', '未知')
+                
+                # 确保用户存在于数据库中并更新信息
+                from utils.db_helper import ensure_user_exists
+                local_user_id = ensure_user_exists(
+                    emos_user_id=user_id_api,
+                    token=token,
+                    telegram_id=user_id,
+                    username=username,
+                    first_name=update.effective_user.first_name,
+                    last_name=update.effective_user.last_name
+                )
+                logger.info(f"用户 {user_id} 数据库操作结果: local_user_id={local_user_id}")
+                
                 await show_menu(update, f"👋 欢迎回来 {username}！\n\n你的ID是\n`{user_id_api}`\n\n请选择功能：")
             else:
                 # token可能已过期，提示用户重新登录

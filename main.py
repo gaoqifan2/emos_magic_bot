@@ -471,11 +471,12 @@ def main() -> None:
                                                     if expired:
                                                         try:
                                                             expire_time = datetime.strptime(expired, '%Y-%m-%d %H:%M:%S')
-                                                        except:
-                                                            pass
+                                                        except Exception as e:
+                                                            logger.error(f"解析过期时间失败: {e}")
                                                     
                                                     # 保存订单到本地数据库
-                                                    create_recharge_order(
+                                                    logger.info(f"开始创建充值订单: local_order_no={local_order_no}, platform_order_no={order_no}, local_user_id={local_user_id}")
+                                                    success = create_recharge_order(
                                                         order_no=local_order_no,
                                                         local_user_id=local_user_id,
                                                         telegram_user_id=user_id,
@@ -484,7 +485,10 @@ def main() -> None:
                                                         pay_url=pay_url,
                                                         expire_time=expire_time
                                                     )
-                                                    logger.info(f"订单已保存到本地数据库: {local_order_no}")
+                                                    if success:
+                                                        logger.info(f"订单已保存到本地数据库: {local_order_no}")
+                                                    else:
+                                                        logger.error(f"订单保存到本地数据库失败: {local_order_no}")
                                         except Exception as db_error:
                                             logger.error(f"保存订单到本地数据库失败: {db_error}")
                                         
