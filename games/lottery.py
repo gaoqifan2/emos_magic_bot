@@ -1,7 +1,7 @@
 # games/lottery.py
 import logging
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
 
@@ -78,14 +78,16 @@ async def lottery_process(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         lottery_data['name'] = text
         lottery_data['description'] = ""  # 默认空描述
         
-        # 自动设置开始时间为当前时间
-        now = datetime.now()
+        # 自动设置开始时间为当前北京时间
+        # 北京时间 UTC+8
+        beijing_tz = timezone(timedelta(hours=8))
+        now = datetime.now(beijing_tz)
         lottery_data['time_start'] = now.strftime("%Y-%m-%d %H:%M:%S")
         
         lottery_data['step'] = 'end'
         context.user_data['lottery'] = lottery_data
         
-        # 计算不同时长的结束时间
+        # 计算不同时长的结束时间（北京时间）
         end_1h = (now + timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
         end_1d = (now + timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
         end_7d = (now + timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S")
@@ -317,13 +319,16 @@ async def handle_end_time_choice(update: Update, context: ContextTypes.DEFAULT_T
         keyboard = add_cancel_button([[]], show_back=True)
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        now = datetime.now()
+        # 北京时间 UTC+8
+        beijing_tz = timezone(timedelta(hours=8))
+        now = datetime.now(beijing_tz)
         default_end = (now + timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
         await query.edit_message_text(
-            f"⏰ 请输入结束时间\n"
-            f"格式：`YYYY-MM-DD HH:MM:SS`\n"
+            "⏰ 请输入结束时间\n"
+            "格式：`YYYY-MM-DD HH:MM:SS`\n"
             f"例如：`{default_end}`\n\n"
-            f"开始时间：`{lottery_data['time_start']}`",
+            f"开始时间：`{lottery_data['time_start']}`\n\n"
+            "💡 请输入北京时间",
             reply_markup=reply_markup,
             parse_mode="Markdown"
         )

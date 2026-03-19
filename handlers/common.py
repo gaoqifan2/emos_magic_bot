@@ -958,8 +958,10 @@ async def handle_back_to_previous(update: Update, context: ContextTypes.DEFAULT_
                 # 显示上一步的提示信息
                 if previous_step == 'end':
                     # 显示结束时间选择按钮
-                    from datetime import datetime, timedelta
-                    now = datetime.now()
+                    from datetime import datetime, timedelta, timezone
+                    # 北京时间 UTC+8
+                    beijing_tz = timezone(timedelta(hours=8))
+                    now = datetime.now(beijing_tz)
                     end_1h = (now + timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
                     end_1d = (now + timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
                     end_7d = (now + timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S")
