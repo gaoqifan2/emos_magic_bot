@@ -336,7 +336,17 @@ async def handle_end_time_choice(update: Update, context: ContextTypes.DEFAULT_T
     elif data.startswith("end_time_"):
         # 快捷时间选择
         # 解析时间：end_time_1h_2023-12-01 12:00:00
-        end_time = data.split('_', 2)[2]
+        # 正确解析时间，去掉前缀
+        if data.startswith("end_time_1h_"):
+            end_time = data.split("end_time_1h_", 1)[1]
+        elif data.startswith("end_time_1d_"):
+            end_time = data.split("end_time_1d_", 1)[1]
+        elif data.startswith("end_time_7d_"):
+            end_time = data.split("end_time_7d_", 1)[1]
+        else:
+            # 安全处理
+            end_time = data.split('_', 2)[2]
+        
         lottery_data['time_end'] = end_time
         lottery_data['step'] = 'amount'
         context.user_data['lottery'] = lottery_data
