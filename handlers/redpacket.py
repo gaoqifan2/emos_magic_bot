@@ -97,7 +97,9 @@ async def redpocket_process(update: Update, context: ContextTypes.DEFAULT_TYPE):
             redpacket_data['step'] = 'number'
             context.user_data['redpacket'] = redpacket_data
             await update.message.reply_text(
-                "👥 请输入可领人数：\n（1 - 10000 之间）",
+                "👥 请输入可领人数：\n（1 - 10000 之间）\n\n"  
+                "📸 提示：您可以随时发送图片作为红包封面，我们会自动上传到云端\n\n"
+                "💡 使用 /cancel 可以随时取消",
                 reply_markup=reply_markup
             )
             return WAITING_NUMBER
@@ -115,7 +117,9 @@ async def redpocket_process(update: Update, context: ContextTypes.DEFAULT_TYPE):
             redpacket_data['step'] = 'blessing'
             context.user_data['redpacket'] = redpacket_data
             await update.message.reply_text(
-                "💬 请输入祝福语（最多50字）：",
+                "💬 请输入祝福语（最多50字）：\n\n"  
+                "📸 提示：您可以随时发送图片作为红包封面，我们会自动上传到云端\n\n"
+                "💡 使用 /cancel 可以随时取消",
                 reply_markup=reply_markup
             )
             return WAITING_BLESSING
@@ -131,9 +135,11 @@ async def redpocket_process(update: Update, context: ContextTypes.DEFAULT_TYPE):
         redpacket_data['step'] = 'password'
         context.user_data['redpacket'] = redpacket_data
         await update.message.reply_text(
-            "🔑 请输入红包口令\n（输入0则为手气红包，无需口令）：",
-            reply_markup=reply_markup
-        )
+                "🔑 请输入红包口令\n（输入0则为手气红包，无需口令）：\n\n"  
+                "📸 提示：您可以随时发送图片作为红包封面，我们会自动上传到云端\n\n"
+                "💡 使用 /cancel 可以随时取消",
+                reply_markup=reply_markup
+            )
         return WAITING_PASSWORD
     
     elif current_step == 'password':
@@ -289,17 +295,17 @@ async def create_redpacket(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"{redpacket_type_display}\n"
                 f"💰 金额: {data['carrot']} 萝卜\n"
                 f"👥 人数: {data['number']}\n"
-                f"💬 祝福语: {data['blessing']}\n"
+                f"💬 祝福语: `{data['blessing']}`\n"
             )
-            # 不显示口令，确保用户自己也不知道
+            # 显示口令，使用等宽字体便于复制
             if redpacket_type == "password":
-                message += "🔑 口令: ******\n"
+                message += f"🔑 口令: `{data['password']}`\n"
             if data.get('cover_url'):
                 message += f"🖼️ 封面: 已上传 ✓\n"
             if result.get('red_packet_id'):
-                message += f"🆔 红包ID: {result['red_packet_id']}\n"
+                message += f"🆔 红包ID: `{result['red_packet_id']}`\n"
             
-            await loading.edit_text(message)
+            await loading.edit_text(message, parse_mode="Markdown")
             
             # 显示返回菜单的按钮
             from handlers.common import show_menu

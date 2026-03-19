@@ -85,11 +85,23 @@ async def lottery_process(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         lottery_data['step'] = 'end'
         context.user_data['lottery'] = lottery_data
         
-        default_end = (now + timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
+        # 计算不同时长的结束时间
+        end_1h = (now + timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
+        end_1d = (now + timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
+        end_7d = (now + timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S")
+        
+        # 显示结束时间选择按钮
+        keyboard = [
+            [InlineKeyboardButton("⏱️ 1小时速抽", callback_data=f"end_time_1h_{end_1h}")],
+            [InlineKeyboardButton("📅 1天期限", callback_data=f"end_time_1d_{end_1d}")],
+            [InlineKeyboardButton("📆 1周开奖", callback_data=f"end_time_7d_{end_7d}")],
+            [InlineKeyboardButton("✏️ 自定义时间", callback_data="end_time_custom")]
+        ]
+        keyboard = add_cancel_button(keyboard, show_back=True)
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
         await update.message.reply_text(
-            f"⏰ 请输入结束时间\n"
-            f"格式：`YYYY-MM-DD HH:MM:SS`\n"
-            f"例如：`{default_end}`\n\n"
+            "⏰ 请选择开奖时间\n\n"  
             f"开始时间：`{lottery_data['time_start']}`",
             reply_markup=reply_markup,
             parse_mode="Markdown"
@@ -283,6 +295,59 @@ async def handle_prize_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return await get_lottery_bodys(update, context)
     
     return WAITING_LOTTERY_PRIZES
+
+async def handle_end_time_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """处理结束时间选择"""
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = update.effective_user.id
+    data = query.data
+    
+    logger.info(f"用户 {user_id} 选择结束时间: {data}")
+    
+    if 'lottery' not in context.user_data:
+        await query.edit_message_text("❌ 会话已过期，请重新发送 /lottery 开始")
+        return ConversationHandler.END
+    
+    lottery_data = context.user_data['lottery']
+    
+    if data == "end_time_custom":
+        # 自定义时间，显示输入框
+        keyboard = add_cancel_button([[]], show_back=True)
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        now = datetime.now()
+        default_end = (now + timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
+        await query.edit_message_text(
+            f"⏰ 请输入结束时间\n"
+            f"格式：`YYYY-MM-DD HH:MM:SS`\n"
+            f"例如：`{default_end}`\n\n"
+            f"开始时间：`{lottery_data['time_start']}`",
+            reply_markup=reply_markup,
+            parse_mode="Markdown"
+        )
+        return WAITING_LOTTERY_END
+    elif data.startswith("end_time_"):
+        # 快捷时间选择
+        # 解析时间：end_time_1h_2023-12-01 12:00:00
+        end_time = data.split('_', 2)[2]
+        lottery_data['time_end'] = end_time
+        lottery_data['step'] = 'amount'
+        context.user_data['lottery'] = lottery_data
+        
+        keyboard = add_cancel_button([[]], show_back=True)
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            f"✅ 结束时间已设置：`{end_time}`\n\n"  
+            f"💰 请输入每人参与所需萝卜数量（1-50000）：",
+            reply_markup=reply_markup,
+            parse_mode="Markdown"
+        )
+        return WAITING_LOTTERY_AMOUNT
+    
+    return WAITING_LOTTERY_END
 
 async def handle_bodys_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """处理是否需要自动发奖的选择"""

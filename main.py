@@ -5,6 +5,10 @@ import logging
 import sys
 import os
 from datetime import datetime
+
+# 兼容 Python 3.12+，替换已被移除的 imghdr 模块
+sys.modules['imghdr'] = __import__('utils.imghdr_compat')
+
 from telegram import Update, BotCommand, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
@@ -79,13 +83,14 @@ from handlers.redpacket import (
     redpocket_command, redpocket_process, cancel_redpacket,
     WAITING_CARROT, WAITING_NUMBER, WAITING_BLESSING, WAITING_PASSWORD
 )
-from handlers.redpacket_query import check_redpacket_command, get_redpacket_id
+from handlers.redpacket_query import WAITING_QUERY_TYPE
+from handlers.redpacket_query import check_redpacket_command, get_redpacket_id, handle_query_type
 from games.lottery import (
     lottery_command, lottery_process,
     WAITING_LOTTERY_NAME, WAITING_LOTTERY_DESC, WAITING_LOTTERY_START,
     WAITING_LOTTERY_END, WAITING_LOTTERY_AMOUNT, WAITING_LOTTERY_NUMBER,
     WAITING_LOTTERY_RULE_CARROT, WAITING_LOTTERY_RULE_SIGN, WAITING_LOTTERY_PRIZES,
-    handle_bodys_choice, get_lottery_bodys, handle_prize_choice
+    handle_bodys_choice, get_lottery_bodys, handle_prize_choice, handle_end_time_choice
 )
 from games.lottery_cancel import lottery_cancel_command, get_lottery_cancel_id
 from ranks.carrot_rank import rank_carrot_command
@@ -171,6 +176,10 @@ def main() -> None:
             CallbackQueryHandler(check_redpacket_command, pattern="^menu_check_redpacket$")
         ],
         states={
+            WAITING_QUERY_TYPE: [
+                CallbackQueryHandler(handle_query_type, pattern="^(my_redpackets|input_id)$"),
+                CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
+            ],
             WAITING_REDPACKET_ID: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, get_redpacket_id),
                 CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
@@ -200,6 +209,7 @@ def main() -> None:
                 CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
             ],
             WAITING_LOTTERY_END: [
+                CallbackQueryHandler(handle_end_time_choice, pattern="^end_time_"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, lottery_process),
                 CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
             ],

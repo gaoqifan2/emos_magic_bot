@@ -16,7 +16,7 @@ USE game_db;
 CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY COMMENT '自增主键，内部使用',
     user_id VARCHAR(50) UNIQUE NOT NULL COMMENT '用户emosid，格式：e开头s结尾（如：e0E446ZE6s）',
-    telegram_id BIGINT UNIQUE COMMENT 'Telegram用户ID',
+/admin_check_playing    telegram_id BIGINT UNIQUE COMMENT 'Telegram用户ID',
     token VARCHAR(255) UNIQUE COMMENT '用户令牌，格式：1047_开头的字符串',
     username VARCHAR(255) COMMENT '登录用户名',
     first_name VARCHAR(255) COMMENT 'Telegram名字',

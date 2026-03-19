@@ -437,6 +437,10 @@ async def show_menu(update, message_text: str):
             InlineKeyboardButton("📨 邀请", callback_data="menu_invite")
         ],
         [
+            InlineKeyboardButton("👀 视奸", callback_data="admin_check_playing"),
+            InlineKeyboardButton("🔍 大调查", callback_data="admin_user_info")
+        ],
+        [
             InlineKeyboardButton("❓ 帮助", callback_data="help")
         ]
     ]
@@ -774,6 +778,39 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.callback_query.edit_message_text("✅ 充值已取消")
         # 清理用户数据
         context.user_data.clear()
+    
+    # 处理视奸按钮
+    elif data == "admin_check_playing":
+        # 显示命令并提供跳转按钮
+        keyboard = [
+            [InlineKeyboardButton("👥 跳转到 emospg 群", url="https://t.me/emospg")],
+            [InlineKeyboardButton("🔙 返回主菜单", callback_data="back_to_main")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(
+            "👀 **视奸功能**\n\n"
+            "请复制以下命令，然后点击下方按钮跳转到群并发送：\n\n"
+            "`/admin_check_playing`",
+            reply_markup=reply_markup,
+            parse_mode="Markdown"
+        )
+    
+    # 处理大调查按钮
+    elif data == "admin_user_info":
+        # 显示命令并提供跳转按钮
+        keyboard = [
+            [InlineKeyboardButton("👥 跳转到 emospg 群", url="https://t.me/emospg")],
+            [InlineKeyboardButton("🔙 返回主菜单", callback_data="back_to_main")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(
+            "🔍 **大调查功能**\n\n"
+            "1. 先在群里**引用回复**一条用户的消息\n"
+            "2. 然后复制以下命令并发送：\n\n"
+            "`/admin_user_info`",
+            reply_markup=reply_markup,
+            parse_mode="Markdown"
+        )
 
 async def show_redpacket_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """红包二级菜单"""
@@ -919,24 +956,48 @@ async def handle_back_to_previous(update: Update, context: ContextTypes.DEFAULT_
                 context.user_data['lottery'] = lottery_data
                 
                 # 显示上一步的提示信息
-                step_messages = {
-                    'name': "请输入抽奖名称（30字内）：",
-                    'end': f"⏰ 请输入结束时间\n格式：`YYYY-MM-DD HH:MM:SS`\n开始时间：`{lottery_data.get('time_start', '')}`",
-                    'amount': "💰 请输入每人参与所需萝卜数量（1-50000）：",
-                    'number': "👥 请输入开奖人数（0-5000）\n• 输入 **0**：时间开奖模式\n• 输入 **数字**：人数开奖模式",
-                    'rule_carrot': "🥕 请输入参与条件（萝卜数量要求，没有则输0）：",
-                    'rule_sign': "📅 请输入参与条件（签到天数要求，没有则输0）：",
-                    'prizes': "🎁 请输入第1个奖品的名称（50字内）："
-                }
-                
-                keyboard = add_cancel_button([[]], show_back=True)
-                reply_markup = InlineKeyboardMarkup(keyboard)
-                
-                await update.callback_query.edit_message_text(
-                    f"🎲 创建抽奖\n\n{step_messages[previous_step]}",
-                    reply_markup=reply_markup, 
-                    parse_mode="Markdown" if previous_step == 'end' or previous_step == 'number' else None
-                )
+                if previous_step == 'end':
+                    # 显示结束时间选择按钮
+                    from datetime import datetime, timedelta
+                    now = datetime.now()
+                    end_1h = (now + timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
+                    end_1d = (now + timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
+                    end_7d = (now + timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S")
+                    
+                    # 显示结束时间选择按钮
+                    keyboard = [
+                        [InlineKeyboardButton("⏱️ 1小时速抽", callback_data=f"end_time_1h_{end_1h}")],
+                        [InlineKeyboardButton("📅 1天期限", callback_data=f"end_time_1d_{end_1d}")],
+                        [InlineKeyboardButton("📆 1周开奖", callback_data=f"end_time_7d_{end_7d}")],
+                        [InlineKeyboardButton("✏️ 自定义时间", callback_data="end_time_custom")]
+                    ]
+                    keyboard = add_cancel_button(keyboard, show_back=True)
+                    reply_markup = InlineKeyboardMarkup(keyboard)
+                    
+                    await update.callback_query.edit_message_text(
+                        "⏰ 请选择开奖时间\n\n"  
+                        f"开始时间：`{lottery_data.get('time_start', '')}`",
+                        reply_markup=reply_markup,
+                        parse_mode="Markdown"
+                    )
+                else:
+                    step_messages = {
+                        'name': "请输入抽奖名称（30字内）：",
+                        'amount': "💰 请输入每人参与所需萝卜数量（1-50000）：",
+                        'number': "👥 请输入开奖人数（0-5000）\n• 输入 **0**：时间开奖模式\n• 输入 **数字**：人数开奖模式",
+                        'rule_carrot': "🥕 请输入参与条件（萝卜数量要求，没有则输0）：",
+                        'rule_sign': "📅 请输入参与条件（签到天数要求，没有则输0）：",
+                        'prizes': "🎁 请输入第1个奖品的名称（50字内）："
+                    }
+                    
+                    keyboard = add_cancel_button([[]], show_back=True)
+                    reply_markup = InlineKeyboardMarkup(keyboard)
+                    
+                    await update.callback_query.edit_message_text(
+                        f"🎲 创建抽奖\n\n{step_messages[previous_step]}",
+                        reply_markup=reply_markup, 
+                        parse_mode="Markdown" if previous_step == 'number' else None
+                    )
                 
                 # 返回对应的状态
                 step_to_state = {
