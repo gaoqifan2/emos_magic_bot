@@ -41,8 +41,12 @@ async def cancel_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     await query.edit_message_text("✅ 操作已取消")
-    # 清理用户数据
-    context.user_data.clear()
+    # 只清理红包相关的数据，保留登录信息
+    if 'redpacket' in context.user_data:
+        del context.user_data['redpacket']
+    # 保留uploaded_files，以便下次使用
+    # 显示返回菜单的按钮
+    await show_menu(update, "📱 功能菜单\n\n请选择功能：")
     return ConversationHandler.END
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -115,6 +119,20 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     )
                     logger.info(f"用户 {user_id} 数据库操作结果: local_user_id={local_user_id}")
                     
+                    # 删除登录面板消息
+                    if 'login_message_id' in context.user_data and 'login_chat_id' in context.user_data:
+                        try:
+                            await context.bot.delete_message(
+                                chat_id=context.user_data['login_chat_id'],
+                                message_id=context.user_data['login_message_id']
+                            )
+                            # 清理存储的消息ID
+                            del context.user_data['login_message_id']
+                            del context.user_data['login_chat_id']
+                        except Exception as e:
+                            # 忽略删除失败的错误
+                            pass
+                    
                     await show_menu(update, f"✅ 授权成功！\n\n欢迎 {username} 使用综合机器人，你的ID是\n`{user_id_api}`\n\n请选择功能：")
                 else:
                     logger.info(f"API响应内容: {response.text}")
@@ -162,9 +180,23 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     telegram_id=user_id,
                     username=username,
                     first_name=update.effective_user.first_name,
-                    last_name=update.effective_user.last_name
+                last_name=update.effective_user.last_name
                 )
                 logger.info(f"用户 {user_id} 数据库操作结果: local_user_id={local_user_id}")
+                
+                # 删除登录面板消息
+                if 'login_message_id' in context.user_data and 'login_chat_id' in context.user_data:
+                    try:
+                        await context.bot.delete_message(
+                            chat_id=context.user_data['login_chat_id'],
+                            message_id=context.user_data['login_message_id']
+                        )
+                        # 清理存储的消息ID
+                        del context.user_data['login_message_id']
+                        del context.user_data['login_chat_id']
+                    except Exception as e:
+                        # 忽略删除失败的错误
+                        pass
                 
                 await show_menu(update, f"✅ 授权成功！\n\n欢迎 {username} 使用综合机器人，你的ID是\n`{user_id_api}`\n\n请选择功能：")
             else:
@@ -341,9 +373,23 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     telegram_id=user_id,
                     username=username,
                     first_name=update.effective_user.first_name,
-                    last_name=update.effective_user.last_name
+                last_name=update.effective_user.last_name
                 )
                 logger.info(f"用户 {user_id} 数据库操作结果: local_user_id={local_user_id}")
+                
+                # 删除登录面板消息
+                if 'login_message_id' in context.user_data and 'login_chat_id' in context.user_data:
+                    try:
+                        await context.bot.delete_message(
+                            chat_id=context.user_data['login_chat_id'],
+                            message_id=context.user_data['login_message_id']
+                        )
+                        # 清理存储的消息ID
+                        del context.user_data['login_message_id']
+                        del context.user_data['login_chat_id']
+                    except Exception as e:
+                        # 忽略删除失败的错误
+                        pass
                 
                 await show_menu(update, f"✅ 授权成功！\n\n欢迎 {username} 使用综合机器人，你的ID是\n`{user_id_api}`\n\n请选择功能：")
             else:
@@ -385,19 +431,19 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 # 移除过期的token
                 del user_tokens[user_id]
                 # 显示登录选项
-                await show_login_options(update)
+                await show_login_options(update, context)
         except Exception as e:
             logger.error(f"获取用户信息失败: {e}")
             # 移除可能无效的token
             if user_id in user_tokens:
                 del user_tokens[user_id]
             # 显示登录选项
-            await show_login_options(update)
+            await show_login_options(update, context)
     else:
         # 显示登录选项，要求用户使用正式token登录
-        await show_login_options(update)
+        await show_login_options(update, context)
 
-async def show_login_options(update: Update):
+async def show_login_options(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """显示登录选项"""
     # 使用开发者的emos user_id来生成登录链接
     developer_emos_id = "e0E446ZE6s"
@@ -407,10 +453,17 @@ async def show_login_options(update: Update):
         [InlineKeyboardButton("❌ 取消", callback_data="cancel_operation")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text(
+    message = await update.message.reply_text(
         "👋 欢迎使用综合机器人！\n\n使用前请先登录EMOS账号：",
         reply_markup=reply_markup
     )
+    # 存储登录面板消息ID，以便登录成功后删除
+    context.user_data['login_message_id'] = message.message_id
+    context.user_data['login_chat_id'] = message.chat_id
+    # 1分钟后自动消失（作为后备）
+    import asyncio
+    from utils.message_utils import auto_delete_message
+    asyncio.create_task(auto_delete_message(update, context, message, 60))
 
 async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """处理/menu命令"""
@@ -554,6 +607,10 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return 107  # 自定义状态码，用于处理服务商转账用户ID输入
         else:
             await update.callback_query.edit_message_text("❌ 只有服务商才能使用此功能！")
+            # 1分钟后自动消失
+            import asyncio
+            from utils.message_utils import auto_delete_message
+            asyncio.create_task(auto_delete_message(update, context, None, 60))
     
     # 服务商功能
     if data == "menu_service":
@@ -601,6 +658,10 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "menu_lottery_cancel":
         from games.lottery_cancel import lottery_cancel_command
         return await lottery_cancel_command(update, context)
+    
+    elif data == "menu_lottery_win":
+        from services.service_main import service_lottery_win
+        await service_lottery_win(update, context)
     
     elif data == "menu_rank_carrot":
         from ranks.carrot_rank import rank_carrot_command
@@ -677,6 +738,10 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "service_pay_close":
         from services.service_main import service_pay_close
         await service_pay_close(update, context)
+    
+    elif data == "service_lottery_win":
+        from services.service_main import service_lottery_win
+        await service_lottery_win(update, context)
     
     elif data == "service_fund_transfer":
         from services.service_main import service_fund_transfer
@@ -799,6 +864,10 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=reply_markup,
             parse_mode="Markdown"
         )
+        # 1分钟后自动消失
+        import asyncio
+        from utils.message_utils import auto_delete_message
+        asyncio.create_task(auto_delete_message(update, context, None, 60))
     
     # 处理大调查按钮
     elif data == "admin_user_info":
@@ -816,6 +885,15 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=reply_markup,
             parse_mode="Markdown"
         )
+        # 1分钟后自动消失
+        import asyncio
+        from utils.message_utils import auto_delete_message
+        asyncio.create_task(auto_delete_message(update, context, None, 60))
+    
+    # 对于其他不认识的回调，不做处理，让其他处理器继续处理
+    else:
+        # 不返回任何值，让Telegram Bot API继续尝试其他处理器
+        pass
 
 async def show_redpacket_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """红包二级菜单"""
@@ -840,6 +918,9 @@ async def show_lottery_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [
             InlineKeyboardButton("🎲 创建抽奖", callback_data="menu_lottery"),
             InlineKeyboardButton("❌ 取消抽奖", callback_data="menu_lottery_cancel")
+        ],
+        [
+            InlineKeyboardButton("🏆 查询中奖列表", callback_data="menu_lottery_win")
         ],
         [
             InlineKeyboardButton("🔙 返回主菜单", callback_data="back_to_main")

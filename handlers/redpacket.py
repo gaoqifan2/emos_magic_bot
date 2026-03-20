@@ -1,5 +1,6 @@
 import logging
 import requests
+import asyncio
 from datetime import datetime, timedelta, timezone
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes, ConversationHandler
@@ -10,11 +11,12 @@ beijing_tz = timezone(timedelta(hours=8))
 from config import user_tokens, Config
 from handlers.common import add_cancel_button
 from utils.r2_client import r2_client
+from utils.message_utils import auto_delete_message
 
 logger = logging.getLogger(__name__)
 
 # 对话状态
-WAITING_CARROT, WAITING_NUMBER, WAITING_BLESSING, WAITING_PASSWORD = range(4)
+WAITING_REDPACKET_TYPE, WAITING_CARROT, WAITING_NUMBER, WAITING_BLESSING, WAITING_PASSWORD = range(5)
 
 async def redpocket_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """开始创建红包"""
@@ -32,7 +34,6 @@ async def redpocket_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 初始化用户数据
     context.user_data['redpacket'] = {
         'user_id': user_id,
-        'step': 'carrot',
         'start_time': datetime.now(beijing_tz).isoformat()
     }
     
@@ -40,22 +41,23 @@ async def redpocket_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if 'uploaded_files' not in context.user_data:
         context.user_data['uploaded_files'] = {}
     
-    keyboard = add_cancel_button([[]], show_back=True)
+    # 显示红包类型选择菜单
+    keyboard = [
+        [InlineKeyboardButton("🎲 普通红包", callback_data="redpacket_type_random")],
+        [InlineKeyboardButton("🔐 口令红包", callback_data="redpacket_type_password")],
+        [InlineKeyboardButton("🖼️ 图片红包", callback_data="redpacket_type_image")],
+        [InlineKeyboardButton("🎵 语音红包", callback_data="redpacket_type_audio")]
+    ]
+    keyboard = add_cancel_button(keyboard, show_back=True)
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    message_text = (
-        "🧧 创建红包\n\n"
-        "💰 请输入红包总金额（萝卜）：\n"
-        "（1 - 60000 之间）\n\n"
-        "📸 提示：您可以随时发送图片作为红包封面，我们会自动上传到云端\n\n"
-        "💡 使用 /cancel 可以随时取消"
-    )
+    message_text = "🧧 创建红包\n\n请选择红包类型："
     
     if update.message:
-        await update.message.reply_text(message_text, reply_markup=reply_markup)
+        message = await update.message.reply_text(message_text, reply_markup=reply_markup)
     else:
         await update.callback_query.edit_message_text(message_text, reply_markup=reply_markup)
-    return WAITING_CARROT
+    return WAITING_REDPACKET_TYPE
 
 async def redpocket_process(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """处理红包创建流程"""
@@ -64,23 +66,159 @@ async def redpocket_process(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("=" * 50)
     logger.info(f"用户 {user_id} 触发 redpocket_process")
     
-    if 'redpacket' not in context.user_data:
-        logger.warning(f"用户 {user_id} 的红包数据不存在")
-        await update.message.reply_text("❌ 会话已过期，请重新开始")
+    # 检查用户登录状态
+    if user_id not in user_tokens:
+        if update.message:
+            await update.message.reply_text("❌ 请先登录！发送 /start 登录")
+        else:
+            await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
         return ConversationHandler.END
     
-    redpacket_data = context.user_data['redpacket']
+    if 'redpacket' not in context.user_data:
+        # 检查是否是红包类型选择的回调
+        if update.callback_query and update.callback_query.data.startswith('redpacket_type_'):
+            # 重新初始化用户数据
+            logger.info(f"用户 {user_id} 重新开始创建红包")
+            context.user_data['redpacket'] = {
+                'user_id': user_id,
+                'start_time': datetime.now(beijing_tz).isoformat()
+            }
+            # 初始化上传文件缓存
+            if 'uploaded_files' not in context.user_data:
+                context.user_data['uploaded_files'] = {}
+            # 更新redpacket_data变量
+            redpacket_data = context.user_data['redpacket']
+        else:
+            logger.warning(f"用户 {user_id} 的红包数据不存在")
+            if update.message:
+                await update.message.reply_text("❌ 会话已过期，请重新开始")
+            elif update.callback_query:
+                await update.callback_query.edit_message_text("❌ 会话已过期，请重新开始")
+            return ConversationHandler.END
+    else:
+        redpacket_data = context.user_data['redpacket']
+    
+    # 检查是否有回调数据（处理红包类型选择）
+    if update.callback_query:
+        callback_data = update.callback_query.data
+        await update.callback_query.answer()
+        
+        if callback_data.startswith('redpacket_type_'):
+            # 处理红包类型选择
+            redpacket_type = callback_data.split('redpacket_type_')[1]
+            logger.info(f"用户 {user_id} 选择了红包类型: {redpacket_type}")
+            
+            redpacket_data['type'] = redpacket_type
+            
+            # 根据红包类型进行不同处理
+            if redpacket_type == 'image':
+                # 图片红包：要求用户上传图片
+                try:
+                    message = await update.callback_query.edit_message_text(
+                        "🖼️ 请发送图片作为红包封面：\n\n💡 使用 /cancel 可以随时取消"
+                    )
+                    # 存储提示消息ID，稍后在用户输入成功后删除
+                    redpacket_data['prompt_message_id'] = message.message_id
+                except Exception as e:
+                    logger.error(f"编辑消息失败: {e}")
+                    # 如果编辑失败，发送新消息
+                    message = await update.callback_query.message.reply_text(
+                        "🖼️ 请发送图片作为红包封面：\n\n💡 使用 /cancel 可以随时取消"
+                    )
+                    redpacket_data['prompt_message_id'] = message.message_id
+                redpacket_data['step'] = 'image_upload'
+                context.user_data['redpacket'] = redpacket_data
+                return WAITING_CARROT
+            elif redpacket_type == 'audio':
+                # 语音红包：要求用户上传语音
+                try:
+                    message = await update.callback_query.edit_message_text(
+                        "🎵 请发送语音作为红包内容：\n\n💡 使用 /cancel 可以随时取消"
+                    )
+                    # 存储提示消息ID，稍后在用户输入成功后删除
+                    redpacket_data['prompt_message_id'] = message.message_id
+                except Exception as e:
+                    logger.error(f"编辑消息失败: {e}")
+                    # 如果编辑失败，发送新消息
+                    message = await update.callback_query.message.reply_text(
+                        "🎵 请发送语音作为红包内容：\n\n💡 使用 /cancel 可以随时取消"
+                    )
+                    redpacket_data['prompt_message_id'] = message.message_id
+                redpacket_data['step'] = 'audio_upload'
+                context.user_data['redpacket'] = redpacket_data
+                return WAITING_CARROT
+            else:
+                # 普通红包和口令红包：直接进入金额输入
+                redpacket_data['step'] = 'carrot'
+                try:
+                    message = await update.callback_query.edit_message_text(
+                        "💰 请输入红包总金额（萝卜）：\n（1 - 60000 之间）\n\n💡 使用 /cancel 可以随时取消"
+                    )
+                    # 存储提示消息ID，稍后在用户输入成功后删除
+                    redpacket_data['prompt_message_id'] = message.message_id
+                except Exception as e:
+                    logger.error(f"编辑消息失败: {e}")
+                    # 如果编辑失败，发送新消息
+                    message = await update.callback_query.message.reply_text(
+                        "💰 请输入红包总金额（萝卜）：\n（1 - 60000 之间）\n\n💡 使用 /cancel 可以随时取消"
+                    )
+                    redpacket_data['prompt_message_id'] = message.message_id
+                context.user_data['redpacket'] = redpacket_data
+                return WAITING_CARROT
+    
     current_step = redpacket_data.get('step', 'carrot')
     
     logger.info(f"用户 {user_id} 当前步骤: {current_step}")
     
-    # 处理图片上传
-    if update.message.photo:
-        logger.info(f"用户 {user_id} 发送了图片")
-        return await handle_photo_upload(update, context)
-    
-    if not update.message.text:
-        return WAITING_CARROT
+    # 记录消息类型
+    if update.message:
+        if update.message.photo:
+            logger.info(f"用户 {user_id} 发送了图片")
+            return await handle_photo_upload(update, context)
+        elif update.message.voice:
+            logger.info(f"用户 {user_id} 发送了语音")
+            return await handle_audio_upload(update, context)
+        elif update.message.audio:
+            logger.info(f"用户 {user_id} 发送了音乐文件")
+            try:
+                title = update.message.audio.title if update.message.audio.title else "未知"
+                duration = update.message.audio.duration if update.message.audio.duration else 0
+                mime_type = update.message.audio.mime_type if update.message.audio.mime_type else "未知"
+                file_size = update.message.audio.file_size if update.message.audio.file_size else 0
+                logger.info(f"音乐文件信息: title={title}, duration={duration}, mime_type={mime_type}, file_size={file_size}")
+                return await handle_audio_upload(update, context)
+            except Exception as e:
+                logger.error(f"处理音乐文件失败: {e}")
+                await update.message.reply_text("❌ 处理音乐文件失败，请重试")
+                return WAITING_CARROT
+        elif update.message.document:
+            logger.info(f"用户 {user_id} 发送了文档")
+            logger.info(f"文档信息: file_name={update.message.document.file_name}, mime_type={update.message.document.mime_type}, file_size={update.message.document.file_size}")
+            # 检查是否是音频文件
+            mime_type = update.message.document.mime_type
+            if mime_type and mime_type.startswith('audio/'):
+                logger.info(f"用户 {user_id} 发送了音频文档")
+                return await handle_audio_upload(update, context)
+            else:
+                logger.info(f"用户 {user_id} 发送了非音频文档，类型: {mime_type}")
+                await update.message.reply_text("❌ 请发送音频文件，支持语音消息、音乐文件或音频文档")
+                return WAITING_CARROT
+        elif update.message.video:
+            logger.info(f"用户 {user_id} 发送了视频")
+            await update.message.reply_text("❌ 请发送音频文件，不支持视频")
+            return WAITING_CARROT
+        elif update.message.sticker:
+            logger.info(f"用户 {user_id} 发送了贴纸")
+            await update.message.reply_text("❌ 请发送音频文件，不支持贴纸")
+            return WAITING_CARROT
+        elif update.message.animation:
+            logger.info(f"用户 {user_id} 发送了动画")
+            await update.message.reply_text("❌ 请发送音频文件，不支持动画")
+            return WAITING_CARROT
+        elif not update.message.text:
+            logger.info(f"用户 {user_id} 发送了其他类型的消息")
+            await update.message.reply_text("❌ 请发送音频文件，支持语音消息、音乐文件或音频文档")
+            return WAITING_CARROT
     
     text = update.message.text.strip()
     # 不记录口令相关的日志
@@ -96,15 +234,29 @@ async def redpocket_process(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if carrot <= 0 or carrot > 60000:
                 await update.message.reply_text("❌ 金额必须在1-60000之间，请重新输入：", reply_markup=reply_markup)
                 return WAITING_CARROT
+            
+            # 删除之前的提示消息
+            if 'prompt_message_id' in redpacket_data:
+                try:
+                    await context.bot.delete_message(
+                        chat_id=update.message.chat_id,
+                        message_id=redpacket_data['prompt_message_id']
+                    )
+                except Exception as e:
+                    pass
+            
             redpacket_data['carrot'] = carrot
             redpacket_data['step'] = 'number'
             context.user_data['redpacket'] = redpacket_data
-            await update.message.reply_text(
-                "👥 请输入可领人数：\n（1 - 10000 之间）\n\n"  
+            message = await update.message.reply_text(
+                "👥 请输入可领人数：\n（1 - 10000 之间）\n\n"
                 "📸 提示：您可以随时发送图片作为红包封面，我们会自动上传到云端\n\n"
                 "💡 使用 /cancel 可以随时取消",
                 reply_markup=reply_markup
             )
+            # 存储提示消息ID，稍后在用户输入成功后删除
+            redpacket_data['prompt_message_id'] = message.message_id
+            context.user_data['redpacket'] = redpacket_data
             return WAITING_NUMBER
         except ValueError:
             await update.message.reply_text("❌ 请输入有效的数字：", reply_markup=reply_markup)
@@ -116,15 +268,29 @@ async def redpocket_process(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if number <= 0 or number > 10000:
                 await update.message.reply_text("❌ 人数必须在1-10000之间，请重新输入：", reply_markup=reply_markup)
                 return WAITING_NUMBER
+            
+            # 删除之前的提示消息
+            if 'prompt_message_id' in redpacket_data:
+                try:
+                    await context.bot.delete_message(
+                        chat_id=update.message.chat_id,
+                        message_id=redpacket_data['prompt_message_id']
+                    )
+                except Exception as e:
+                    pass
+            
             redpacket_data['number'] = number
             redpacket_data['step'] = 'blessing'
             context.user_data['redpacket'] = redpacket_data
-            await update.message.reply_text(
-                "💬 请输入祝福语（最多50字）：\n\n"  
+            message = await update.message.reply_text(
+                "💬 请输入祝福语（最多50字）：\n\n"
                 "📸 提示：您可以随时发送图片作为红包封面，我们会自动上传到云端\n\n"
                 "💡 使用 /cancel 可以随时取消",
                 reply_markup=reply_markup
             )
+            # 存储提示消息ID，稍后在用户输入成功后删除
+            redpacket_data['prompt_message_id'] = message.message_id
+            context.user_data['redpacket'] = redpacket_data
             return WAITING_BLESSING
         except ValueError:
             await update.message.reply_text("❌ 请输入有效的数字：", reply_markup=reply_markup)
@@ -134,15 +300,29 @@ async def redpocket_process(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if len(text) > 50:
             await update.message.reply_text("❌ 祝福语不能超过50字，请重新输入：", reply_markup=reply_markup)
             return WAITING_BLESSING
+        
+        # 删除之前的提示消息
+        if 'prompt_message_id' in redpacket_data:
+            try:
+                await context.bot.delete_message(
+                    chat_id=update.message.chat_id,
+                    message_id=redpacket_data['prompt_message_id']
+                )
+            except Exception as e:
+                pass
+        
         redpacket_data['blessing'] = text
         redpacket_data['step'] = 'password'
         context.user_data['redpacket'] = redpacket_data
-        await update.message.reply_text(
-                "🔑 请输入红包口令\n（输入0则为手气红包，无需口令）：\n\n"  
-                "📸 提示：您可以随时发送图片作为红包封面，我们会自动上传到云端\n\n"
-                "💡 使用 /cancel 可以随时取消",
-                reply_markup=reply_markup
-            )
+        message = await update.message.reply_text(
+                    "🔑 请输入红包口令\n（输入0则为手气红包，无需口令）：\n\n"
+                    "📸 提示：您可以随时发送图片作为红包封面，我们会自动上传到云端\n\n"
+                    "💡 使用 /cancel 可以随时取消",
+                    reply_markup=reply_markup
+                )
+        # 存储提示消息ID，稍后在用户输入成功后删除
+        redpacket_data['prompt_message_id'] = message.message_id
+        context.user_data['redpacket'] = redpacket_data
         return WAITING_PASSWORD
     
     elif current_step == 'password':
@@ -150,6 +330,16 @@ async def redpocket_process(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not token:
             await update.message.reply_text("❌ 登录已过期，请重新发送 /start 登录")
             return ConversationHandler.END
+        
+        # 删除之前的提示消息
+        if 'prompt_message_id' in redpacket_data:
+            try:
+                await context.bot.delete_message(
+                    chat_id=update.message.chat_id,
+                    message_id=redpacket_data['prompt_message_id']
+                )
+            except Exception as e:
+                pass
         
         # 如果用户没有输入内容，默认设置为0（手气红包）
         if not text.strip():
@@ -203,20 +393,30 @@ async def handle_photo_upload(update: Update, context: ContextTypes.DEFAULT_TYPE
             context.user_data['uploaded_files'][file_id] = cover_url
             await loading.edit_text("✅ 图片上传成功！")
         
+        # 删除之前的提示消息
+        redpacket_data = context.user_data['redpacket']
+        if 'prompt_message_id' in redpacket_data:
+            try:
+                await context.bot.delete_message(
+                    chat_id=update.message.chat_id,
+                    message_id=redpacket_data['prompt_message_id']
+                )
+            except Exception as e:
+                pass
+        
         context.user_data['redpacket']['cover_url'] = cover_url
+        context.user_data['redpacket']['file_type'] = 'image'
         # 不设置file_id_image，让它默认为null
         
-        current_step = context.user_data['redpacket'].get('step', 'carrot')
-        step_messages = {
-            'carrot': "💰 请继续输入红包金额：",
-            'number': "👥 请继续输入可领人数：",
-            'blessing': "💬 请继续输入祝福语：",
-            'password': "🔑 请继续输入口令："
-        }
+        # 图片上传后直接进入金额输入
+        redpacket_data['step'] = 'carrot'
         
-        keyboard = add_cancel_button([[]], show_back=True)
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text(step_messages.get(current_step, "请继续"), reply_markup=reply_markup)
+        message = await update.message.reply_text(
+            "💰 请输入红包总金额（萝卜）：\n（1 - 60000 之间）\n\n💡 使用 /cancel 可以随时取消"
+        )
+        # 存储提示消息ID，稍后在用户输入成功后删除
+        redpacket_data['prompt_message_id'] = message.message_id
+        context.user_data['redpacket'] = redpacket_data
         
     except Exception as e:
         logger.error(f"上传图片失败: {e}")
@@ -224,13 +424,203 @@ async def handle_photo_upload(update: Update, context: ContextTypes.DEFAULT_TYPE
         logger.error(traceback.format_exc())
         await loading.edit_text("❌ 图片上传失败，请稍后重试")
     
-    step_to_state = {
-        'carrot': WAITING_CARROT,
-        'number': WAITING_NUMBER,
-        'blessing': WAITING_BLESSING,
-        'password': WAITING_PASSWORD
-    }
-    return step_to_state.get(context.user_data['redpacket'].get('step', 'carrot'), WAITING_CARROT)
+    return WAITING_CARROT
+
+async def handle_audio_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """处理音频上传（支持语音消息、音乐文件和音频文档）"""
+    user_id = update.effective_user.id
+    
+    if 'redpacket' not in context.user_data:
+        await update.message.reply_text("❌ 请先开始创建红包")
+        return WAITING_CARROT
+    
+    loading = await update.message.reply_text("🔄 正在上传音频到云端...")
+    
+    try:
+        # 确定音频文件来源
+        file_id = None
+        file_extension = 'ogg'
+        file_size = 0
+        
+        if update.message.voice:
+            audio_source = update.message.voice
+            file_id = audio_source.file_id
+            file_extension = 'ogg'
+            file_size = audio_source.file_size
+            logger.info(f"收到语音消息: file_id={file_id}, size={file_size} bytes")
+        elif update.message.audio:
+            audio_source = update.message.audio
+            file_id = audio_source.file_id
+            # 根据MIME类型确定文件扩展名
+            mime_type = audio_source.mime_type
+            logger.info(f"收到音乐文件: file_id={file_id}, mime_type={mime_type}")
+            if mime_type == 'audio/mpeg':
+                file_extension = 'mp3'
+            elif mime_type == 'audio/ogg':
+                file_extension = 'ogg'
+            elif mime_type == 'audio/wav':
+                file_extension = 'wav'
+            elif mime_type == 'audio/mp4':
+                file_extension = 'm4a'
+            elif mime_type == 'audio/aac':
+                file_extension = 'aac'
+            elif mime_type == 'audio/flac':
+                file_extension = 'flac'
+            elif mime_type == 'audio/opus':
+                file_extension = 'opus'
+            elif mime_type == 'audio/webm':
+                file_extension = 'webm'
+            elif mime_type == 'audio/x-wav':
+                file_extension = 'wav'
+            elif mime_type == 'audio/x-m4a':
+                file_extension = 'm4a'
+            else:
+                # 对于其他音频格式，尝试从MIME类型中提取扩展名
+                if mime_type and '/' in mime_type:
+                    ext = mime_type.split('/')[-1]
+                    # 确保扩展名是有效的
+                    valid_exts = ['mp3', 'ogg', 'wav', 'm4a', 'aac', 'flac', 'opus', 'webm']
+                    if ext in valid_exts:
+                        file_extension = ext
+                    else:
+                        file_extension = 'ogg'
+                else:
+                    file_extension = 'ogg'
+            file_size = audio_source.file_size
+            logger.info(f"音乐文件处理结果: extension={file_extension}, size={file_size} bytes")
+        elif update.message.document:
+            document = update.message.document
+            file_id = document.file_id
+            # 根据MIME类型确定文件扩展名
+            mime_type = document.mime_type
+            file_name = document.file_name
+            logger.info(f"收到文档文件: file_id={file_id}, file_name={file_name}, mime_type={mime_type}")
+            
+            # 优先从文件名后缀判断
+            if file_name and '.' in file_name:
+                ext_from_name = file_name.split('.')[-1].lower()
+                if ext_from_name in ['mp3', 'ogg', 'wav', 'm4a', 'aac', 'flac', 'opus', 'webm']:
+                    file_extension = ext_from_name
+                    logger.info(f"从文件名确定扩展名: {file_extension}")
+            
+            # 如果文件名没有扩展名，再使用MIME类型
+            if file_extension == 'ogg' and mime_type:
+                if mime_type == 'audio/mpeg':
+                    file_extension = 'mp3'
+                elif mime_type == 'audio/ogg':
+                    file_extension = 'ogg'
+                elif mime_type == 'audio/wav':
+                    file_extension = 'wav'
+                elif mime_type == 'audio/mp4':
+                    file_extension = 'm4a'
+                elif mime_type == 'audio/aac':
+                    file_extension = 'aac'
+                elif mime_type == 'audio/flac':
+                    file_extension = 'flac'
+                elif mime_type == 'audio/opus':
+                    file_extension = 'opus'
+                elif mime_type == 'audio/webm':
+                    file_extension = 'webm'
+                elif mime_type == 'audio/x-wav':
+                    file_extension = 'wav'
+                elif mime_type == 'audio/x-m4a':
+                    file_extension = 'm4a'
+                else:
+                    # 对于其他音频格式，尝试从MIME类型中提取扩展名
+                    if mime_type and '/' in mime_type:
+                        ext = mime_type.split('/')[-1]
+                        # 确保扩展名是有效的
+                        valid_exts = ['mp3', 'ogg', 'wav', 'm4a', 'aac', 'flac', 'opus', 'webm']
+                        if ext in valid_exts:
+                            file_extension = ext
+                        else:
+                            file_extension = 'ogg'
+                    else:
+                        file_extension = 'ogg'
+            file_size = document.file_size
+            logger.info(f"文档文件处理结果: extension={file_extension}, size={file_size} bytes")
+        else:
+            logger.error("收到非音频文件类型")
+            await loading.edit_text("❌ 不支持的音频文件类型")
+            return WAITING_CARROT
+        
+        # 检查文件大小（限制为10MB）
+        max_file_size = 10 * 1024 * 1024  # 10MB
+        if file_size > max_file_size:
+            await loading.edit_text(f"❌ 文件大小超过限制（{max_file_size // 1024 // 1024}MB），请上传更小的文件")
+            return WAITING_CARROT
+        
+        if file_id in context.user_data['uploaded_files']:
+            audio_url = context.user_data['uploaded_files'][file_id]
+            await loading.edit_text("✅ 使用已上传的音频！")
+        else:
+            # 检查R2客户端状态
+            if not r2_client:
+                logger.error("R2客户端未初始化")
+                await loading.edit_text("❌ 音频上传服务未初始化，请稍后重试")
+                return WAITING_CARROT
+            
+            # 检查R2客户端内部状态
+            if not hasattr(r2_client, 'client') or not r2_client.client:
+                logger.error("R2客户端内部client未初始化")
+                await loading.edit_text("❌ 音频上传服务未就绪，请稍后重试")
+                return WAITING_CARROT
+            
+            try:
+                file = await context.bot.get_file(file_id)
+                # 下载文件（使用异步方式）
+                file_data = await file.download_as_bytearray()
+                file_name = f"redpacket_{user_id}_{file_id}.{file_extension}"
+                
+                logger.info(f"开始上传音频: {file_name}, 大小: {len(file_data)} bytes")
+                
+                # 上传文件到R2
+                audio_url = r2_client.upload_file(bytes(file_data), file_name, "redpacket")
+                logger.info(f"音频上传成功: {audio_url}")
+                
+                context.user_data['uploaded_files'][file_id] = audio_url
+                await loading.edit_text("✅ 音频上传成功！")
+            except asyncio.TimeoutError:
+                logger.error("音频上传超时")
+                await loading.edit_text("❌ 音频上传超时，请稍后重试")
+                return WAITING_CARROT
+            except Exception as e:
+                logger.error(f"下载或上传音频失败: {e}")
+                await loading.edit_text("❌ 音频上传失败，请稍后重试")
+                return WAITING_CARROT
+        
+        # 删除之前的提示消息
+        redpacket_data = context.user_data['redpacket']
+        if 'prompt_message_id' in redpacket_data:
+            try:
+                await context.bot.delete_message(
+                    chat_id=update.message.chat_id,
+                    message_id=redpacket_data['prompt_message_id']
+                )
+            except Exception as e:
+                pass
+        
+        context.user_data['redpacket']['cover_url'] = audio_url
+        context.user_data['redpacket']['file_type'] = 'audio'
+        # 不设置file_id_image，让它默认为null
+        
+        # 音频上传后直接进入金额输入
+        redpacket_data['step'] = 'carrot'
+        
+        message = await update.message.reply_text(
+            "💰 请输入红包总金额（萝卜）：\n（1 - 60000 之间）\n\n💡 使用 /cancel 可以随时取消"
+        )
+        # 存储提示消息ID，稍后在用户输入成功后删除
+        redpacket_data['prompt_message_id'] = message.message_id
+        context.user_data['redpacket'] = redpacket_data
+        
+    except Exception as e:
+        logger.error(f"上传音频失败: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        await loading.edit_text("❌ 音频上传失败，请稍后重试")
+    
+    return WAITING_CARROT
 
 async def create_redpacket(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """创建红包API调用"""
@@ -261,13 +651,22 @@ async def create_redpacket(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Content-Type": "application/json"
         }
         
-        # 判断红包类型：口令为0则是手气红包
-        if data['password'] == '0':
+        # 根据用户选择的红包类型设置类型
+        if data.get('type') == 'random' or (data.get('type') != 'password' and data['password'] == '0'):
             redpacket_type = "random"
             redpacket_text = None  # 手气红包不需要口令
-        else:
+        elif data.get('type') == 'password' or data['password'] != '0':
             redpacket_type = "password"
-            redpacket_text = data['password']
+            redpacket_text = data['password'] if data['password'] != '0' else None
+        elif data.get('type') == 'image':
+            redpacket_type = "fixed"
+            redpacket_text = None
+        elif data.get('type') == 'audio':
+            redpacket_type = "fixed"
+            redpacket_text = None
+        else:
+            redpacket_type = "random"
+            redpacket_text = None
         
         payload = {
             "type": redpacket_type,
@@ -275,7 +674,8 @@ async def create_redpacket(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "number": data['number'],
             "blessing": data['blessing'],
             "text": redpacket_text,
-            "file_url": data.get('cover_url', None)
+            "file_url": data.get('cover_url', None),
+            "file_type": data.get('file_type', None)
         }
         
         # 不记录口令相关的日志
@@ -300,7 +700,18 @@ async def create_redpacket(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if 'text' in result_for_log:
                 result_for_log['text'] = '******'  # 隐藏口令
             logger.info(f"API返回结果: {result_for_log}")
-            redpacket_type_display = "🎲 手气红包" if redpacket_type == "random" else "🔐 口令红包"
+            # 根据红包类型显示不同的标签
+            if redpacket_type == "random":
+                redpacket_type_display = "🎲 普通红包"
+            elif redpacket_type == "password":
+                redpacket_type_display = "🔐 口令红包"
+            elif data.get('file_type') == 'image':
+                redpacket_type_display = "🖼️ 图片红包"
+            elif data.get('file_type') == 'audio':
+                redpacket_type_display = "🎵 语音红包"
+            else:
+                redpacket_type_display = "🧧 红包"
+            
             message = (
                 f"✅ 红包创建成功！\n\n"
                 f"{redpacket_type_display}\n"
@@ -309,10 +720,13 @@ async def create_redpacket(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"💬 祝福语: `{data['blessing']}`\n"
             )
             # 显示口令，使用等宽字体便于复制
-            if redpacket_type == "password":
-                message += f"🔑 口令: `{data['password']}`\n"
+            if redpacket_type == "password" and redpacket_text:
+                message += f"🔑 口令: `{redpacket_text}`\n"
             if data.get('cover_url'):
-                message += f"🖼️ 封面: 已上传 ✓\n"
+                if data.get('file_type') == 'image':
+                    message += f"🖼️ 封面: 已上传 ✓\n"
+                elif data.get('file_type') == 'audio':
+                    message += f"🎵 语音: 已上传 ✓\n"
             if result.get('red_packet_id'):
                 message += f"🆔 红包ID: `{result['red_packet_id']}`\n"
             

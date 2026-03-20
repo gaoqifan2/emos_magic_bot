@@ -84,7 +84,7 @@ from handlers.common import (
 )
 from handlers.redpacket import (
     redpocket_command, redpocket_process, cancel_redpacket,
-    WAITING_CARROT, WAITING_NUMBER, WAITING_BLESSING, WAITING_PASSWORD
+    WAITING_REDPACKET_TYPE, WAITING_CARROT, WAITING_NUMBER, WAITING_BLESSING, WAITING_PASSWORD
 )
 from handlers.redpacket_query import WAITING_QUERY_TYPE
 from handlers.redpacket_query import check_redpacket_command, get_redpacket_id, handle_query_type
@@ -147,24 +147,40 @@ def main() -> None:
             CallbackQueryHandler(redpocket_command, pattern="^menu_redpocket$")
         ],
         states={
+            WAITING_REDPACKET_TYPE: [
+                CallbackQueryHandler(redpocket_process, pattern="^redpacket_type_"),
+                CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
+            ],
             WAITING_CARROT: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, redpocket_process),
                 MessageHandler(filters.PHOTO, redpocket_process),
+                MessageHandler(filters.VOICE, redpocket_process),
+                MessageHandler(filters.AUDIO, redpocket_process),
+                MessageHandler(filters.Document.ALL, redpocket_process),
                 CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
             ],
             WAITING_NUMBER: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, redpocket_process),
                 MessageHandler(filters.PHOTO, redpocket_process),
+                MessageHandler(filters.VOICE, redpocket_process),
+                MessageHandler(filters.AUDIO, redpocket_process),
+                MessageHandler(filters.Document.ALL, redpocket_process),
                 CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
             ],
             WAITING_BLESSING: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, redpocket_process),
                 MessageHandler(filters.PHOTO, redpocket_process),
+                MessageHandler(filters.VOICE, redpocket_process),
+                MessageHandler(filters.AUDIO, redpocket_process),
+                MessageHandler(filters.Document.ALL, redpocket_process),
                 CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
             ],
             WAITING_PASSWORD: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, redpocket_process),
                 MessageHandler(filters.PHOTO, redpocket_process),
+                MessageHandler(filters.VOICE, redpocket_process),
+                MessageHandler(filters.AUDIO, redpocket_process),
+                MessageHandler(filters.Document.ALL, redpocket_process),
                 CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
             ],
         },
@@ -541,7 +557,7 @@ def main() -> None:
                         # 计算需要的游戏币数量（10游戏币=1萝卜）
                         # 10%手续费
                         base_game_coin = carrot_amount * 10
-                        fee_game_coin = int(base_game_coin * 0.1)
+                        fee_game_coin = int(base_game_coin * 0.01)
                         amount = base_game_coin + fee_game_coin
                         
                         if 1 <= carrot_amount <= 5000 and amount <= game_balance:
@@ -998,6 +1014,55 @@ def main() -> None:
                     except Exception as e:
                         logger.error(f"关闭订单失败: {e}")
                         await loading.edit_text("❌ 关闭失败，请稍后重试")
+                    
+                    # 清理用户数据
+                    context.user_data.clear()
+                else:
+                    await update.message.reply_text("❌ 请先登录！发送 /start 登录")
+            
+            elif operation == 'service_lottery_win_id':
+                # 处理查询中奖列表
+                if token:
+                    lottery_id = input_text
+                    loading = await update.message.reply_text("🔄 正在查询中奖列表...")
+                    
+                    try:
+                        import httpx
+                        headers = {"Authorization": f"Bearer {token}"}
+                        async with httpx.AsyncClient() as client:
+                            response = await client.get(
+                                f"{Config.API_BASE_URL}/lottery/win?lottery_id={lottery_id}",
+                                headers=headers,
+                                timeout=10
+                            )
+                        
+                        if response.status_code == 200:
+                            win_data = response.json()
+                            message = "🏆 中奖列表\n\n"
+                            message += f"抽奖ID：`{lottery_id}`\n"
+                            message += f"结束时间：{win_data.get('time_end', '未知')}\n"
+                            message += f"抽奖价格：{win_data.get('amount', 0)}\n"
+                            
+                            users = win_data.get('users', [])
+                            winning_count = len(users)
+                            message += f"中奖个数：{winning_count}\n\n"
+                            
+                            if users:
+                                message += "中奖名单：\n"
+                                for i, user in enumerate(users, 1):
+                                    username = user.get('user_username', user.get('username', '未知'))
+                                    user_id = user.get('user_id', '未知')
+                                    join_index = user.get('join_index', '未知')
+                                    message += f"{i}. `{username}` (id:`{user_id}`) 中奖号码：`{join_index}`\n"
+                            else:
+                                message += "暂无中奖用户\n"
+                            
+                            await loading.edit_text(message, parse_mode="Markdown")
+                        else:
+                            await loading.edit_text(f"❌ 查询失败，状态码：{response.status_code}", parse_mode="Markdown")
+                    except Exception as e:
+                        logger.error(f"查询中奖列表失败: {e}")
+                        await loading.edit_text("❌ 查询失败，请稍后重试", parse_mode="Markdown")
                     
                     # 清理用户数据
                     context.user_data.clear()

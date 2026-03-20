@@ -100,7 +100,12 @@ async def get_user_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else:
                 message += "\n📅 签到信息：今日未签到\n"
             
-            await loading.edit_text(message, parse_mode="Markdown")
+            message_obj = await loading.edit_text(message, parse_mode="Markdown")
+            # 30秒后自动消失
+            import asyncio
+            from utils.message_utils import auto_delete_message
+            # 使用message_obj作为消息对象
+            asyncio.create_task(auto_delete_message(update, context, message_obj, 30))
         else:
             await loading.edit_text(f"❌ 获取失败，状态码：{response.status_code}")
     except Exception as e:

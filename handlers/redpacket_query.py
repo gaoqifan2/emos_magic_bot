@@ -6,6 +6,7 @@ from telegram.ext import ContextTypes, ConversationHandler
 
 from config import user_tokens, Config
 from handlers.common import add_cancel_button
+from utils.message_utils import auto_delete_message
 
 logger = logging.getLogger(__name__)
 
@@ -22,25 +23,27 @@ async def check_redpacket_command(update: Update, context: ContextTypes.DEFAULT_
             await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
         return ConversationHandler.END
     
-    # 显示查询类型选择
-    keyboard = [
-        [InlineKeyboardButton("📋 查看我发的红包", callback_data="my_redpackets")],
-        [InlineKeyboardButton("🔍 输入红包ID查询", callback_data="input_id")]
-    ]
-    keyboard = add_cancel_button(keyboard)
+    # 直接进入输入红包ID查询
+    keyboard = add_cancel_button([[]])
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     if update.callback_query:
         await update.callback_query.edit_message_text(
-            "📊 查询红包记录\n\n请选择查询方式：",
+            "📊 查询红包领取记录\n\n请输入红包ID：",
             reply_markup=reply_markup
         )
+        # 5秒后自动消失
+        import asyncio
+        asyncio.create_task(auto_delete_message(update, context, None, 5))
     else:
-        await update.message.reply_text(
-            "📊 查询红包记录\n\n请选择查询方式：",
+        message = await update.message.reply_text(
+            "📊 查询红包领取记录\n\n请输入红包ID：",
             reply_markup=reply_markup
         )
-    return WAITING_QUERY_TYPE
+        # 5秒后自动消失
+        import asyncio
+        asyncio.create_task(auto_delete_message(update, context, message, 5))
+    return WAITING_REDPACKET_ID
 
 async def handle_query_type(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """处理查询类型选择"""
@@ -140,24 +143,26 @@ async def get_redpacket_id(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             data = response.json()
             
             if not data or not data.get('items'):
-                await loading.edit_text(f"📊 红包查询结果\n\n红包ID: {redpacket_id}\n暂无领取记录")
+                await loading.edit_text(f"📊 红包查询结果\n\n红包ID: `{redpacket_id}`\n暂无领取记录", parse_mode="Markdown")
                 return ConversationHandler.END
             
-            message = f"📊 红包领取记录\n\n红包ID: {redpacket_id}\n"
+            message = f"📊 红包领取记录\n\n红包ID: `{redpacket_id}`\n"
             message += f"总领取: {data.get('total', 0)} 人\n\n"
             
             for item in data.get('items', []):
                 username = item.get('username', '未知用户')
                 carrot = item.get('carrot', 0)
                 receive_at = item.get('receive_at', '未知时间')[:19].replace('T', ' ')
-                message += f"👤 {username}\n   🥕 {carrot} 萝卜\n   ⏰ {receive_at}\n\n"
+                message += f"👤 {username}\n"
+                message += f"   🥕 {carrot} 萝卜\n"
+                message += f"   ⏰ {receive_at}\n\n"
             
-            await loading.edit_text(message)
+            await loading.edit_text(message, parse_mode="Markdown")
         else:
-            await loading.edit_text(f"❌ 查询失败，状态码：{response.status_code}")
+                await loading.edit_text(f"❌ 查询失败，状态码：{response.status_code}", parse_mode="Markdown")
             
     except Exception as e:
         logger.error(f"查询红包失败: {e}")
-        await loading.edit_text("❌ 查询失败，请稍后重试")
+        await loading.edit_text("❌ 查询失败，请稍后重试", parse_mode="Markdown")
     
     return ConversationHandler.END

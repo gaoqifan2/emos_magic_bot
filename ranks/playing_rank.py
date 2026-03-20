@@ -1,10 +1,12 @@
 # ranks/playing_rank.py
 import logging
 import requests
+import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
 from config import user_tokens, Config
+from utils.message_utils import auto_delete_message
 from handlers.common import add_cancel_button
 
 logger = logging.getLogger(__name__)
@@ -123,6 +125,8 @@ async def playing_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             # 移除 parse_mode="Markdown"，使用纯文本
             await loading.edit_text(message, reply_markup=reply_markup)
+            # 30秒后自动消失
+            asyncio.create_task(auto_delete_message(update, context, None, 30))
         else:
             await loading.edit_text(f"❌ 获取失败，状态码：{response.status_code}")
             

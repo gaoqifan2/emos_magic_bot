@@ -57,7 +57,7 @@ class R2Client:
             ext = 'jpg'
         
         # 确保扩展名有效
-        valid_exts = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp']
+        valid_exts = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'ogg', 'mp3', 'wav', 'm4a', 'aac', 'flac', 'opus', 'webm']
         if ext not in valid_exts:
             ext = 'jpg'
         
@@ -74,6 +74,22 @@ class R2Client:
                 content_type = 'image/webp'
             elif ext == 'bmp':
                 content_type = 'image/bmp'
+            elif ext == 'ogg':
+                content_type = 'audio/ogg'
+            elif ext == 'mp3':
+                content_type = 'audio/mpeg'
+            elif ext == 'wav':
+                content_type = 'audio/wav'
+            elif ext == 'm4a':
+                content_type = 'audio/mp4'
+            elif ext == 'aac':
+                content_type = 'audio/aac'
+            elif ext == 'flac':
+                content_type = 'audio/flac'
+            elif ext == 'opus':
+                content_type = 'audio/opus'
+            elif ext == 'webm':
+                content_type = 'audio/webm'
             
             self.client.put_object(
                 Bucket=self.bucket,

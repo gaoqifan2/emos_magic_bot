@@ -6,6 +6,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
 from config import user_tokens, Config
+from utils.message_utils import auto_delete_message
 
 logger = logging.getLogger(__name__)
 
@@ -192,6 +193,7 @@ async def service_pay(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton("➕ 创建订单", callback_data="service_pay_create")],
         [InlineKeyboardButton("🔍 查询订单", callback_data="service_pay_query")],
+        [InlineKeyboardButton("🏆 查询中奖列表", callback_data="service_lottery_win")],
         [InlineKeyboardButton("❌ 关闭订单", callback_data="service_pay_close")],
         [InlineKeyboardButton("🔙 返回服务商菜单", callback_data="menu_service")]
     ]
@@ -247,6 +249,26 @@ async def service_pay_close(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # 存储当前状态，等待用户输入
     context.user_data['current_operation'] = 'service_pay_close_no'
+    context.user_data['token'] = token
+
+async def service_lottery_win(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """查询中奖列表"""
+    user_id = update.effective_user.id
+    token = user_tokens.get(user_id)
+    
+    if not token:
+        await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
+        return
+    
+    # 提示用户输入lottery_id
+    await update.callback_query.edit_message_text("🏆 请输入抽奖ID：")
+    
+    # 5秒后自动消失
+    import asyncio
+    asyncio.create_task(auto_delete_message(update, context, None, 5))
+    
+    # 存储当前状态，等待用户输入
+    context.user_data['current_operation'] = 'service_lottery_win_id'
     context.user_data['token'] = token
 
 async def service_fund(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -388,10 +410,10 @@ async def service_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         if game_balance is not None:
             # 计算最大可提现萝卜数
-            max_carrot = game_balance // 11  # 11游戏币=1萝卜（包含10%手续费）
+            max_carrot = game_balance // 10  # 10游戏币=1萝卜（包含1%手续费）
             if max_carrot > 0:
                 base_game_coin = max_carrot * 10
-                fee_game_coin = int(base_game_coin * 0.1)
+                fee_game_coin = int(base_game_coin * 0.01)
                 total_game_coin = base_game_coin + fee_game_coin
             else:
                 base_game_coin = 0
