@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
 
-from config import user_tokens, Config
+from config import user_tokens, Config, get_user_token
 from handlers.common import add_cancel_button
 
 logger = logging.getLogger(__name__)
@@ -533,7 +533,7 @@ async def finish_prizes(update, context):
         user_id = query.from_user.id
         message = query.message
     
-    token = user_tokens.get(user_id)
+    token = get_user_token(user_id)
     
     if not token:
         await message.reply_text("❌ 登录已过期，请重新发送 /start 登录")

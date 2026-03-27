@@ -4,7 +4,7 @@ import requests
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes, ConversationHandler
 
-from config import user_tokens, Config
+from config import user_tokens, Config, get_user_token
 from handlers.common import add_cancel_button
 from utils.message_utils import auto_delete_message
 
@@ -55,7 +55,8 @@ async def handle_query_type(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     
     if data == "my_redpackets":
         # 查看我发的红包
-        token = user_tokens.get(user_id)
+        token = get_user_token(user_id)
+        
         if not token:
             await query.edit_message_text("❌ 登录已过期，请重新发送 /start 登录")
             return ConversationHandler.END
@@ -123,7 +124,7 @@ async def get_redpacket_id(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     """接收红包ID并查询记录"""
     user_id = update.effective_user.id
     redpacket_id = update.message.text.strip()
-    token = user_tokens.get(user_id)
+    token = get_user_token(user_id)
     
     if not token:
         await update.message.reply_text("❌ 登录已过期，请重新发送 /start 登录")

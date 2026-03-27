@@ -4,8 +4,8 @@ import requests
 from telegram import Update, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
 
-from config import user_tokens, Config
-from handlers.common import add_cancel_button
+from config import user_tokens, Config, get_user_token
+from handlers.common import add_cancel_button, show_menu
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ async def get_lottery_cancel_id(update: Update, context: ContextTypes.DEFAULT_TY
     """接收抽奖ID并取消"""
     user_id = update.effective_user.id
     lottery_id = update.message.text.strip()
-    token = user_tokens.get(user_id)
+    token = get_user_token(user_id)
     
     logger.info(f"用户 {user_id} 请求取消抽奖: {lottery_id}")
     
@@ -68,28 +68,34 @@ async def get_lottery_cancel_id(update: Update, context: ContextTypes.DEFAULT_TY
         if response.status_code == 200:
             result = response.json()
             if result.get("is_success"):
+                # 取消成功，显示成功消息并自动返回主菜单
                 await loading_msg.edit_text(
                     f"✅ 抽奖取消成功！\n\n"
                     f"抽奖ID: {lottery_id}"
                 )
+                # 自动返回主菜单
+                await show_menu(update, "🏠 主菜单\n\n请选择操作：")
             else:
                 await loading_msg.edit_text(f"❌ 取消失败：操作未成功")
+                # 失败时也返回主菜单
+                await show_menu(update, "🏠 主菜单\n\n请选择操作：")
         elif response.status_code == 401:
             if user_id in user_tokens:
                 del user_tokens[user_id]
             await loading_msg.edit_text("❌ 登录已过期，请重新发送 /start 登录")
         elif response.status_code == 404:
             await loading_msg.edit_text(f"❌ 未找到抽奖ID: {lottery_id}")
+            # 失败时也返回主菜单
+            await show_menu(update, "🏠 主菜单\n\n请选择操作：")
         else:
             await loading_msg.edit_text(f"❌ 取消失败，状态码：{response.status_code}")
+            # 失败时也返回主菜单
+            await show_menu(update, "🏠 主菜单\n\n请选择操作：")
             
     except Exception as e:
         logger.error(f"用户 {user_id} 取消抽奖失败: {e}")
         await loading_msg.edit_text("❌ 取消失败，请稍后重试")
-    
-    # 操作完成后显示返回菜单按钮
-    keyboard = add_cancel_button([[]])
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("🏠 返回菜单", reply_markup=reply_markup)
+        # 异常时也返回主菜单
+        await show_menu(update, "🏠 主菜单\n\n请选择操作：")
     
     return ConversationHandler.END

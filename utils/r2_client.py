@@ -95,8 +95,7 @@ class R2Client:
                 Bucket=self.bucket,
                 Key=key,
                 Body=file_data,
-                ContentType=content_type,
-                ACL='public-read'
+                ContentType=content_type
             )
             
             url = f"{self.public_url}/{key}"

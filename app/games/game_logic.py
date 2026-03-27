@@ -47,12 +47,12 @@ def play_slot_game(bet_amount):
     if reels[0] == reels[1] == reels[2]:
         # 三个相同
         is_win = True
-        win_amount = bet_amount * 4  # 赢了获得下注金额的4倍
+        win_amount = bet_amount * 3  # 赢了获得下注金额的3倍
         result = f"{reels[0]} {reels[1]} {reels[2]} - 三个相同！"
     elif reels[0] == reels[1] or reels[1] == reels[2] or reels[0] == reels[2]:
         # 两个相同
         is_win = True
-        win_amount = bet_amount  # 赢了获得下注金额的1倍
+        win_amount = bet_amount * 0.5  # 赢了获得下注金额的0.5倍
         result = f"{reels[0]} {reels[1]} {reels[2]} - 两个相同！"
     else:
         # 全不同

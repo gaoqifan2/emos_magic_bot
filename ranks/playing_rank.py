@@ -35,7 +35,8 @@ def to_unicode(text):
 async def playing_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """正在播放排行榜 - 修复Markdown格式"""
     user_id = update.effective_user.id
-    token = user_tokens.get(user_id)
+    user_info = user_tokens.get(user_id)
+    token = user_info.get('token') if isinstance(user_info, dict) else user_info
     
     if not token:
         if update.message:
@@ -60,6 +61,9 @@ async def playing_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             headers=headers,
             timeout=10
         )
+        
+        # 确保使用正确的编码
+        response.encoding = 'utf-8'
         
         if response.status_code == 200:
             data = response.json()

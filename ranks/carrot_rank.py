@@ -24,7 +24,8 @@ def to_unicode(text):
 async def rank_carrot_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """萝卜排行榜 - 左右分列版"""
     user_id = update.effective_user.id
-    token = user_tokens.get(user_id)
+    user_info = user_tokens.get(user_id)
+    token = user_info.get('token') if isinstance(user_info, dict) else user_info
     
     if not token:
         if update.message:

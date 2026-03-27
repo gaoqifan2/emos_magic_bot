@@ -7,15 +7,40 @@ from telegram.ext import ContextTypes, ConversationHandler
 # 北京时间 UTC+8
 beijing_tz = timezone(timedelta(hours=8))
 
-from config import user_tokens, Config
+from config import user_tokens, Config, get_user_token
 from handlers.common import add_cancel_button
 from utils.r2_client import r2_client
 from utils.message_utils import auto_delete_message
 
 logger = logging.getLogger(__name__)
 
-# 对话状态
-WAITING_TYPE, WAITING_CARROT, WAITING_NUMBER, WAITING_BLESSING, WAITING_PASSWORD, WAITING_MEDIA = range(6)
+# 对话状态 (从1开始，避免与 ConversationHandler.END=0 冲突)
+WAITING_TYPE, WAITING_CARROT, WAITING_NUMBER, WAITING_BLESSING, WAITING_PASSWORD, WAITING_MEDIA = range(1, 7)
+
+# 步骤顺序，用于返回上一步
+STEP_ORDER = ['type', 'carrot', 'number', 'blessing', 'password', 'media']
+
+def get_step_keyboard(current_step):
+    """获取当前步骤的键盘，包含返回上一步按钮"""
+    keyboard = []
+    
+    # 找到当前步骤在顺序中的位置
+    if current_step in STEP_ORDER:
+        current_index = STEP_ORDER.index(current_step)
+        # 如果有上一步，添加返回按钮和取消按钮在同一行
+        if current_index > 0:
+            prev_step = STEP_ORDER[current_index - 1]
+            keyboard.append([
+                InlineKeyboardButton("⬅️ 返回上一步", callback_data=f"back_{prev_step}"),
+                InlineKeyboardButton("❌ 取消", callback_data="cancel_operation")
+            ])
+        else:
+            # 没有上一步，只添加取消按钮
+            keyboard.append([InlineKeyboardButton("❌ 取消", callback_data="cancel_operation")])
+    else:
+        keyboard.append([InlineKeyboardButton("❌ 取消", callback_data="cancel_operation")])
+    
+    return InlineKeyboardMarkup(keyboard)
 
 async def redpocket_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """开始创建红包"""
@@ -33,7 +58,8 @@ async def redpocket_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 初始化用户数据
     context.user_data['redpacket'] = {
         'user_id': user_id,
-        'start_time': datetime.now(beijing_tz).isoformat()
+        'start_time': datetime.now(beijing_tz).isoformat(),
+        'current_step': 'type'
     }
     
     # 初始化上传文件缓存
@@ -42,10 +68,10 @@ async def redpocket_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # 显示红包类型选择菜单
     keyboard = [
-        [InlineKeyboardButton("🎲 普通红包", callback_data="type_random")],
-        [InlineKeyboardButton("🔐 口令红包", callback_data="type_password")],
-        [InlineKeyboardButton("🖼️ 图片红包", callback_data="type_image")],
-        [InlineKeyboardButton("🎵 语音红包", callback_data="type_audio")]
+        [InlineKeyboardButton("🎲 普通红包　　　　　　", callback_data="type_random")],
+        [InlineKeyboardButton("🔐 口令红包　　　　　　", callback_data="type_password")],
+        [InlineKeyboardButton("🖼️ 图片红包　　　　　　", callback_data="type_image")],
+        [InlineKeyboardButton("🎵 语音红包　　　　　　", callback_data="type_audio")]
     ]
     keyboard = add_cancel_button(keyboard)
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -59,7 +85,6 @@ async def redpocket_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.callback_query.edit_message_text(message_text, reply_markup=reply_markup)
         except Exception as e:
             logger.error(f"编辑消息失败: {e}")
-            # 如果编辑失败，发送新消息
             await update.callback_query.message.reply_text(message_text, reply_markup=reply_markup)
     
     return WAITING_TYPE
@@ -76,34 +101,116 @@ async def handle_type(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if 'redpacket' not in context.user_data:
         context.user_data['redpacket'] = {
             'user_id': user_id,
-            'start_time': datetime.now(beijing_tz).isoformat()
+            'start_time': datetime.now(beijing_tz).isoformat(),
+            'current_step': 'type'
         }
     
     redpacket_data = context.user_data['redpacket']
     
     if data == 'type_random':
         redpacket_data['type'] = 'random'
-        redpacket_data['step'] = 'carrot'
-        await query.edit_message_text("💰 请输入红包总金额（萝卜）：\n（1 - 60000 之间）")
+        redpacket_data['current_step'] = 'carrot'
+        await query.edit_message_text("💰 请输入红包总金额（萝卜）：\n（1 - 60000 之间）", reply_markup=get_step_keyboard('carrot'))
         return WAITING_CARROT
     elif data == 'type_password':
         redpacket_data['type'] = 'password'
-        redpacket_data['step'] = 'carrot'
-        await query.edit_message_text("💰 请输入红包总金额（萝卜）：\n（1 - 60000 之间）")
+        redpacket_data['current_step'] = 'carrot'
+        await query.edit_message_text("💰 请输入红包总金额（萝卜）：\n（1 - 60000 之间）", reply_markup=get_step_keyboard('carrot'))
         return WAITING_CARROT
     elif data == 'type_image':
         redpacket_data['type'] = 'image'
-        redpacket_data['step'] = 'media'
-        await query.edit_message_text("🖼️ 请发送图片作为红包封面：")
-        return WAITING_MEDIA
+        redpacket_data['current_step'] = 'password_choice'
+        # 显示口令选择菜单
+        keyboard = [
+            [InlineKeyboardButton("🚫 无口令 (手气红包)　　", callback_data="image_no_password")],
+            [InlineKeyboardButton("🔐 有口令　　　　　　　", callback_data="image_with_password")]
+        ]
+        keyboard = add_cancel_button(keyboard)
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text("🖼️ 图片红包\n\n请选择是否需要口令：", reply_markup=reply_markup)
+        return WAITING_TYPE
     elif data == 'type_audio':
         redpacket_data['type'] = 'audio'
-        redpacket_data['step'] = 'media'
-        await query.edit_message_text("🎵 请发送语音作为红包内容：")
-        return WAITING_MEDIA
+        redpacket_data['current_step'] = 'password_choice'
+        # 显示口令选择菜单
+        keyboard = [
+            [InlineKeyboardButton("🚫 无口令 (手气红包)　　", callback_data="audio_no_password")],
+            [InlineKeyboardButton("🔐 有口令　　　　　　　", callback_data="audio_with_password")]
+        ]
+        keyboard = add_cancel_button(keyboard)
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text("🎵 语音红包\n\n请选择是否需要口令：", reply_markup=reply_markup)
+        return WAITING_TYPE
+    elif data == 'image_no_password':
+        redpacket_data['has_password'] = False
+        redpacket_data['current_step'] = 'carrot'
+        await query.edit_message_text("🖼️ 图片红包 - 无口令\n\n💰 请输入红包总金额（萝卜）：\n（1 - 60000 之间）", reply_markup=get_step_keyboard('carrot'))
+        return WAITING_CARROT
+    elif data == 'image_with_password':
+        redpacket_data['has_password'] = True
+        redpacket_data['current_step'] = 'carrot'
+        await query.edit_message_text("🖼️ 图片红包 - 有口令\n\n💰 请输入红包总金额（萝卜）：\n（1 - 60000 之间）", reply_markup=get_step_keyboard('carrot'))
+        return WAITING_CARROT
+    elif data == 'audio_no_password':
+        redpacket_data['has_password'] = False
+        redpacket_data['current_step'] = 'carrot'
+        await query.edit_message_text("🎵 语音红包 - 无口令\n\n💰 请输入红包总金额（萝卜）：\n（1 - 60000 之间）", reply_markup=get_step_keyboard('carrot'))
+        return WAITING_CARROT
+    elif data == 'audio_with_password':
+        redpacket_data['has_password'] = True
+        redpacket_data['current_step'] = 'carrot'
+        await query.edit_message_text("🎵 语音红包 - 有口令\n\n💰 请输入红包总金额（萝卜）：\n（1 - 60000 之间）", reply_markup=get_step_keyboard('carrot'))
+        return WAITING_CARROT
+    elif data.startswith('back_'):
+        # 处理返回上一步
+        return await handle_back(update, context, data)
     else:
         await query.edit_message_text("❌ 未知的红包类型")
         return ConversationHandler.END
+
+async def handle_back(update: Update, context: ContextTypes.DEFAULT_TYPE, data: str):
+    """处理返回上一步"""
+    query = update.callback_query
+    redpacket_data = context.user_data.get('redpacket')
+    prev_step = data.replace('back_', '')
+    
+    logger.info(f"用户返回上一步到: {prev_step}")
+    
+    if prev_step == 'type':
+        redpacket_data['current_step'] = 'type'
+        keyboard = [
+            [InlineKeyboardButton("🎲 普通红包", callback_data="type_random")],
+            [InlineKeyboardButton("🔐 口令红包", callback_data="type_password")],
+            [InlineKeyboardButton("🖼️ 图片红包", callback_data="type_image")],
+            [InlineKeyboardButton("🎵 语音红包", callback_data="type_audio")]
+        ]
+        keyboard = add_cancel_button(keyboard)
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text("🧧 创建红包\n\n请选择红包类型：", reply_markup=reply_markup)
+        return WAITING_TYPE
+    elif prev_step == 'carrot':
+        redpacket_data['current_step'] = 'carrot'
+        await query.edit_message_text("💰 请输入红包总金额（萝卜）：\n（1 - 60000 之间）", reply_markup=get_step_keyboard('carrot'))
+        return WAITING_CARROT
+    elif prev_step == 'number':
+        redpacket_data['current_step'] = 'number'
+        await query.edit_message_text("👥 请输入可领人数：\n（1 - 10000 之间）", reply_markup=get_step_keyboard('number'))
+        return WAITING_NUMBER
+    elif prev_step == 'blessing':
+        redpacket_data['current_step'] = 'blessing'
+        await query.edit_message_text("💬 请输入祝福语（最多50字）：", reply_markup=get_step_keyboard('blessing'))
+        return WAITING_BLESSING
+    elif prev_step == 'password':
+        redpacket_data['current_step'] = 'password'
+        await query.edit_message_text("🔑 请输入红包口令：", reply_markup=get_step_keyboard('password'))
+        return WAITING_PASSWORD
+    elif prev_step == 'media':
+        redpacket_data['current_step'] = 'media'
+        media_type = "图片" if redpacket_data.get('type') == 'image' else "语音"
+        await query.edit_message_text(f"🖼️ 请发送{media_type}作为红包封面：", reply_markup=get_step_keyboard('media'))
+        return WAITING_MEDIA
+    else:
+        return WAITING_TYPE
 
 async def handle_carrot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """处理红包金额输入"""
@@ -121,15 +228,21 @@ async def handle_carrot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         carrot = int(text)
         if carrot <= 0 or carrot > 60000:
-            await update.message.reply_text("❌ 金额必须在1-60000之间，请重新输入：")
+            await update.message.reply_text("❌ 金额必须在1-60000之间，请重新输入：", reply_markup=get_step_keyboard('carrot'))
             return WAITING_CARROT
         
         redpacket_data['carrot'] = carrot
-        redpacket_data['step'] = 'number'
-        await update.message.reply_text("👥 请输入可领人数：\n（1 - 10000 之间）")
+        redpacket_data['current_step'] = 'number'
+        
+        # 图片/语音红包提示可以上传媒体
+        if redpacket_data['type'] in ['image', 'audio']:
+            media_type = "图片" if redpacket_data['type'] == 'image' else "语音"
+            await update.message.reply_text(f"👥 请输入可领人数：\n（1 - 10000 之间）\n\n📎 你也可以随时发送{media_type}作为红包封面", reply_markup=get_step_keyboard('number'))
+        else:
+            await update.message.reply_text("👥 请输入可领人数：\n（1 - 10000 之间）", reply_markup=get_step_keyboard('number'))
         return WAITING_NUMBER
     except ValueError:
-        await update.message.reply_text("❌ 请输入有效的数字：")
+        await update.message.reply_text("❌ 请输入有效的数字：", reply_markup=get_step_keyboard('carrot'))
         return WAITING_CARROT
 
 async def handle_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -148,15 +261,21 @@ async def handle_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         number = int(text)
         if number <= 0 or number > 10000:
-            await update.message.reply_text("❌ 人数必须在1-10000之间，请重新输入：")
+            await update.message.reply_text("❌ 人数必须在1-10000之间，请重新输入：", reply_markup=get_step_keyboard('number'))
             return WAITING_NUMBER
         
         redpacket_data['number'] = number
-        redpacket_data['step'] = 'blessing'
-        await update.message.reply_text("💬 请输入祝福语（最多50字）：")
+        redpacket_data['current_step'] = 'blessing'
+        
+        # 图片/语音红包提示可以上传媒体
+        if redpacket_data['type'] in ['image', 'audio']:
+            media_type = "图片" if redpacket_data['type'] == 'image' else "语音"
+            await update.message.reply_text(f"💬 请输入祝福语（最多50字）：\n\n📎 你也可以随时发送{media_type}作为红包封面", reply_markup=get_step_keyboard('blessing'))
+        else:
+            await update.message.reply_text("💬 请输入祝福语（最多50字）：", reply_markup=get_step_keyboard('blessing'))
         return WAITING_BLESSING
     except ValueError:
-        await update.message.reply_text("❌ 请输入有效的数字：")
+        await update.message.reply_text("❌ 请输入有效的数字：", reply_markup=get_step_keyboard('number'))
         return WAITING_NUMBER
 
 async def handle_blessing(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -173,15 +292,27 @@ async def handle_blessing(update: Update, context: ContextTypes.DEFAULT_TYPE):
     redpacket_data = context.user_data['redpacket']
     
     if len(text) > 50:
-        await update.message.reply_text("❌ 祝福语不能超过50字，请重新输入：")
+        await update.message.reply_text("❌ 祝福语不能超过50字，请重新输入：", reply_markup=get_step_keyboard('blessing'))
         return WAITING_BLESSING
     
     redpacket_data['blessing'] = text
+    redpacket_data['current_step'] = 'password' if redpacket_data.get('has_password') or redpacket_data['type'] == 'password' else 'media' if redpacket_data['type'] in ['image', 'audio'] else 'complete'
     
     if redpacket_data['type'] == 'password':
-        redpacket_data['step'] = 'password'
-        await update.message.reply_text("🔑 请输入红包口令：")
+        await update.message.reply_text("🔑 请输入红包口令：", reply_markup=get_step_keyboard('password'))
         return WAITING_PASSWORD
+    elif redpacket_data['type'] in ['image', 'audio']:
+        if redpacket_data.get('has_password'):
+            await update.message.reply_text("🔑 请输入红包口令：", reply_markup=get_step_keyboard('password'))
+            return WAITING_PASSWORD
+        else:
+            # 检查是否已经上传了媒体
+            if redpacket_data.get('cover_url'):
+                return await create_redpacket(update, context)
+            else:
+                media_type = "图片" if redpacket_data['type'] == 'image' else "语音"
+                await update.message.reply_text(f"🖼️ 请发送{media_type}作为红包封面：", reply_markup=get_step_keyboard('media'))
+                return WAITING_MEDIA
     else:
         return await create_redpacket(update, context)
 
@@ -198,8 +329,18 @@ async def handle_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     redpacket_data = context.user_data['redpacket']
     redpacket_data['password'] = text
+    redpacket_data['current_step'] = 'media' if redpacket_data['type'] in ['image', 'audio'] else 'complete'
     
-    return await create_redpacket(update, context)
+    if redpacket_data['type'] in ['image', 'audio']:
+        # 检查是否已经上传了媒体
+        if redpacket_data.get('cover_url'):
+            return await create_redpacket(update, context)
+        else:
+            media_type = "图片" if redpacket_data['type'] == 'image' else "语音"
+            await update.message.reply_text(f"🖼️ 请发送{media_type}作为红包封面：", reply_markup=get_step_keyboard('media'))
+            return WAITING_MEDIA
+    else:
+        return await create_redpacket(update, context)
 
 async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """处理媒体上传（图片/音频）"""
@@ -242,9 +383,9 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         redpacket_data['cover_url'] = cover_url
         redpacket_data['file_type'] = 'image'
-        redpacket_data['step'] = 'carrot'
-        await update.message.reply_text("💰 请输入红包总金额（萝卜）：\n（1 - 60000 之间）")
-        return WAITING_CARROT
+        
+        # 根据当前步骤继续
+        return await continue_after_media(update, context)
     
     elif update.message.voice or update.message.audio or update.message.document:
         # 处理音频
@@ -312,29 +453,66 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         redpacket_data['cover_url'] = audio_url
         redpacket_data['file_type'] = 'audio'
-        redpacket_data['step'] = 'carrot'
-        await update.message.reply_text("💰 请输入红包总金额（萝卜）：\n（1 - 60000 之间）")
-        return WAITING_CARROT
+        
+        # 根据当前步骤继续
+        return await continue_after_media(update, context)
     else:
         await update.message.reply_text("❌ 请发送有效的媒体文件")
         return WAITING_MEDIA
 
+async def continue_after_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """上传媒体后根据当前步骤继续"""
+    redpacket_data = context.user_data['redpacket']
+    current_step = redpacket_data.get('current_step', 'carrot')
+    
+    if current_step == 'carrot':
+        await update.message.reply_text("💰 请输入红包总金额（萝卜）：\n（1 - 60000 之间）", reply_markup=get_step_keyboard('carrot'))
+        return WAITING_CARROT
+    elif current_step == 'number':
+        await update.message.reply_text("👥 请输入可领人数：\n（1 - 10000 之间）", reply_markup=get_step_keyboard('number'))
+        return WAITING_NUMBER
+    elif current_step == 'blessing':
+        await update.message.reply_text("💬 请输入祝福语（最多50字）：", reply_markup=get_step_keyboard('blessing'))
+        return WAITING_BLESSING
+    elif current_step == 'password':
+        if redpacket_data.get('has_password'):
+            if 'password' in redpacket_data:
+                return await create_redpacket(update, context)
+            else:
+                await update.message.reply_text("🔑 请输入红包口令：", reply_markup=get_step_keyboard('password'))
+                return WAITING_PASSWORD
+        else:
+            return await create_redpacket(update, context)
+    else:
+        required_fields = ['carrot', 'number', 'blessing']
+        if all(field in redpacket_data for field in required_fields):
+            if redpacket_data.get('has_password') and 'password' not in redpacket_data:
+                await update.message.reply_text("🔑 请输入红包口令：", reply_markup=get_step_keyboard('password'))
+                return WAITING_PASSWORD
+            return await create_redpacket(update, context)
+        else:
+            if 'carrot' not in redpacket_data:
+                await update.message.reply_text("💰 请输入红包总金额（萝卜）：\n（1 - 60000 之间）", reply_markup=get_step_keyboard('carrot'))
+                return WAITING_CARROT
+            elif 'number' not in redpacket_data:
+                await update.message.reply_text("👥 请输入可领人数：\n（1 - 10000 之间）", reply_markup=get_step_keyboard('number'))
+                return WAITING_NUMBER
+            elif 'blessing' not in redpacket_data:
+                await update.message.reply_text("💬 请输入祝福语（最多50字）：", reply_markup=get_step_keyboard('blessing'))
+                return WAITING_BLESSING
+            else:
+                return await create_redpacket(update, context)
+
 async def create_redpacket(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """创建红包API调用"""
     user_id = update.effective_user.id
-    user_info = user_tokens.get(user_id)
+    token = get_user_token(user_id)
     
     if 'redpacket' not in context.user_data:
         await update.message.reply_text("❌ 数据不完整，请重新开始")
         return ConversationHandler.END
     
     data = context.user_data['redpacket']
-    
-    # 检查user_info是字典还是字符串
-    if isinstance(user_info, dict):
-        token = user_info.get('token')
-    else:
-        token = user_info
     
     if not token:
         await update.message.reply_text("❌ 登录已过期，请重新发送 /start 登录")
@@ -354,19 +532,19 @@ async def create_redpacket(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Content-Type": "application/json"
         }
         
-        # 根据用户选择的红包类型设置类型
         if data.get('type') == 'random':
             redpacket_type = "random"
             redpacket_text = None
         elif data.get('type') == 'password':
             redpacket_type = "password"
             redpacket_text = data.get('password', None)
-        elif data.get('type') == 'image':
-            redpacket_type = "fixed"
-            redpacket_text = None
-        elif data.get('type') == 'audio':
-            redpacket_type = "fixed"
-            redpacket_text = None
+        elif data.get('type') in ['image', 'audio']:
+            if data.get('has_password'):
+                redpacket_type = "password"
+                redpacket_text = data.get('password', None)
+            else:
+                redpacket_type = "fixed"
+                redpacket_text = None
         else:
             redpacket_type = "random"
             redpacket_text = None
@@ -394,7 +572,6 @@ async def create_redpacket(update: Update, context: ContextTypes.DEFAULT_TYPE):
             result = response.json()
             logger.info(f"API返回结果: {result}")
             
-            # 根据红包类型显示不同的标签
             if redpacket_type == "random":
                 redpacket_type_display = "🎲 普通红包"
             elif redpacket_type == "password":
@@ -413,7 +590,7 @@ async def create_redpacket(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"👥 人数: {data['number']}\n"
                 f"💬 祝福语: `{data['blessing']}`\n"
             )
-            if redpacket_type == "password" and redpacket_text:
+            if redpacket_text:
                 message += f"🔑 口令: `{redpacket_text}`\n"
             if data.get('cover_url'):
                 if data.get('file_type') == 'image':
@@ -434,7 +611,6 @@ async def create_redpacket(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(traceback.format_exc())
         await loading.edit_text("❌ 创建失败，请稍后重试")
     
-    # 清理数据
     if 'redpacket' in context.user_data:
         del context.user_data['redpacket']
     

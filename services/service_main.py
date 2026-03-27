@@ -14,7 +14,8 @@ async def show_service_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """服务商主菜单"""
     user_id = update.effective_user.id
     try:
-        token = user_tokens.get(user_id)
+        user_info = user_tokens.get(user_id)
+        token = user_info.get('token') if isinstance(user_info, dict) else user_info
     except UnicodeEncodeError:
         token = None
         logger.error("获取用户token时发生编码错误")
@@ -95,7 +96,8 @@ async def show_service_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def service_manage(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """服务商管理"""
     user_id = update.effective_user.id
-    token = user_tokens.get(user_id)
+    user_info = user_tokens.get(user_id)
+    token = user_info.get('token') if isinstance(user_info, dict) else user_info
     
     if not token:
         await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
@@ -160,7 +162,8 @@ async def service_manage(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def service_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """更新服务商信息"""
     user_id = update.effective_user.id
-    token = user_tokens.get(user_id)
+    user_info = user_tokens.get(user_id)
+    token = user_info.get('token') if isinstance(user_info, dict) else user_info
     
     if not token:
         await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
@@ -176,7 +179,8 @@ async def service_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def service_apply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """申请成为服务商"""
     user_id = update.effective_user.id
-    token = user_tokens.get(user_id)
+    user_info = user_tokens.get(user_id)
+    token = user_info.get('token') if isinstance(user_info, dict) else user_info
     
     if not token:
         await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
@@ -192,7 +196,8 @@ async def service_apply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def service_pay(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """支付核心"""
     user_id = update.effective_user.id
-    token = user_tokens.get(user_id)
+    user_info = user_tokens.get(user_id)
+    token = user_info.get('token') if isinstance(user_info, dict) else user_info
     
     if not token:
         await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
@@ -215,7 +220,8 @@ async def service_pay(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def service_pay_create(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """创建订单"""
     user_id = update.effective_user.id
-    token = user_tokens.get(user_id)
+    user_info = user_tokens.get(user_id)
+    token = user_info.get('token') if isinstance(user_info, dict) else user_info
     
     if not token:
         await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
@@ -231,7 +237,8 @@ async def service_pay_create(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def service_pay_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """查询订单"""
     user_id = update.effective_user.id
-    token = user_tokens.get(user_id)
+    user_info = user_tokens.get(user_id)
+    token = user_info.get('token') if isinstance(user_info, dict) else user_info
     
     if not token:
         await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
@@ -247,7 +254,8 @@ async def service_pay_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def service_pay_close(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """关闭订单"""
     user_id = update.effective_user.id
-    token = user_tokens.get(user_id)
+    user_info = user_tokens.get(user_id)
+    token = user_info.get('token') if isinstance(user_info, dict) else user_info
     
     if not token:
         await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
@@ -263,7 +271,8 @@ async def service_pay_close(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def service_lottery_win(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """查询中奖列表"""
     user_id = update.effective_user.id
-    token = user_tokens.get(user_id)
+    user_info = user_tokens.get(user_id)
+    token = user_info.get('token') if isinstance(user_info, dict) else user_info
     
     if not token:
         await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
@@ -283,7 +292,8 @@ async def service_lottery_win(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def service_fund(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """资金操作"""
     user_id = update.effective_user.id
-    token = user_tokens.get(user_id)
+    user_info = user_tokens.get(user_id)
+    token = user_info.get('token') if isinstance(user_info, dict) else user_info
     
     if not token:
         await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
@@ -303,7 +313,8 @@ async def service_fund(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def service_fund_transfer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """转账给用户"""
     user_id = update.effective_user.id
-    token = user_tokens.get(user_id)
+    user_info = user_tokens.get(user_id)
+    token = user_info.get('token') if isinstance(user_info, dict) else user_info
     
     if not token:
         await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
@@ -319,7 +330,8 @@ async def service_fund_transfer(update: Update, context: ContextTypes.DEFAULT_TY
 async def service_user_manage(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """用户管理"""
     user_id = update.effective_user.id
-    token = user_tokens.get(user_id)
+    user_info = user_tokens.get(user_id)
+    token = user_info.get('token') if isinstance(user_info, dict) else user_info
     
     if not token:
         await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
@@ -363,7 +375,8 @@ async def service_user_manage(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def service_recharge(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """充值中心"""
     user_id = update.effective_user.id
-    token = user_tokens.get(user_id)
+    user_info = user_tokens.get(user_id)
+    token = user_info.get('token') if isinstance(user_info, dict) else user_info
     
     if not token:
         await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
@@ -379,7 +392,8 @@ async def service_recharge(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def service_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """提现专区"""
     user_id = update.effective_user.id
-    token = user_tokens.get(user_id)
+    user_info = user_tokens.get(user_id)
+    token = user_info.get('token') if isinstance(user_info, dict) else user_info
     
     if not token:
         await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
@@ -472,7 +486,8 @@ async def service_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def service_game_center(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """游戏中心"""
     user_id = update.effective_user.id
-    token = user_tokens.get(user_id)
+    user_info = user_tokens.get(user_id)
+    token = user_info.get('token') if isinstance(user_info, dict) else user_info
     
     if not token:
         await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
@@ -524,7 +539,8 @@ async def create_recharge_order(user_id, carrot_amount, game_id="1"):
         order_no = f"R{datetime.now(beijing_tz).strftime('%Y%m%d')}{str(uuid.uuid4())[:8].upper()}"
         
         # 调用平台API
-        token = user_tokens.get(user_id)
+        user_info = user_tokens.get(user_id)
+        token = user_info.get('token') if isinstance(user_info, dict) else user_info
         if not token:
             return {"success": False, "error": "用户未登录"}
         
@@ -573,7 +589,8 @@ async def process_withdraw_order(user_id, game_coin_amount):
         order_no = f"W{datetime.now(beijing_tz).strftime('%Y%m%d')}{str(uuid.uuid4())[:8].upper()}"
         
         # 调用转账API
-        token = user_tokens.get(user_id)
+        user_info = user_tokens.get(user_id)
+        token = user_info.get('token') if isinstance(user_info, dict) else user_info
         if not token:
             return {"success": False, "error": "用户未登录"}
         

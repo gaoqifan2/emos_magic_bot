@@ -501,6 +501,35 @@ def add_withdrawal_record(user_id, amount):
         connection.close()
     return False
 
+def get_withdrawal_history(user_id):
+    """获取用户的提现历史"""
+    connection = get_db_connection()
+    if not connection:
+        return []
+    
+    try:
+        with connection.cursor() as cursor:
+            # 先通过用户的user_id找到用户在数据库中的id
+            cursor.execute('SELECT id FROM users WHERE user_id = %s', (user_id,))
+            user_result = cursor.fetchone()
+            
+            if user_result:
+                user_id_db = user_result['id']
+                # 查询用户的所有提现记录
+                cursor.execute('''
+                    SELECT amount, created_at 
+                    FROM withdrawal_records 
+                    WHERE user_id = %s 
+                    ORDER BY created_at DESC
+                ''', (user_id_db,))
+                records = cursor.fetchall()
+                return records
+    except Exception as e:
+        print(f"获取提现历史时出错: {e}")
+    finally:
+        connection.close()
+    return []
+
 def ensure_user_exists(emos_user_id, token, telegram_id=None, username=None, first_name=None, last_name=None):
     """确保用户存在，如果不存在则创建
 
@@ -656,3 +685,32 @@ def update_recharge_order_status(platform_order_no, status):
         return False
     finally:
         connection.close()
+
+def get_recharge_history(user_id):
+    """获取用户的充值历史"""
+    connection = get_db_connection()
+    if not connection:
+        return []
+    
+    try:
+        with connection.cursor() as cursor:
+            # 先通过用户的user_id找到用户在数据库中的id
+            cursor.execute('SELECT id FROM users WHERE user_id = %s', (user_id,))
+            user_result = cursor.fetchone()
+            
+            if user_result:
+                user_id_db = user_result['id']
+                # 查询用户的所有充值记录
+                cursor.execute('''
+                    SELECT carrot_amount, created_at 
+                    FROM recharge_orders 
+                    WHERE user_id = %s AND status = 'success' 
+                    ORDER BY created_at DESC
+                ''', (user_id_db,))
+                records = cursor.fetchall()
+                return records
+    except Exception as e:
+        print(f"获取充值历史时出错: {e}")
+    finally:
+        connection.close()
+    return []

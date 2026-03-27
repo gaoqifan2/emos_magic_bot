@@ -574,17 +574,32 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except UnicodeEncodeError:
         logger.info(f"用户 {user_id} 点击按钮: {data}")
     
+    # 定义已知的回调前缀
+    known_prefixes = ('type_', 'menu_', 'cancel_', 'back_', 'games', 'help', 'add_more_prizes', 'finish_prizes',
+                      'service_', 'end_time_', 'need_bodys_', 'cancel_recharge')
+    known_callbacks = ('games', 'help', 'add_more_prizes', 'finish_prizes', 'cancel_recharge')
+    
+    # menu_redpocket 直接处理，启动红包创建流程
+    if data == 'menu_redpocket':
+        logger.info(f"处理 menu_redpocket 按钮")
+        from handlers.redpacket import redpocket_command
+        return await redpocket_command(update, context)
+    
+    # 红包类型选择回调直接处理
+    if data.startswith('type_'):
+        logger.info(f"处理红包类型回调: {data}")
+        from handlers.redpacket import handle_type
+        return await handle_type(update, context)
+    
+    # 图片/语音红包口令选择回调
+    if data in ('image_no_password', 'image_with_password', 'audio_no_password', 'audio_with_password'):
+        logger.info(f"处理红包口令选择回调: {data}")
+        from handlers.redpacket import handle_type
+        return await handle_type(update, context)
+    
     # 先 answer 回调
     await query.answer()
     logger.info(f"已响应回调: {data}")
-    
-    # 对于红包类型选择回调，不做处理，让redpocket_conv处理
-    # 如果用户没有进入对话，系统会自动处理
-    if data.startswith('type_'):
-        logger.info(f"用户点击红包类型按钮: {data}")
-        # 不做处理，让redpocket_conv处理这个回调
-        # 直接返回，确保函数不会继续执行后面的代码
-        return
     
     # 处理游戏相关的按钮回调
     from app.handlers.command_handlers import callback_handler as game_callback_handler
@@ -598,11 +613,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if game_handled:
         return
     
-    # 对于menu_redpocket，直接调用redpocket_command函数
-    if data == "menu_redpocket":
-        logger.info(f"处理菜单红包按钮")
-        from handlers.redpacket import redpocket_command
-        return await redpocket_command(update, context)
+    # menu_redpocket 由 redpocket_conv 的 entry_points 处理，这里不处理
     
     if data == "cancel_operation":
         logger.info(f"处理取消操作按钮")

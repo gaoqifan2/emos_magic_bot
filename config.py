@@ -9,7 +9,7 @@ class Config:
     BOT_TOKEN: str = "8682707944:AAGvauAZxz8BRxwFd2piaG3adi01zGQtydY"
     BOT_USERNAME: str = "emosMagicBox_bot"
 
-    #测试bot
+    # # 测试bot
     # BOT_TOKEN: str = "8714100893:AAFxkl8zL2bpdNzgEBJ9fIseNsAG8D-mSjI"
     # BOT_USERNAME: str = "emosCheShiBox_bot"
     
@@ -77,17 +77,54 @@ GROUP_ALLOWED_COMMANDS = [
 # 全局变量 - 存储用户token
 user_tokens = {}
 
+def get_user_token(user_id):
+    """从user_tokens中获取用户的token字符串
+    
+    支持两种存储格式：
+    1. 字典格式: {'token': 'xxx', 'user_id': 'xxx', ...}
+    2. 字符串格式: 'xxx'
+    
+    Args:
+        user_id: 用户ID
+        
+    Returns:
+        token字符串或None
+    """
+    user_info = user_tokens.get(user_id)
+    if not user_info:
+        return None
+    
+    # 如果是字典，提取token字段
+    if isinstance(user_info, dict):
+        return user_info.get('token')
+    
+    # 如果是字符串，直接返回
+    return user_info
+
 # 服务商token（用于为所有用户创建支付订单）
 SERVICE_PROVIDER_TOKEN = "1047_ow2NHeo3HyzDSxvl"
 
-# MySQL数据库配置
+# MySQL数据库配置（正式环境）
 DB_CONFIG = {
     "host": "66.235.105.125",
     "port": 3306,
     "user": "root",
     "password": "H_fans200109~",
-    "database": "game_db_test",
+    "database": "game_db",
     "charset": "utf8mb4"
+}
+
+# 提现限制配置
+WITHDRAW_LIMITS = {
+    "daily": 50,  # 每日提现上限（萝卜）
+    "monthly": 200,  # 每月提现上限（萝卜）
+    "lifetime": 1000  # 终身提现上限（萝卜）
+}
+
+# 充值限制配置
+RECHARGE_LIMITS = {
+    "daily": 100,  # 每日充值上限（萝卜）
+    "monthly": 500  # 每月充值上限（萝卜）
 }
 
 # 初始化R2客户端

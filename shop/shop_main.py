@@ -3,7 +3,7 @@ import httpx
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
-from config import user_tokens, Config
+from config import user_tokens, Config, get_user_token
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +25,7 @@ async def show_shop_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def shop_manage(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """店铺管理"""
     user_id = update.effective_user.id
-    token = user_tokens.get(user_id)
+    token = get_user_token(user_id)
     
     if not token:
         await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
@@ -77,7 +77,7 @@ async def shop_manage(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def shop_apply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """申请开店"""
     user_id = update.effective_user.id
-    token = user_tokens.get(user_id)
+    token = get_user_token(user_id)
     
     if not token:
         await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
@@ -93,7 +93,7 @@ async def shop_apply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def shop_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """商品分类管理"""
     user_id = update.effective_user.id
-    token = user_tokens.get(user_id)
+    token = get_user_token(user_id)
     
     if not token:
         await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
@@ -137,7 +137,7 @@ async def shop_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def shop_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """商品管理"""
     user_id = update.effective_user.id
-    token = user_tokens.get(user_id)
+    token = get_user_token(user_id)
     
     if not token:
         await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
@@ -181,7 +181,7 @@ async def shop_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def shop_order(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """订单管理"""
     user_id = update.effective_user.id
-    token = user_tokens.get(user_id)
+    token = get_user_token(user_id)
     
     if not token:
         await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")

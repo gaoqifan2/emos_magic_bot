@@ -513,19 +513,9 @@ async def balance_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # 检查用户是否已绑定 token
     user_info = None
-    for key, info in user_tokens.items():
-        # 检查键是否匹配（键是telegram_user_id）
-        if key == telegram_id:
-            user_info = info
-            break
-    
-    # 如果没找到，再检查是否有其他键对应相同的用户
-    if not user_info:
-        for key, info in user_tokens.items():
-            # 检查是否有相同的用户信息
-            if info.get('username') == user.username or info.get('first_name') == user.first_name:
-                user_info = info
-                break
+    # 只基于 telegram_id 进行用户识别
+    if telegram_id in user_tokens:
+        user_info = user_tokens[telegram_id]
     
     if not user_info:
         # 生成授权链接
@@ -631,20 +621,7 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data == 'back':
         # 返回主菜单
         # 检查用户是否已登录（是否有token）
-        is_logged_in = False
-        for key, info in user_tokens.items():
-            # 检查键是否匹配（键是telegram_user_id）
-            if key == user_id:
-                is_logged_in = True
-                break
-        
-        # 如果没找到，再检查是否有其他键对应相同的用户
-        if not is_logged_in:
-            for key, info in user_tokens.items():
-                # 检查是否有相同的用户信息
-                if info.get('username') == user.username or info.get('first_name') == user.first_name:
-                    is_logged_in = True
-                    break
+        is_logged_in = user_id in user_tokens
         
         # 创建按钮菜单，根据登录状态决定是否显示授权登录按钮
         if is_logged_in:
@@ -680,19 +657,9 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # 处理余额查询
         # 检查用户是否已绑定 token
         user_info = None
-        for key, info in user_tokens.items():
-            # 检查键是否匹配（键是telegram_user_id）
-            if key == user_id:
-                user_info = info
-                break
-        
-        # 如果没找到，再检查是否有其他键对应相同的用户
-        if not user_info:
-            for key, info in user_tokens.items():
-                # 检查是否有相同的用户信息
-                if info.get('username') == user.username or info.get('first_name') == user.first_name:
-                    user_info = info
-                    break
+        # 只基于 telegram_id 进行用户识别
+        if user_id in user_tokens:
+            user_info = user_tokens[user_id]
         
         if not user_info:
             # 生成授权链接
@@ -746,19 +713,9 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # 处理每日签到
         # 检查用户是否已绑定 token
         user_info = None
-        for key, info in user_tokens.items():
-            # 检查键是否匹配（键是telegram_user_id）
-            if key == user_id:
-                user_info = info
-                break
-        
-        # 如果没找到，再检查是否有其他键对应相同的用户
-        if not user_info:
-            for key, info in user_tokens.items():
-                # 检查是否有相同的用户信息
-                if info.get('username') == user.username or info.get('first_name') == user.first_name:
-                    user_info = info
-                    break
+        # 只基于 telegram_id 进行用户识别
+        if user_id in user_tokens:
+            user_info = user_tokens[user_id]
         
         if not user_info:
             # 生成授权链接
@@ -1017,20 +974,9 @@ async def guess_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # 检查用户是否已绑定 token
     user_info = None
-    for key, info in user_tokens.items():
-        # 检查键是否匹配（键是telegram_user_id）
-        if key == telegram_id:
-            user_info = info
-            break
-    
-    # 如果没找到，再检查是否有其他键对应相同的用户
-    if not user_info:
-        for key, info in user_tokens.items():
-            # 检查是否有相同的用户信息
-            # 注意：info可能是字符串，所以需要先检查类型
-            if isinstance(info, dict) and (info.get('username') == user.username or info.get('first_name') == user.first_name):
-                user_info = info
-                break
+    # 只基于 telegram_id 进行用户识别
+    if telegram_id in user_tokens:
+        user_info = user_tokens[telegram_id]
     
     if not user_info:
         # 生成授权链接
@@ -1100,19 +1046,9 @@ async def process_guess(update: Update, context: ContextTypes.DEFAULT_TYPE, amou
     
     # 检查用户是否已绑定 token
     user_info = None
-    for key, info in user_tokens.items():
-        # 检查键是否匹配（键是telegram_user_id）
-        if key == telegram_id:
-            user_info = info
-            break
-    
-    # 如果没找到，再检查是否有其他键对应相同的用户
-    if not user_info:
-        for key, info in user_tokens.items():
-            # 检查是否有相同的用户信息
-            if info.get('username') == user.username or info.get('first_name') == user.first_name:
-                user_info = info
-                break
+    # 只基于 telegram_id 进行用户识别
+    if telegram_id in user_tokens:
+        user_info = user_tokens[telegram_id]
     
     if not user_info:
         # 生成授权链接
@@ -1485,20 +1421,9 @@ async def slot_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # 检查用户是否已绑定 token
     user_info = None
-    for key, info in user_tokens.items():
-        # 检查键是否匹配（键是telegram_user_id）
-        if key == telegram_id:
-            user_info = info
-            break
-    
-    # 如果没找到，再检查是否有其他键对应相同的用户
-    if not user_info:
-        for key, info in user_tokens.items():
-            # 检查是否有相同的用户信息
-            # 注意：info可能是字符串，所以需要先检查类型
-            if isinstance(info, dict) and (info.get('username') == user.username or info.get('first_name') == user.first_name):
-                user_info = info
-                break
+    # 只基于 telegram_id 进行用户识别
+    if telegram_id in user_tokens:
+        user_info = user_tokens[telegram_id]
     
     if not user_info:
         # 生成授权链接
@@ -1568,19 +1493,9 @@ async def process_slot(update: Update, context: ContextTypes.DEFAULT_TYPE, amoun
     
     # 检查用户是否已绑定 token
     user_info = None
-    for key, info in user_tokens.items():
-        # 检查键是否匹配（键是telegram_user_id）
-        if key == telegram_id:
-            user_info = info
-            break
-    
-    # 如果没找到，再检查是否有其他键对应相同的用户
-    if not user_info:
-        for key, info in user_tokens.items():
-            # 检查是否有相同的用户信息
-            if info.get('username') == user.username or info.get('first_name') == user.first_name:
-                user_info = info
-                break
+    # 只基于 telegram_id 进行用户识别
+    if telegram_id in user_tokens:
+        user_info = user_tokens[telegram_id]
     
     if not user_info:
         # 生成授权链接
@@ -1674,7 +1589,7 @@ async def process_slot(update: Update, context: ContextTypes.DEFAULT_TYPE, amoun
     # 小奖：两个相同图案
     elif left == middle or middle == right or left == right:
         is_win = True
-        win_amount = bet_amount  # 2倍
+        win_amount = int(bet_amount * 0.5)  # 0.5倍
         result += " - 两个相同！"
     # 未中奖：全不同图案
     else:
@@ -1722,20 +1637,9 @@ async def blackjack_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # 检查用户是否已绑定 token
     user_info = None
-    for key, info in user_tokens.items():
-        # 检查键是否匹配（键是telegram_user_id）
-        if key == telegram_id:
-            user_info = info
-            break
-    
-    # 如果没找到，再检查是否有其他键对应相同的用户
-    if not user_info:
-        for key, info in user_tokens.items():
-            # 检查是否有相同的用户信息
-            # 注意：info可能是字符串，所以需要先检查类型
-            if isinstance(info, dict) and (info.get('username') == user.username or info.get('first_name') == user.first_name):
-                user_info = info
-                break
+    # 只基于 telegram_id 进行用户识别
+    if telegram_id in user_tokens:
+        user_info = user_tokens[telegram_id]
     
     if not user_info:
         # 生成授权链接
@@ -1805,19 +1709,9 @@ async def process_blackjack(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     
     # 检查用户是否已绑定 token
     user_info = None
-    for key, info in user_tokens.items():
-        # 检查键是否匹配（键是telegram_user_id）
-        if key == telegram_id:
-            user_info = info
-            break
-    
-    # 如果没找到，再检查是否有其他键对应相同的用户
-    if not user_info:
-        for key, info in user_tokens.items():
-            # 检查是否有相同的用户信息
-            if info.get('username') == user.username or info.get('first_name') == user.first_name:
-                user_info = info
-                break
+    # 只基于 telegram_id 进行用户识别
+    if telegram_id in user_tokens:
+        user_info = user_tokens[telegram_id]
     
     if not user_info:
         # 生成授权链接
@@ -2220,20 +2114,9 @@ async def daily_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # 检查用户是否已绑定 token
     user_info = None
-    for key, info in user_tokens.items():
-        # 检查键是否匹配（键是telegram_user_id）
-        if key == telegram_id:
-            user_info = info
-            break
-    
-    # 如果没找到，再检查是否有其他键对应相同的用户
-    if not user_info:
-        for key, info in user_tokens.items():
-            # 检查是否有相同的用户信息
-            # 注意：info可能是字符串，所以需要先检查类型
-            if isinstance(info, dict) and (info.get('username') == user.username or info.get('first_name') == user.first_name):
-                user_info = info
-                break
+    # 只基于 telegram_id 进行用户识别
+    if telegram_id in user_tokens:
+        user_info = user_tokens[telegram_id]
     
     if not user_info:
         # 生成授权链接
@@ -2341,19 +2224,9 @@ async def withdraw_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # 检查用户是否已绑定 token
     user_info = None
-    for key, info in user_tokens.items():
-        # 检查键是否匹配（键是telegram_user_id）
-        if key == telegram_id:
-            user_info = info
-            break
-    
-    # 如果没找到，再检查是否有其他键对应相同的用户
-    if not user_info:
-        for key, info in user_tokens.items():
-            # 检查是否有相同的用户信息
-            if info.get('username') == user.username or info.get('first_name') == user.first_name:
-                user_info = info
-                break
+    # 只基于 telegram_id 进行用户识别
+    if telegram_id in user_tokens:
+        user_info = user_tokens[telegram_id]
     
     if not user_info:
         # 生成授权链接
@@ -2445,6 +2318,51 @@ async def process_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE, a
             return
     except ValueError:
         await update.message.reply_text("请输入有效的数字作为提现金额")
+        return
+    
+    # 检查提现限制
+    from config import WITHDRAW_LIMITS
+    from app.database import get_withdrawal_history
+    from datetime import datetime, timedelta
+    
+    # 获取用户提现历史
+    withdrawal_history = get_withdrawal_history(user_id_api)
+    
+    # 计算各时间段的提现总额
+    today = datetime.now().date()
+    this_month = today.month
+    this_year = today.year
+    
+    daily_withdrawal = 0
+    monthly_withdrawal = 0
+    lifetime_withdrawal = 0
+    
+    for record in withdrawal_history:
+        record_date = record['created_at'].date()
+        record_amount = record['amount']
+        
+        # 累计终身提现
+        lifetime_withdrawal += record_amount
+        
+        # 累计本月提现
+        if record_date.month == this_month and record_date.year == this_year:
+            monthly_withdrawal += record_amount
+        
+        # 累计今日提现
+        if record_date == today:
+            daily_withdrawal += record_amount
+    
+    # 检查提现限制
+    if daily_withdrawal + withdraw_amount > WITHDRAW_LIMITS['daily']:
+        await update.message.reply_text(f"今日提现已达上限！今日已提现 {daily_withdrawal} 萝卜，最多可提现 {WITHDRAW_LIMITS['daily']} 萝卜")
+        return
+    
+    if monthly_withdrawal + withdraw_amount > WITHDRAW_LIMITS['monthly']:
+        await update.message.reply_text(f"本月提现已达上限！本月已提现 {monthly_withdrawal} 萝卜，最多可提现 {WITHDRAW_LIMITS['monthly']} 萝卜")
+        return
+    
+    if lifetime_withdrawal + withdraw_amount > WITHDRAW_LIMITS['lifetime']:
+        await update.message.reply_text(f"终身提现已达上限！已累计提现 {lifetime_withdrawal} 萝卜，最多可提现 {WITHDRAW_LIMITS['lifetime']} 萝卜")
         return
     
     # 检查余额
