@@ -597,6 +597,55 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         from handlers.redpacket import handle_type
         return await handle_type(update, context)
     
+    # 处理视奸按钮（移到游戏回调之前）
+    if data == "admin_check_playing":
+        logger.info(f"处理视奸按钮")
+        await query.answer()
+        # 显示命令并提供跳转按钮
+        keyboard = [
+            [InlineKeyboardButton("👥 跳转到 emospg 群", url="https://t.me/emospg")],
+            [InlineKeyboardButton("🔙 返回主菜单", callback_data="back_to_main")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(
+            "👀 **视奸功能**\n\n"  
+            "请复制以下命令，然后点击下方按钮跳转到群并发送：\n\n"  
+            "`/admin_check_playing`",
+            reply_markup=reply_markup,
+            parse_mode="Markdown"
+        )
+        # 1分钟后自动消失
+        import asyncio
+        from utils.message_utils import auto_delete_message
+        asyncio.create_task(auto_delete_message(update, context, None, 60))
+        logger.info(f"显示视奸功能信息")
+        return
+    
+    # 处理大调查按钮（移到游戏回调之前）
+    if data == "admin_user_info":
+        logger.info(f"处理大调查按钮")
+        await query.answer()
+        # 显示命令并提供跳转按钮
+        keyboard = [
+            [InlineKeyboardButton("👥 跳转到 emospg 群", url="https://t.me/emospg")],
+            [InlineKeyboardButton("🔙 返回主菜单", callback_data="back_to_main")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(
+            "🔍 **大调查功能**\n\n"  
+            "1. 先在群里**引用回复**一条用户的消息\n"  
+            "2. 然后复制以下命令并发送：\n\n"  
+            "`/admin_user_info`",
+            reply_markup=reply_markup,
+            parse_mode="Markdown"
+        )
+        # 1分钟后自动消失
+        import asyncio
+        from utils.message_utils import auto_delete_message
+        asyncio.create_task(auto_delete_message(update, context, None, 60))
+        logger.info(f"显示大调查功能信息")
+        return
+    
     # 先 answer 回调
     await query.answer()
     logger.info(f"已响应回调: {data}")
@@ -1342,53 +1391,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if 'current_operation' in context.user_data:
             del context.user_data['current_operation']
         logger.info(f"清理用户数据")
-        return
-    
-    # 处理视奸按钮
-    if data == "admin_check_playing":
-        logger.info(f"处理视奸按钮")
-        # 显示命令并提供跳转按钮
-        keyboard = [
-            [InlineKeyboardButton("👥 跳转到 emospg 群", url="https://t.me/emospg")],
-            [InlineKeyboardButton("🔙 返回主菜单", callback_data="back_to_main")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(
-            "👀 **视奸功能**\n\n"  
-            "请复制以下命令，然后点击下方按钮跳转到群并发送：\n\n"  
-            "`/admin_check_playing`",
-            reply_markup=reply_markup,
-            parse_mode="Markdown"
-        )
-        # 1分钟后自动消失
-        import asyncio
-        from utils.message_utils import auto_delete_message
-        asyncio.create_task(auto_delete_message(update, context, None, 60))
-        logger.info(f"显示视奸功能信息")
-        return
-    
-    # 处理大调查按钮
-    if data == "admin_user_info":
-        logger.info(f"处理大调查按钮")
-        # 显示命令并提供跳转按钮
-        keyboard = [
-            [InlineKeyboardButton("👥 跳转到 emospg 群", url="https://t.me/emospg")],
-            [InlineKeyboardButton("🔙 返回主菜单", callback_data="back_to_main")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(
-            "🔍 **大调查功能**\n\n"  
-            "1. 先在群里**引用回复**一条用户的消息\n"  
-            "2. 然后复制以下命令并发送：\n\n"  
-            "`/admin_user_info`",
-            reply_markup=reply_markup,
-            parse_mode="Markdown"
-        )
-        # 1分钟后自动消失
-        import asyncio
-        from utils.message_utils import auto_delete_message
-        asyncio.create_task(auto_delete_message(update, context, None, 60))
-        logger.info(f"显示大调查功能信息")
         return
     
     # 对于其他不认识的回调，不做处理，让其他处理器继续处理

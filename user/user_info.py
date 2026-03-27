@@ -317,6 +317,12 @@ async def user_invite(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 # 存储当前状态，等待用户输入
                 context.user_data['current_operation'] = 'invite_user'
                 context.user_data['token'] = token
+                # 显示返回按钮
+                keyboard = [
+                    [InlineKeyboardButton("🔙 返回主菜单", callback_data="back_to_main")]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                await update.callback_query.message.reply_text("等待输入被邀请人ID...", reply_markup=reply_markup)
                 return 101  # 自定义状态码，用于处理邀请输入
             else:
                 # 没有邀请资格

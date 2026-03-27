@@ -71,9 +71,9 @@ async def redpocket_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("🎲 普通红包　　　　　　", callback_data="type_random")],
         [InlineKeyboardButton("🔐 口令红包　　　　　　", callback_data="type_password")],
         [InlineKeyboardButton("🖼️ 图片红包　　　　　　", callback_data="type_image")],
-        [InlineKeyboardButton("🎵 语音红包　　　　　　", callback_data="type_audio")]
+        [InlineKeyboardButton("🎵 语音红包　　　　　　", callback_data="type_audio")],
+        [InlineKeyboardButton("⬅️ 返回上一步", callback_data="back_to_main")]
     ]
-    keyboard = add_cancel_button(keyboard)
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     message_text = "🧧 创建红包\n\n请选择红包类型："
