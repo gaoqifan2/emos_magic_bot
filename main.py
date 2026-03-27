@@ -75,16 +75,46 @@ def cleanup():
 
 atexit.register(cleanup)
 
-from config import Config, BOT_COMMANDS, SERVICE_PROVIDER_TOKEN
+from config import Config, BOT_COMMANDS, SERVICE_PROVIDER_TOKEN, user_tokens, GROUP_ALLOWED_COMMANDS
 from utils.db_helper import ensure_user_exists, create_recharge_order
 from handlers.common import (
     start, menu_command, help_command, cancel_command,
     button_callback, post_init,
     WAITING_REDPACKET_ID, WAITING_LOTTERY_CANCEL_ID
 )
+
+# 群聊命令过滤装饰器
+from functools import wraps
+from telegram import Update
+from telegram.ext import ContextTypes
+
+def group_command_filter(func):
+    """群聊命令过滤装饰器"""
+    @wraps(func)
+    async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        # 检查是否是群聊
+        if update.message and update.message.chat.type in ['group', 'supergroup']:
+            # 获取命令名称，处理带@机器人用户名的情况
+            command_part = update.message.text.split(' ')[0].lstrip('/')
+            # 移除@机器人用户名部分
+            command = command_part.split('@')[0]
+            # 检查命令是否在允许列表中
+            if command not in GROUP_ALLOWED_COMMANDS:
+                # 群聊中不允许的命令，不执行
+                logger.info(f"群聊中拒绝执行命令: /{command_part}")
+                return
+        # 执行原函数
+        return await func(update, context)
+    return wrapper
+
 from handlers.redpacket import (
-    redpocket_command, redpocket_process, cancel_redpacket,
-    WAITING_REDPACKET_TYPE, WAITING_CARROT, WAITING_NUMBER, WAITING_BLESSING, WAITING_PASSWORD
+    redpocket_command, handle_type, handle_carrot, handle_number, handle_blessing, 
+    handle_password, handle_media, create_redpacket, cancel_redpacket,
+    WAITING_TYPE, WAITING_CARROT, WAITING_NUMBER, WAITING_BLESSING, WAITING_PASSWORD, WAITING_MEDIA
+)
+from app.handlers.command_handlers import (
+    start_handler, balance_handler, guess_handler, slot_handler, daily_handler, help_handler, 
+    blackjack_handler, hit_handler, stand_handler, message_handler, callback_handler, withdraw_handler
 )
 from handlers.redpacket_query import WAITING_QUERY_TYPE
 from handlers.redpacket_query import check_redpacket_command, get_redpacket_id, handle_query_type
@@ -108,11 +138,19 @@ if not os.path.exists('logs'):
 log_filename = f"logs/bot_{datetime.now(beijing_tz).strftime('%Y%m%d_%H%M%S')}.log"
 
 # 设置日志
+try:
+    sys.stdout.reconfigure(encoding='utf-8')
+except (AttributeError, OSError):
+    pass
+
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO,
     handlers=[
-        logging.StreamHandler(sys.stdout),
+        console_handler,
         logging.FileHandler(log_filename, encoding='utf-8')
     ]
 )
@@ -128,6 +166,16 @@ def main() -> None:
     
     logger.info("正在启动机器人...")
     
+    # 初始化游戏数据库
+    logger.info("初始化游戏数据库...")
+    from app.database import init_db
+    init_db()
+    
+    # 加载游戏用户token
+    logger.info("加载游戏用户token...")
+    from app.config import load_tokens_from_db
+    load_tokens_from_db()
+    
     # 创建应用
     application = Application.builder() \
         .token(Config.BOT_TOKEN) \
@@ -135,52 +183,54 @@ def main() -> None:
         .build()
     
     # ===== 基本命令 =====
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("menu", menu_command))
-    application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CommandHandler("cancel", cancel_command))
+    application.add_handler(CommandHandler("start", group_command_filter(start)))
+    application.add_handler(CommandHandler("menu", group_command_filter(menu_command)))
+    application.add_handler(CommandHandler("help", group_command_filter(help_command)))
+    application.add_handler(CommandHandler("cancel", group_command_filter(cancel_command)))
+    
+    # ===== 游戏命令 =====
+    application.add_handler(CommandHandler("game", group_command_filter(start_handler)))
+    application.add_handler(CommandHandler("balance", group_command_filter(balance_handler)))
+    application.add_handler(CommandHandler("guess", group_command_filter(guess_handler)))
+    application.add_handler(CommandHandler("slot", group_command_filter(slot_handler)))
+    application.add_handler(CommandHandler("blackjack", group_command_filter(blackjack_handler)))
+    application.add_handler(CommandHandler("hit", group_command_filter(hit_handler)))
+    application.add_handler(CommandHandler("stand", group_command_filter(stand_handler)))
+    application.add_handler(CommandHandler("daily", group_command_filter(daily_handler)))
+    application.add_handler(CommandHandler("withdraw", group_command_filter(withdraw_handler)))
     
     # ===== 红包对话 =====
     redpocket_conv = ConversationHandler(
         entry_points=[
-            CommandHandler("redpocket", redpocket_command),
+            CommandHandler("redpocket", group_command_filter(redpocket_command)),
             CallbackQueryHandler(redpocket_command, pattern="^menu_redpocket$")
         ],
         states={
-            WAITING_REDPACKET_TYPE: [
-                CallbackQueryHandler(redpocket_process, pattern="^redpacket_type_"),
+            WAITING_TYPE: [
+                CallbackQueryHandler(handle_type, pattern="^type_"),
                 CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
             ],
             WAITING_CARROT: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, redpocket_process),
-                MessageHandler(filters.PHOTO, redpocket_process),
-                MessageHandler(filters.VOICE, redpocket_process),
-                MessageHandler(filters.AUDIO, redpocket_process),
-                MessageHandler(filters.Document.ALL, redpocket_process),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_carrot),
                 CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
             ],
             WAITING_NUMBER: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, redpocket_process),
-                MessageHandler(filters.PHOTO, redpocket_process),
-                MessageHandler(filters.VOICE, redpocket_process),
-                MessageHandler(filters.AUDIO, redpocket_process),
-                MessageHandler(filters.Document.ALL, redpocket_process),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_number),
                 CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
             ],
             WAITING_BLESSING: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, redpocket_process),
-                MessageHandler(filters.PHOTO, redpocket_process),
-                MessageHandler(filters.VOICE, redpocket_process),
-                MessageHandler(filters.AUDIO, redpocket_process),
-                MessageHandler(filters.Document.ALL, redpocket_process),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_blessing),
                 CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
             ],
             WAITING_PASSWORD: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, redpocket_process),
-                MessageHandler(filters.PHOTO, redpocket_process),
-                MessageHandler(filters.VOICE, redpocket_process),
-                MessageHandler(filters.AUDIO, redpocket_process),
-                MessageHandler(filters.Document.ALL, redpocket_process),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_password),
+                CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
+            ],
+            WAITING_MEDIA: [
+                MessageHandler(filters.PHOTO, handle_media),
+                MessageHandler(filters.VOICE, handle_media),
+                MessageHandler(filters.AUDIO, handle_media),
+                MessageHandler(filters.Document.ALL, handle_media),
                 CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
             ],
         },
@@ -191,7 +241,7 @@ def main() -> None:
     # ===== 红包查询对话 =====
     redpocket_query_conv = ConversationHandler(
         entry_points=[
-            CommandHandler("check_redpacket", check_redpacket_command),
+            CommandHandler("check_redpacket", group_command_filter(check_redpacket_command)),
             CallbackQueryHandler(check_redpacket_command, pattern="^menu_check_redpacket$")
         ],
         states={
@@ -211,7 +261,7 @@ def main() -> None:
     # ===== 抽奖对话 =====
     lottery_conv = ConversationHandler(
         entry_points=[
-            CommandHandler("lottery", lottery_command),
+            CommandHandler("lottery", group_command_filter(lottery_command)),
             CallbackQueryHandler(lottery_command, pattern="^menu_lottery$")
         ],
         states={
@@ -263,7 +313,7 @@ def main() -> None:
     # ===== 取消抽奖对话 =====
     lottery_cancel_conv = ConversationHandler(
         entry_points=[
-            CommandHandler("lottery_cancel", lottery_cancel_command),
+            CommandHandler("lottery_cancel", group_command_filter(lottery_cancel_command)),
             CallbackQueryHandler(lottery_cancel_command, pattern="^menu_lottery_cancel$")
         ],
         states={
@@ -277,9 +327,9 @@ def main() -> None:
     application.add_handler(lottery_cancel_conv)
     
     # ===== 排行榜命令 =====
-    application.add_handler(CommandHandler("playing", playing_command))
-    application.add_handler(CommandHandler("rank_carrot", rank_carrot_command))
-    application.add_handler(CommandHandler("rank_upload", rank_upload_command))
+    application.add_handler(CommandHandler("playing", group_command_filter(playing_command)))
+    application.add_handler(CommandHandler("rank_carrot", group_command_filter(rank_carrot_command)))
+    application.add_handler(CommandHandler("rank_upload", group_command_filter(rank_upload_command)))
     
     # 处理用户输入
     async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -287,9 +337,54 @@ def main() -> None:
         user_id = update.effective_user.id
         input_text = update.message.text.strip()
         
+        # 首先检查是否有游戏状态需要处理
+        # 检查是否在等待猜大小游戏的输入
+        if 'awaiting_guess' in context.user_data and context.user_data['awaiting_guess']:
+            from app.handlers.command_handlers import process_guess
+            parts = input_text.split()
+            if len(parts) == 2:
+                amount, guess = parts
+                await process_guess(update, context, amount, guess)
+            else:
+                await update.message.reply_text("请输入正确的格式，例如：10 大")
+            context.user_data['awaiting_guess'] = False
+            return
+        
+        # 检查是否在等待老虎机游戏的输入
+        if 'awaiting_slot' in context.user_data and context.user_data['awaiting_slot']:
+            from app.handlers.command_handlers import process_slot
+            await process_slot(update, context, input_text)
+            context.user_data['awaiting_slot'] = False
+            return
+        
+        # 检查是否在等待21点游戏的输入
+        if 'awaiting_blackjack' in context.user_data and context.user_data['awaiting_blackjack']:
+            from app.handlers.command_handlers import process_blackjack
+            await process_blackjack(update, context, input_text)
+            context.user_data['awaiting_blackjack'] = False
+            return
+        
         if 'current_operation' in context.user_data:
             operation = context.user_data['current_operation']
-            token = context.user_data.get('token')
+            user_id = update.effective_user.id
+            token = None
+            print(f"DEBUG: user_id={user_id}")
+            print(f"DEBUG: user_tokens type={type(user_tokens)}")
+            print(f"DEBUG: user_tokens keys={list(user_tokens.keys())}")
+            try:
+                if user_id in user_tokens:
+                    user_info = user_tokens[user_id]
+                    print(f"DEBUG: user_info type={type(user_info)}")
+                    if isinstance(user_info, dict):
+                        token = user_info.get('token')
+                        print(f"DEBUG: token from dict={token[:20]}..." if token else "DEBUG: token is None")
+                    else:
+                        token = user_info
+                        print(f"DEBUG: token from string={token[:20]}..." if token else "DEBUG: token is None")
+                print(f"DEBUG: final token={token[:20]}..." if token else "DEBUG: final token is None")
+            except Exception as e:
+                print(f"DEBUG: Token获取异常: {type(e).__name__}: {e}")
+                token = None
             
             if operation == 'change_pseudonym':
                 # 处理笔名更新
@@ -311,8 +406,15 @@ def main() -> None:
                         else:
                             await loading.edit_text(f"❌ 更新笔名失败，状态码：{response.status_code}")
                     except Exception as e:
-                        logger.error(f"更新笔名失败: {e}")
+                        # 直接记录固定的错误信息，避免尝试编码包含emoji的异常信息
+                        logger.error("更新笔名失败")
                         await loading.edit_text("❌ 更新笔名失败，请稍后重试")
+                    
+                    # 显示返回菜单
+                    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                    keyboard = [[InlineKeyboardButton("🔙 返回个人信息", callback_data="menu_user_main")]]
+                    reply_markup = InlineKeyboardMarkup(keyboard)
+                    await update.message.reply_text("操作完成", reply_markup=reply_markup)
                     
                     # 清理用户数据
                     context.user_data.clear()
@@ -343,8 +445,15 @@ def main() -> None:
                         else:
                             await loading.edit_text(f"❌ 邀请失败，状态码：{response.status_code}")
                     except Exception as e:
-                        logger.error(f"邀请用户失败: {e}")
+                        # 直接记录固定的错误信息，避免尝试编码包含emoji的异常信息
+                        logger.error("邀请用户失败")
                         await loading.edit_text("❌ 邀请用户失败，请稍后重试")
+                    
+                    # 显示返回菜单
+                    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                    keyboard = [[InlineKeyboardButton("🔙 返回个人信息", callback_data="menu_user_main")]]
+                    reply_markup = InlineKeyboardMarkup(keyboard)
+                    await update.message.reply_text("操作完成", reply_markup=reply_markup)
                     
                     # 清理用户数据
                     context.user_data.clear()
@@ -392,8 +501,15 @@ def main() -> None:
                                 else:
                                     await loading.edit_text(f"❌ 转赠失败，状态码：{response.status_code}")
                             except Exception as e:
-                                logger.error(f"转赠失败: {e}")
+                                # 直接记录固定的错误信息，避免尝试编码包含emoji的异常信息
+                                logger.error("转赠失败")
                                 await loading.edit_text("❌ 转赠失败，请稍后重试")
+                            
+                            # 显示返回菜单
+                            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                            keyboard = [[InlineKeyboardButton("🔙 返回转账菜单", callback_data="menu_transfer_main")]]
+                            reply_markup = InlineKeyboardMarkup(keyboard)
+                            await update.message.reply_text("操作完成", reply_markup=reply_markup)
                         else:
                             await update.message.reply_text("❌ 转赠金额必须在2-6000之间，请重新输入：")
                             return 103  # 继续等待金额输入
@@ -417,13 +533,17 @@ def main() -> None:
                             try:
                                 import httpx
                                 import uuid
+                                import json
                                 from datetime import datetime
                                 
                                 # 生成唯一参数
                                 param = str(uuid.uuid4())[:8]
                                 
                                 # 调用创建订单API（使用服务商token）
-                                headers = {"Authorization": f"Bearer {SERVICE_PROVIDER_TOKEN}"}
+                                headers = {
+                                    "Authorization": f"Bearer {SERVICE_PROVIDER_TOKEN}",
+                                    "Content-Type": "application/json; charset=utf-8"
+                                }
                                 data = {
                                     "pay_way": "telegram_bot",
                                     "price": amount,
@@ -434,11 +554,13 @@ def main() -> None:
                                 
                                 logger.info(f"创建支付订单: {data}")
                                 
+                                json_data = json.dumps(data, ensure_ascii=False).encode('utf-8')
+                                
                                 async with httpx.AsyncClient() as client:
                                     response = await client.post(
                                         f"{Config.API_BASE_URL}/pay/create",
                                         headers=headers,
-                                        json=data,
+                                        content=json_data,
                                         timeout=10
                                     )
                                 
@@ -534,8 +656,9 @@ def main() -> None:
                                 else:
                                     await loading.edit_text(f"❌ 创建订单失败，状态码：{response.status_code}\n响应：{response.text}")
                             except Exception as e:
-                                logger.error(f"创建支付订单失败: {e}")
-                                await loading.edit_text(f"❌ 创建订单失败，请稍后重试\n错误：{str(e)}")
+                                # 直接记录固定的错误信息，避免尝试编码包含emoji的异常信息
+                                logger.error("创建支付订单失败")
+                                await loading.edit_text("❌ 创建订单失败，请稍后重试")
                         else:
                             await update.message.reply_text("❌ 充值金额必须在1-50000之间，请重新输入：")
                             return 104  # 继续等待金额输入
@@ -623,6 +746,12 @@ def main() -> None:
                                                 # 计算剩余游戏币余额
                                                 remaining_balance = game_balance - amount
                                                 await loading.edit_text(f"✅ 提现成功！\n\n订单号：\n```\n{order_no}\n```\n🎮 游戏币扣除：{amount}\n🥕 兑换萝卜：{carrot_amount}\n💸 手续费：{fee_game_coin}游戏币\n💰 实际到账：{carrot_amount}萝卜\n🎮 剩余游戏币：{remaining_balance}\n已转入您的账号", parse_mode="Markdown")
+                                                
+                                                # 显示返回菜单
+                                                from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                                                keyboard = [[InlineKeyboardButton("🔙 返回游戏厅", callback_data="games")]]
+                                                reply_markup = InlineKeyboardMarkup(keyboard)
+                                                await update.message.reply_text("操作完成", reply_markup=reply_markup)
                                             else:
                                                 # 更新提现订单状态为失败
                                                 update_withdraw_order_status(
@@ -656,14 +785,15 @@ def main() -> None:
                                     )
                                     await loading.edit_text(f"❌ 游戏币扣除失败，状态码：{game_response.status_code}\n订单号：\n```\n{order_no}\n```\n", parse_mode="Markdown")
                             except Exception as e:
-                                logger.error(f"提现失败: {e}")
+                                # 直接记录固定的错误信息，避免尝试编码包含emoji的异常信息
+                                logger.error("提现失败")
                                 # 更新提现订单状态为失败
                                 update_withdraw_order_status(
                                     order_no=order_no,
                                     status='failed',
-                                    transfer_result=f"提现失败：{str(e)}"
+                                    transfer_result="提现失败，请稍后重试"
                                 )
-                                await loading.edit_text(f"❌ 提现失败，请稍后重试\n错误：{str(e)}\n订单号：\n```\n{order_no}\n```\n", parse_mode="Markdown")
+                                await loading.edit_text(f"❌ 提现失败，请稍后重试\n订单号：\n```\n{order_no}\n```\n", parse_mode="Markdown")
                         else:
                             if amount > game_balance:
                                 max_carrot = game_balance // 10
@@ -708,8 +838,15 @@ def main() -> None:
                                 else:
                                     await loading.edit_text(f"❌ 游戏充值失败，状态码：{response.status_code}")
                             except Exception as e:
-                                logger.error(f"游戏充值失败: {e}")
+                                # 直接记录固定的错误信息，避免尝试编码包含emoji的异常信息
+                                logger.error("游戏充值失败")
                                 await loading.edit_text("❌ 游戏充值失败，请稍后重试")
+                            
+                            # 显示返回菜单
+                            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                            keyboard = [[InlineKeyboardButton("🔙 返回游戏厅", callback_data="games")]]
+                            reply_markup = InlineKeyboardMarkup(keyboard)
+                            await update.message.reply_text("操作完成", reply_markup=reply_markup)
                         else:
                             await update.message.reply_text("❌ 充值金额必须在1-50000之间，请重新输入：")
                             return 106  # 继续等待金额输入
@@ -744,23 +881,91 @@ def main() -> None:
                     
                     try:
                         import httpx
-                        headers = {"Authorization": f"Bearer {token}"}
+                        import json
+                        print(f"DEBUG: Creating headers with token length={len(token) if token else 0}")
+                        headers = {
+                            "Authorization": f"Bearer {token}",
+                            "Content-Type": "application/json; charset=utf-8"
+                        }
+                        print(f"DEBUG: Headers created successfully")
                         data = {"name": service_name, "description": service_description}
+                        
+                        print(f"DEBUG: Request data: name={service_name}, description={service_description}")
+                        
+                        logger.info(f"申请服务商请求: name={service_name[:20]}, description={service_description[:50]}")
+                        logger.info(f"API地址: {Config.API_BASE_URL}/pay/apply")
+                        
+                        json_data = json.dumps(data, ensure_ascii=False).encode('utf-8')
+                        print(f"DEBUG: JSON data encoded successfully, length={len(json_data)}")
+                        
                         async with httpx.AsyncClient() as client:
+                            print(f"DEBUG: Sending API request...")
                             response = await client.post(
                                 f"{Config.API_BASE_URL}/pay/apply",
                                 headers=headers,
-                                json=data,
+                                content=json_data,
                                 timeout=10
                             )
+                        print(f"DEBUG: API request completed, status={response.status_code}")
+                        
+                        try:
+                            status_code = response.status_code
+                            print(f"DEBUG: Response status code={status_code}")
+                            logger.info(f"申请服务商响应状态码: {status_code}")
+                        except Exception as e:
+                            print(f"DEBUG: Status code logging error: {e}")
+                        
+                        # 避免在日志中直接记录可能包含emoji的响应内容
+                        try:
+                            response_text = response.text
+                            # 安全处理响应内容，避免编码错误
+                            safe_text = response_text.encode('utf-8', errors='replace').decode('utf-8')
+                            print(f"DEBUG: Safe response text={safe_text[:100]}...")
+                            logger.info(f"申请服务商响应内容: {safe_text[:200]}")
+                        except Exception as e:
+                            print(f"DEBUG: Error processing response text: {type(e).__name__}: {e}")
+                            logger.info("申请服务商响应内容: [无法处理的响应]")
                         
                         if response.status_code == 200:
+                            # API返回200表示成功，可能没有响应体
                             await loading.edit_text("✅ 申请成功！请等待审核结果")
                         else:
-                            await loading.edit_text(f"❌ 申请失败，状态码：{response.status_code}")
-                    except Exception as e:
-                        logger.error(f"申请成为服务商失败: {e}")
+                            try:
+                                error_text = response.text[:200] if response.text else "无响应内容"
+                                # 安全处理错误文本
+                                safe_error = error_text.encode('utf-8', errors='replace').decode('utf-8')
+                                print(f"DEBUG: Safe error text={safe_error[:100]}...")
+                                logger.error(f"申请服务商API返回错误: 状态码={response.status_code}")
+                                await loading.edit_text(f"❌ 申请失败，状态码：{response.status_code}\n{safe_error}")
+                            except Exception as e:
+                                print(f"DEBUG: Error processing error text: {type(e).__name__}: {e}")
+                                logger.error(f"申请服务商API返回错误: 状态码={response.status_code} [无法处理的响应]")
+                                await loading.edit_text(f"❌ 申请失败，状态码：{response.status_code}\n[响应内容无法显示]")
+                    except httpx.HTTPStatusError as e:
+                        print(f"DEBUG: HTTPStatusError: {e}")
+                        logger.error(f"申请服务商HTTP错误: {e.response.status_code}")
+                        await loading.edit_text(f"❌ 申请失败，HTTP错误：{e.response.status_code}")
+                    except httpx.RequestError as e:
+                        print(f"DEBUG: RequestError: {e}")
+                        logger.error(f"申请服务商请求错误: {type(e).__name__}")
+                        await loading.edit_text("❌ 申请失败，网络请求错误，请检查网络连接")
+                    except UnicodeEncodeError as e:
+                        print(f"DEBUG: UnicodeEncodeError: {e}")
+                        print(f"DEBUG: Error details: {e.encode}")
+                        # 记录异常类型但不记录可能包含emoji的消息
+                        logger.error(f"申请服务商发生异常: UnicodeEncodeError")
                         await loading.edit_text("❌ 申请失败，请稍后重试")
+                    except Exception as e:
+                        print(f"DEBUG: Other exception: {type(e).__name__}: {e}")
+                        # 记录异常类型但不记录可能包含emoji的消息
+                        logger.error(f"申请服务商发生异常: {type(e).__name__}")
+                        await loading.edit_text("❌ 申请失败，请稍后重试")
+                    
+                    # 显示返回菜单
+                    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                    keyboard = [[InlineKeyboardButton("🔙 返回服务商菜单", callback_data="menu_service")]]
+                    reply_markup = InlineKeyboardMarkup(keyboard)
+                    await update.message.reply_text("操作完成", reply_markup=reply_markup)
                     
                     # 清理用户数据
                     context.user_data.clear()
@@ -804,13 +1009,18 @@ def main() -> None:
                     
                     try:
                         import httpx
-                        headers = {"Authorization": f"Bearer {token}"}
+                        import json
+                        headers = {
+                            "Authorization": f"Bearer {token}",
+                            "Content-Type": "application/json; charset=utf-8"
+                        }
                         data = {"name": service_name, "description": service_description, "notify_url": service_notify_url}
+                        json_data = json.dumps(data, ensure_ascii=False).encode('utf-8')
                         async with httpx.AsyncClient() as client:
                             response = await client.post(
                                 f"{Config.API_BASE_URL}/pay/update",
                                 headers=headers,
-                                json=data,
+                                content=json_data,
                                 timeout=10
                             )
                         
@@ -821,6 +1031,12 @@ def main() -> None:
                     except Exception as e:
                         logger.error(f"更新服务商信息失败: {e}")
                         await loading.edit_text("❌ 更新失败，请稍后重试")
+                    
+                    # 显示返回菜单
+                    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                    keyboard = [[InlineKeyboardButton("🔙 返回服务商菜单", callback_data="menu_service")]]
+                    reply_markup = InlineKeyboardMarkup(keyboard)
+                    await update.message.reply_text("操作完成", reply_markup=reply_markup)
                     
                     # 清理用户数据
                     context.user_data.clear()
@@ -871,6 +1087,12 @@ def main() -> None:
                             except Exception as e:
                                 logger.error(f"转账失败: {e}")
                                 await loading.edit_text("❌ 转账失败，请稍后重试")
+                            
+                            # 显示返回菜单
+                            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                            keyboard = [[InlineKeyboardButton("🔙 返回服务商菜单", callback_data="menu_service")]]
+                            reply_markup = InlineKeyboardMarkup(keyboard)
+                            await update.message.reply_text("操作完成", reply_markup=reply_markup)
                         else:
                             await update.message.reply_text("❌ 转账金额必须在1-50000之间，请重新输入：")
                             return 107  # 继续等待金额输入
@@ -1068,10 +1290,78 @@ def main() -> None:
                     context.user_data.clear()
                 else:
                     await update.message.reply_text("❌ 请先登录！发送 /start 登录")
+            
+            elif operation == 'revoke_invite':
+                # 处理撤销邀请
+                if token:
+                    target_user_id = input_text
+                    loading = await update.message.reply_text("🔄 正在撤销邀请...")
+                    
+                    try:
+                        import httpx
+                        headers = {"Authorization": f"Bearer {token}"}
+                        data = {"user_id": target_user_id}
+                        async with httpx.AsyncClient() as client:
+                            response = await client.post(
+                                f"{Config.API_BASE_URL}/invite/revoke",
+                                headers=headers,
+                                json=data,
+                                timeout=10
+                            )
+                        
+                        if response.status_code == 200:
+                            result = response.json()
+                            remaining = result.get('invite_remaining', 0)
+                            await loading.edit_text(f"✅ 撤销邀请成功！剩余邀请次数：{remaining}")
+                        else:
+                            await loading.edit_text(f"❌ 撤销邀请失败，状态码：{response.status_code}")
+                    except Exception as e:
+                        logger.error(f"撤销邀请失败: {e}")
+                        await loading.edit_text("❌ 撤销邀请失败，请稍后重试")
+                    
+                    # 清理用户数据
+                    context.user_data.clear()
+                else:
+                    await update.message.reply_text("❌ 请先登录！发送 /start 登录")
+            
+            elif operation == 'custom_password':
+                # 处理自定义密码
+                if token:
+                    custom_password = input_text
+                    loading = await update.message.reply_text("🔄 正在设置自定义密码...")
+                    
+                    try:
+                        import httpx
+                        headers = {"Authorization": f"Bearer {token}"}
+                        async with httpx.AsyncClient() as client:
+                            response = await client.put(
+                                f"{Config.API_BASE_URL}/emya/resetPassword?password={custom_password}",
+                                headers=headers,
+                                timeout=10
+                            )
+                        
+                        if response.status_code == 204:
+                            await loading.edit_text("✅ 自定义密码设置成功！")
+                        else:
+                            await loading.edit_text(f"❌ 设置密码失败，状态码：{response.status_code}")
+                    except Exception as e:
+                        logger.error(f"设置自定义密码失败: {e}")
+                        await loading.edit_text("❌ 设置密码失败，请稍后重试")
+                    
+                    # 显示返回菜单
+                    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                    keyboard = [[InlineKeyboardButton("🔙 返回密码管理", callback_data="menu_password_management")]]
+                    reply_markup = InlineKeyboardMarkup(keyboard)
+                    await update.message.reply_text("操作完成", reply_markup=reply_markup)
+                    
+                    # 清理用户数据
+                    context.user_data.clear()
+                else:
+                    await update.message.reply_text("❌ 请先登录！发送 /start 登录")
         
         return
     
-    # 添加用户输入处理器
+    # 添加用户输入处理器（包含游戏消息处理）
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_user_input))
     
     # 按钮回调（处理所有未被对话捕获的回调）

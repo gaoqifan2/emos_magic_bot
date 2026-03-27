@@ -55,7 +55,7 @@ async def rank_upload_command(update: Update, context: ContextTypes.DEFAULT_TYPE
                 return
             
             message = "📤 上传排行榜 (前30)\n\n"
-            message += "```\n"
+            message += "`"
             
             left_column = []
             right_column = []
@@ -76,7 +76,7 @@ async def rank_upload_command(update: Update, context: ContextTypes.DEFAULT_TYPE
             for left, right in zip(left_column, right_column):
                 message += f"{left:<{max_left_width}}  {right:>8}\n"
             
-            message += "```"
+            message += "`"
             
             keyboard = [
                 [InlineKeyboardButton("🔙 返回排行榜菜单", callback_data="menu_rank_main")],

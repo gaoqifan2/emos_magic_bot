@@ -13,7 +13,11 @@ logger = logging.getLogger(__name__)
 async def show_service_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """服务商主菜单"""
     user_id = update.effective_user.id
-    token = user_tokens.get(user_id)
+    try:
+        token = user_tokens.get(user_id)
+    except UnicodeEncodeError:
+        token = None
+        logger.error("获取用户token时发生编码错误")
     
     if not token:
         await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
@@ -40,7 +44,8 @@ async def show_service_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.warning("服务商检查API不存在，暂时将用户视为普通用户")
             is_service = False
     except Exception as e:
-        logger.error(f"检查服务商状态失败: {e}")
+        # 直接记录固定的错误信息，避免尝试编码包含emoji的异常信息
+        logger.error("检查服务商状态失败")
     
     if is_service:
         # 服务商界面
@@ -67,20 +72,23 @@ async def show_service_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=reply_markup
         )
     else:
-        # 普通用户界面 - 所有用户都可以充值和提现，不需要成为服务商
+        # 普通用户界面 - 询问是否申请成为服务商
         keyboard = [
             [
-                InlineKeyboardButton("💰 游戏币充值", callback_data="service_recharge"),
-                InlineKeyboardButton("💎 提现", callback_data="service_withdraw")
+                InlineKeyboardButton("✅ 申请成为服务商", callback_data="service_apply"),
+                InlineKeyboardButton("💰 游戏币充值", callback_data="service_recharge")
             ],
             [
-                InlineKeyboardButton("🔍 订单查询", callback_data="service_pay_query"),
+                InlineKeyboardButton("💎 提现", callback_data="service_withdraw"),
+                InlineKeyboardButton("🔍 订单查询", callback_data="service_pay_query")
+            ],
+            [
                 InlineKeyboardButton("🔙 返回主菜单", callback_data="back_to_main")
             ]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.callback_query.edit_message_text(
-            "💳 支付中心\n\n👤 您是普通用户\n\n请选择操作：",
+            "💳 支付中心\n\n👤 您不是服务商\n\n是否申请成为服务商？\n\n普通用户也可以使用充值和提现功能",
             reply_markup=reply_markup
         )
 
@@ -145,7 +153,8 @@ async def service_manage(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup = InlineKeyboardMarkup(keyboard)
             await update.callback_query.message.reply_text("服务商管理", reply_markup=reply_markup)
     except Exception as e:
-        logger.error(f"获取服务商信息失败: {e}")
+        # 直接记录固定的错误信息，避免尝试编码包含emoji的异常信息
+        logger.error("获取服务商信息失败")
         await loading.edit_text("❌ 获取服务商信息失败，请稍后重试")
 
 async def service_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -347,7 +356,8 @@ async def service_user_manage(update: Update, context: ContextTypes.DEFAULT_TYPE
         else:
             await loading.edit_text("❌ 获取用户信息失败")
     except Exception as e:
-        logger.error(f"获取用户信息失败: {e}")
+        # 直接记录固定的错误信息，避免尝试编码包含emoji的异常信息
+        logger.error("获取用户信息失败")
         await loading.edit_text("❌ 获取用户信息失败，请稍后重试")
 
 async def service_recharge(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -451,7 +461,8 @@ async def service_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data['game_balance'] = 50000  # 默认最大值
             context.user_data['local_user_id'] = local_user_id
     except Exception as e:
-        logger.error(f"查询游戏余额失败: {e}")
+        # 直接记录固定的错误信息，避免尝试编码包含emoji的异常信息
+        logger.error("查询游戏余额失败")
         # 即使查询失败，也允许用户输入提现金额
         await loading.edit_text("💎 请输入提现金额（10-50000游戏币，必须是10的倍数）：")
         context.user_data['current_operation'] = 'service_withdraw_amount'
@@ -491,7 +502,8 @@ async def service_game_center(update: Update, context: ContextTypes.DEFAULT_TYPE
         else:
             await loading.edit_text("❌ 获取游戏列表失败")
     except Exception as e:
-        logger.error(f"获取游戏列表失败: {e}")
+        # 直接记录固定的错误信息，避免尝试编码包含emoji的异常信息
+        logger.error("获取游戏列表失败")
         await loading.edit_text("❌ 获取游戏列表失败，请稍后重试")
 
 async def create_recharge_order(user_id, carrot_amount, game_id="1"):
@@ -540,8 +552,9 @@ async def create_recharge_order(user_id, carrot_amount, game_id="1"):
         else:
             return {"success": False, "error": f"API调用失败: {response.status_code}"}
     except Exception as e:
-        logger.error(f"创建充值订单失败: {e}")
-        return {"success": False, "error": str(e)}
+        # 直接记录固定的错误信息，避免尝试编码包含emoji的异常信息
+        logger.error("创建充值订单失败")
+        return {"success": False, "error": "创建订单失败，请稍后重试"}
 
 async def process_withdraw_order(user_id, game_coin_amount):
     """处理提现订单
@@ -588,5 +601,6 @@ async def process_withdraw_order(user_id, game_coin_amount):
         else:
             return {"success": False, "error": f"转账失败: {response.status_code}"}
     except Exception as e:
-        logger.error(f"处理提现订单失败: {e}")
-        return {"success": False, "error": str(e)}
+        # 直接记录固定的错误信息，避免尝试编码包含emoji的异常信息
+        logger.error("处理提现订单失败")
+        return {"success": False, "error": "处理提现订单失败，请稍后重试"}

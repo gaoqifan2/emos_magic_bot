@@ -6,12 +6,12 @@ import boto3
 @dataclass
 class Config:
     # 正式Bot配置
-    # BOT_TOKEN: str = "8682707944:AAGvauAZxz8BRxwFd2piaG3adi01zGQtydY"
-    # BOT_USERNAME: str = "emosMagicBox_bot"
+    BOT_TOKEN: str = "8682707944:AAGvauAZxz8BRxwFd2piaG3adi01zGQtydY"
+    BOT_USERNAME: str = "emosMagicBox_bot"
 
     #测试bot
-    BOT_TOKEN: str = "8714100893:AAFxkl8zL2bpdNzgEBJ9fIseNsAG8D-mSjI"
-    BOT_USERNAME: str = "emosCheShiBox_bot"
+    # BOT_TOKEN: str = "8714100893:AAFxkl8zL2bpdNzgEBJ9fIseNsAG8D-mSjI"
+    # BOT_USERNAME: str = "emosCheShiBox_bot"
     
     # API地址
     # 生产环境地址
@@ -32,6 +32,9 @@ class Config:
     RANK_CARROT_URL: str = f"{API_BASE_URL}/rank/carrot"
     RANK_UPLOAD_URL: str = f"{API_BASE_URL}/rank/upload"
     
+    # 游戏相关
+    API_USER_ENDPOINT: str = f"https://emos.best/api/user"
+    
     # Cloudflare R2配置
     R2_ACCESS_KEY: str = "6418f1afb056eaefe68b38294e9666a9"
     R2_SECRET_KEY: str = "9dfa529c359c8b1439c7564f0a41f03b35ae8b8b88cf59786cce43bb06e57035"
@@ -50,7 +53,25 @@ BOT_COMMANDS = [
     ("lottery_cancel", "取消抽奖"),
     ("rank_upload", "上传榜"),
     ("cancel", "取消操作"),
-    ("help", "帮助")
+    ("help", "帮助"),
+    ("game", "游戏厅"),
+    ("balance", "查看余额"),
+    ("guess", "猜大小游戏"),
+    ("slot", "老虎机游戏"),
+    ("blackjack", "21点游戏"),
+    ("hit", "要牌（21点）"),
+    ("stand", "停牌（21点）"),
+    ("daily", "每日签到"),
+    ("withdraw", "提现")
+]
+
+# 群聊中允许的命令列表
+# 空列表表示群聊中不允许任何命令
+GROUP_ALLOWED_COMMANDS = [
+    "balance",     # 查看余额
+    "guess",       # 猜大小游戏
+    "slot",        # 老虎机游戏
+    "blackjack",   # 21点游戏
 ]
 
 # 全局变量 - 存储用户token
