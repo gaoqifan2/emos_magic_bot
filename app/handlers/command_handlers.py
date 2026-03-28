@@ -726,7 +726,7 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         await query.edit_message_text(
-            f"💰 {user_name} 的游戏余额\n🎮 当前余额：{balance} 🪙",
+            f"💰 {user_name} 的游戏余额\n🪙 当前余额：{balance} 🪙",
             reply_markup=reply_markup
         )
         handled = True
@@ -2702,10 +2702,10 @@ async def withdraw_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         total_deduct = 0
     
     # 提示用户输入提现金额
-    message = f"💎 您的游戏余额：{balance} 游戏币\n"
+    message = f"💎 您的游戏余额：{balance} 🪙\n"
     message += f"💰 可提现金额：{max_withdraw} 单位\n"
-    message += f"💸 手续费：{fee} 游戏币\n"
-    message += f"🎮 总计扣除：{total_deduct} 游戏币\n"
+    message += f"💸 手续费：{fee} 🪙\n"
+    message += f"🪙 总计扣除：{total_deduct} 🪙\n"
     message += f"🎁 实际到账：{max_withdraw} 单位\n\n"
     message += "请输入提现金额（1-50000单位）："
     

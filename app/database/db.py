@@ -793,12 +793,31 @@ def get_user_total_recharge(user_id):
     
     try:
         with connection.cursor() as cursor:
-            # 先通过用户的user_id找到用户在数据库中的id
+            # 尝试通过id查询
+            try:
+                # 尝试将user_id转换为整数，判断是否为数据库id
+                user_id_int = int(user_id)
+                cursor.execute('SELECT total_recharge FROM users WHERE id = %s', (user_id_int,))
+                user_result = cursor.fetchone()
+                if user_result:
+                    return float(user_result.get('total_recharge', 0))
+            except (ValueError, TypeError):
+                pass
+            
+            # 如果通过id查询失败，尝试通过user_id查询
             cursor.execute('SELECT total_recharge FROM users WHERE user_id = %s', (user_id,))
             user_result = cursor.fetchone()
-            
             if user_result:
-                return user_result.get('total_recharge', 0)
+                return float(user_result.get('total_recharge', 0))
+            
+            # 如果通过user_id查询失败，尝试查询所有用户，然后返回第一个匹配的
+            cursor.execute('SELECT id, user_id, total_recharge FROM users')
+            users = cursor.fetchall()
+            for user in users:
+                if str(user['id']) == str(user_id) or str(user['user_id']) == str(user_id):
+                    return float(user.get('total_recharge', 0))
+            
+            # 如果没有找到匹配的用户，返回0
             return 0
     except Exception as e:
         print(f"获取用户累计充值金额时出错: {e}")
@@ -810,14 +829,47 @@ def update_user_total_recharge(user_id, amount):
     """更新用户的累计充值金额"""
     connection = get_db_connection()
     if not connection:
+        print("数据库连接失败")
         return False
     
     try:
         with connection.cursor() as cursor:
-            # 先通过用户的user_id找到用户在数据库中的id
-            cursor.execute('UPDATE users SET total_recharge = total_recharge + %s WHERE user_id = %s', (amount, user_id))
+            affected_rows = 0
+            
+            # 尝试通过id更新
+            try:
+                # 尝试将user_id转换为整数，判断是否为数据库id
+                user_id_int = int(user_id)
+                print(f"尝试通过id更新: id={user_id_int}, amount={amount}")
+                cursor.execute('UPDATE users SET total_recharge = total_recharge + %s WHERE id = %s', (amount, user_id_int))
+                affected_rows = cursor.rowcount
+                print(f"影响行数: {affected_rows}")
+            except (ValueError, TypeError):
+                pass
+            
+            # 如果通过id更新失败，尝试通过user_id更新
+            if affected_rows == 0:
+                print(f"尝试通过user_id更新: user_id={user_id}, amount={amount}")
+                cursor.execute('UPDATE users SET total_recharge = total_recharge + %s WHERE user_id = %s', (amount, user_id))
+                affected_rows = cursor.rowcount
+                print(f"影响行数: {affected_rows}")
+            
+            # 如果通过user_id更新失败，尝试查询所有用户，然后更新第一个匹配的
+            if affected_rows == 0:
+                cursor.execute('SELECT id, user_id FROM users')
+                users = cursor.fetchall()
+                for user in users:
+                    if str(user['id']) == str(user_id) or str(user['user_id']) == str(user_id):
+                        print(f"尝试通过查询到的id更新: id={user['id']}, amount={amount}")
+                        cursor.execute('UPDATE users SET total_recharge = total_recharge + %s WHERE id = %s', (amount, user['id']))
+                        affected_rows = cursor.rowcount
+                        print(f"影响行数: {affected_rows}")
+                        break
+            
+            # 提交事务
             connection.commit()
-            return True
+            print(f"更新用户累计充值金额成功: user_id={user_id}, amount={amount}, affected_rows={affected_rows}")
+            return affected_rows > 0
     except Exception as e:
         print(f"更新用户累计充值金额时出错: {e}")
         connection.rollback()
@@ -833,12 +885,31 @@ def get_user_total_withdraw(user_id):
     
     try:
         with connection.cursor() as cursor:
-            # 先通过用户的user_id找到用户在数据库中的id
+            # 尝试通过id查询
+            try:
+                # 尝试将user_id转换为整数，判断是否为数据库id
+                user_id_int = int(user_id)
+                cursor.execute('SELECT total_withdraw FROM users WHERE id = %s', (user_id_int,))
+                user_result = cursor.fetchone()
+                if user_result:
+                    return float(user_result.get('total_withdraw', 0))
+            except (ValueError, TypeError):
+                pass
+            
+            # 如果通过id查询失败，尝试通过user_id查询
             cursor.execute('SELECT total_withdraw FROM users WHERE user_id = %s', (user_id,))
             user_result = cursor.fetchone()
-            
             if user_result:
-                return user_result.get('total_withdraw', 0)
+                return float(user_result.get('total_withdraw', 0))
+            
+            # 如果通过user_id查询失败，尝试查询所有用户，然后返回第一个匹配的
+            cursor.execute('SELECT id, user_id, total_withdraw FROM users')
+            users = cursor.fetchall()
+            for user in users:
+                if str(user['id']) == str(user_id) or str(user['user_id']) == str(user_id):
+                    return float(user.get('total_withdraw', 0))
+            
+            # 如果没有找到匹配的用户，返回0
             return 0
     except Exception as e:
         print(f"获取用户累计提现金额时出错: {e}")
@@ -850,14 +921,47 @@ def update_user_total_withdraw(user_id, amount):
     """更新用户的累计提现金额"""
     connection = get_db_connection()
     if not connection:
+        print("数据库连接失败")
         return False
     
     try:
         with connection.cursor() as cursor:
-            # 先通过用户的user_id找到用户在数据库中的id
-            cursor.execute('UPDATE users SET total_withdraw = total_withdraw + %s WHERE user_id = %s', (amount, user_id))
+            affected_rows = 0
+            
+            # 尝试通过id更新
+            try:
+                # 尝试将user_id转换为整数，判断是否为数据库id
+                user_id_int = int(user_id)
+                print(f"尝试通过id更新: id={user_id_int}, amount={amount}")
+                cursor.execute('UPDATE users SET total_withdraw = total_withdraw + %s WHERE id = %s', (amount, user_id_int))
+                affected_rows = cursor.rowcount
+                print(f"影响行数: {affected_rows}")
+            except (ValueError, TypeError):
+                pass
+            
+            # 如果通过id更新失败，尝试通过user_id更新
+            if affected_rows == 0:
+                print(f"尝试通过user_id更新: user_id={user_id}, amount={amount}")
+                cursor.execute('UPDATE users SET total_withdraw = total_withdraw + %s WHERE user_id = %s', (amount, user_id))
+                affected_rows = cursor.rowcount
+                print(f"影响行数: {affected_rows}")
+            
+            # 如果通过user_id更新失败，尝试查询所有用户，然后更新第一个匹配的
+            if affected_rows == 0:
+                cursor.execute('SELECT id, user_id FROM users')
+                users = cursor.fetchall()
+                for user in users:
+                    if str(user['id']) == str(user_id) or str(user['user_id']) == str(user_id):
+                        print(f"尝试通过查询到的id更新: id={user['id']}, amount={amount}")
+                        cursor.execute('UPDATE users SET total_withdraw = total_withdraw + %s WHERE id = %s', (amount, user['id']))
+                        affected_rows = cursor.rowcount
+                        print(f"影响行数: {affected_rows}")
+                        break
+            
+            # 提交事务
             connection.commit()
-            return True
+            print(f"更新用户累计提现金额成功: user_id={user_id}, amount={amount}, affected_rows={affected_rows}")
+            return affected_rows > 0
     except Exception as e:
         print(f"更新用户累计提现金额时出错: {e}")
         connection.rollback()

@@ -594,6 +594,16 @@ def main() -> None:
                                         if record_date == today:
                                             daily_recharge += record_amount
                                     
+                                    # 检查累计充值限额
+                                    from app.database import get_user_total_recharge
+                                    total_recharge = get_user_total_recharge(emos_user_id)
+                                    max_total_recharge = 100  # 累计充值限额为100萝卜
+                                    
+                                    if total_recharge + amount > max_total_recharge:
+                                        remaining_recharge = max_total_recharge - total_recharge
+                                        await update.message.reply_text(f"累计充值已达上限！累计已充值 {total_recharge} 萝卜，最多可充值 {max_total_recharge} 萝卜，还可充值 {remaining_recharge} 萝卜")
+                                        return
+                                    
                                     # 检查充值限制
                                     if daily_recharge + amount > RECHARGE_LIMITS['daily']:
                                         await update.message.reply_text(f"今日充值已达上限！今日已充值 {daily_recharge} 萝卜，最多可充值 {RECHARGE_LIMITS['daily']} 萝卜")
@@ -835,7 +845,7 @@ def main() -> None:
                                                     )
                                                     # 计算剩余游戏币余额
                                                     remaining_balance = game_balance - amount
-                                                    await loading.edit_text(f"✅ 提现成功！\n\n订单号：\n```\n{order_no}\n```\n🎮 游戏币扣除：{amount}\n🥕 兑换萝卜：{carrot_amount}\n💸 手续费：{fee_game_coin}游戏币\n💼 税费：{tax_carrot}萝卜\n💰 实际到账（税后）：{after_tax_carrot}萝卜\n🎮 剩余游戏币：{remaining_balance}\n已转入您的账号", parse_mode="Markdown")
+                                                    await loading.edit_text(f"✅ 提现成功！\n\n订单号：\n```\n{order_no}\n```\n🪙 游戏币扣除：{amount}\n🥕 兑换萝卜：{carrot_amount}\n💸 手续费：{fee_game_coin} 🪙\n💼 税费：{tax_carrot}萝卜\n💰 实际到账（税后）：{after_tax_carrot}萝卜\n🪙 剩余游戏币：{remaining_balance} 🪙\n已转入您的账号", parse_mode="Markdown")
                                                     
                                                     # 显示返回菜单
                                                     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
