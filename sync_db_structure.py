@@ -56,16 +56,24 @@ def sync_structures(source_config, target_config):
                         # 对于users表，使用ALTER TABLE添加缺失的字段
                         # 首先检查表是否存在
                         cursor.execute("SHOW TABLES LIKE 'users'")
-                        if cursor.fetchone():
+                        table_exists = cursor.fetchone()
+                        print(f"🔍 检查users表是否存在: {table_exists is not None}")
+                        if table_exists:
                             # 表存在，检查并添加缺失的字段
                             # 检查current_cycle_score字段
                             cursor.execute("SHOW COLUMNS FROM users LIKE 'current_cycle_score'")
-                            if not cursor.fetchone():
+                            field_exists = cursor.fetchone()
+                            print(f"🔍 检查current_cycle_score字段是否存在: {field_exists is not None}")
+                            if not field_exists:
+                                print("🔧 尝试添加current_cycle_score字段...")
                                 cursor.execute("ALTER TABLE users ADD COLUMN current_cycle_score INT DEFAULT 0 COMMENT '当前周期贡献分（每下注1币增加1分，中奖后归零）'")
                                 print("✅ 为users表添加current_cycle_score字段")
+                            else:
+                                print("✅ current_cycle_score字段已存在")
                             print(f"✅ 同步表结构: {table_name}")
                         else:
                             # 表不存在，直接创建
+                            print("🔧 创建users表...")
                             cursor.execute(create_sql)
                             print(f"✅ 创建表结构: {table_name}")
                     else:
