@@ -615,6 +615,16 @@ def ensure_user_exists(emos_user_id, token, telegram_id=None, username=None, fir
                         "UPDATE users SET token = %s, telegram_id = %s, first_name = %s, last_name = %s WHERE id = %s",
                         (token, telegram_id, first_name, last_name, user_id)
                     )
+                # 确保用户有余额记录并更新username
+                cursor.execute('SELECT * FROM balances WHERE user_id = %s', (user_id,))
+                balance_result = cursor.fetchone()
+                if not balance_result:
+                    # 如果余额记录不存在，创建一个，默认为0
+                    cursor.execute('INSERT INTO balances (user_id, balance, username) VALUES (%s, %s, %s)', (user_id, 0, username))
+                else:
+                    # 如果余额记录存在，更新username
+                    cursor.execute('UPDATE balances SET username = %s WHERE user_id = %s', (username, user_id))
+                
                 connection.commit()
                 print(f"  用户更新成功：id={user_id}")
                 return user_id
@@ -632,8 +642,8 @@ def ensure_user_exists(emos_user_id, token, telegram_id=None, username=None, fir
                 
                 # 创建余额记录
                 cursor.execute(
-                    "INSERT INTO balances (user_id, balance) VALUES (%s, 0)",
-                    (user_id,)
+                    "INSERT INTO balances (user_id, balance, username) VALUES (%s, %s, %s)",
+                    (user_id, 0, safe_username)
                 )
                 print(f"  余额记录创建成功：user_id={user_id}, balance=0")
                 
