@@ -757,7 +757,7 @@ def main() -> None:
                             user_id = update.effective_user.id
                             
                             # 计算需要的游戏币数量（10游戏币=1萝卜）
-                            # 10%手续费
+                            # 1%手续费
                             base_game_coin = carrot_amount * 10
                             fee_game_coin = int(base_game_coin * 0.01)
                             amount = base_game_coin + fee_game_coin

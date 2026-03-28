@@ -275,7 +275,7 @@ def add_user(user_id, user_data):
                 user_id_db = cursor.lastrowid
                 
                 # 为新用户初始化余额，默认为0
-                cursor.execute('INSERT INTO balances (user_id, balance) VALUES (%s, 0)', (user_id_db,))
+                cursor.execute('INSERT INTO balances (user_id, balance, username) VALUES (%s, %s, %s)', (user_id_db, 0, username))
                 
                 connection.commit()
             else:
@@ -427,9 +427,13 @@ def update_user_token(telegram_id, token, first_name='', last_name=''):
                     # 确保用户有余额记录
                     user_id_db = existing_user['id']
                     cursor.execute('SELECT * FROM balances WHERE user_id = %s', (user_id_db,))
-                    if not cursor.fetchone():
+                    balance_result = cursor.fetchone()
+                    if not balance_result:
                         # 如果余额记录不存在，创建一个，默认为0
-                        cursor.execute('INSERT INTO balances (user_id, balance) VALUES (%s, 0)', (user_id_db,))
+                        cursor.execute('INSERT INTO balances (user_id, balance, username) VALUES (%s, %s, %s)', (user_id_db, 0, username))
+                    else:
+                        # 如果余额记录存在，更新username
+                        cursor.execute('UPDATE balances SET username = %s WHERE user_id = %s', (username, user_id_db))
                 else:
                     # 用户不存在，创建用户
                     cursor.execute('''
@@ -439,7 +443,7 @@ def update_user_token(telegram_id, token, first_name='', last_name=''):
                     # 获取生成的用户id
                     user_id_db = cursor.lastrowid
                     # 为新用户初始化余额，默认为0
-                    cursor.execute('INSERT INTO balances (user_id, balance) VALUES (%s, 0)', (user_id_db,))
+                    cursor.execute('INSERT INTO balances (user_id, balance, username) VALUES (%s, %s, %s)', (user_id_db, 0, username))
             
             connection.commit()
     except Exception as e:
@@ -597,21 +601,31 @@ def ensure_user_exists(emos_user_id, token, telegram_id=None, username=None, fir
             if result:
                 user_id = result['id']
                 print(f"  用户已存在：id={user_id}, user_id={result['user_id']}, telegram_id={result['telegram_id']}")
-                # 更新用户信息
+                # 更新用户信息，确保username不为None
                 print(f"  更新用户信息：token={token}, telegram_id={telegram_id}, username={username}")
-                cursor.execute(
-                    "UPDATE users SET token = %s, telegram_id = %s, username = %s, first_name = %s, last_name = %s WHERE id = %s",
-                    (token, telegram_id, username, first_name, last_name, user_id)
-                )
+                # 只有当username不为None时才更新
+                if username is not None:
+                    cursor.execute(
+                        "UPDATE users SET token = %s, telegram_id = %s, username = %s, first_name = %s, last_name = %s WHERE id = %s",
+                        (token, telegram_id, username, first_name, last_name, user_id)
+                    )
+                else:
+                    # 不更新username字段
+                    cursor.execute(
+                        "UPDATE users SET token = %s, telegram_id = %s, first_name = %s, last_name = %s WHERE id = %s",
+                        (token, telegram_id, first_name, last_name, user_id)
+                    )
                 connection.commit()
                 print(f"  用户更新成功：id={user_id}")
                 return user_id
             else:
-                # 创建新用户
+                # 创建新用户，确保username不为None
                 print(f"  用户不存在，创建新用户：user_id={emos_user_id}, telegram_id={telegram_id}")
+                # 确保username不为None
+                safe_username = username if username is not None else ''
                 cursor.execute(
                     "INSERT INTO users (user_id, telegram_id, token, username, first_name, last_name) VALUES (%s, %s, %s, %s, %s, %s)",
-                    (emos_user_id, telegram_id, token, username, first_name, last_name)
+                    (emos_user_id, telegram_id, token, safe_username, first_name, last_name)
                 )
                 user_id = cursor.lastrowid
                 print(f"  新用户创建成功：id={user_id}")
@@ -748,3 +762,83 @@ def get_recharge_history(user_id):
     finally:
         connection.close()
     return []
+
+def get_user_total_recharge(user_id):
+    """获取用户的累计充值金额"""
+    connection = get_db_connection()
+    if not connection:
+        return 0
+    
+    try:
+        with connection.cursor() as cursor:
+            # 先通过用户的user_id找到用户在数据库中的id
+            cursor.execute('SELECT total_recharge FROM users WHERE user_id = %s', (user_id,))
+            user_result = cursor.fetchone()
+            
+            if user_result:
+                return user_result.get('total_recharge', 0)
+            return 0
+    except Exception as e:
+        print(f"获取用户累计充值金额时出错: {e}")
+        return 0
+    finally:
+        connection.close()
+
+def update_user_total_recharge(user_id, amount):
+    """更新用户的累计充值金额"""
+    connection = get_db_connection()
+    if not connection:
+        return False
+    
+    try:
+        with connection.cursor() as cursor:
+            # 先通过用户的user_id找到用户在数据库中的id
+            cursor.execute('UPDATE users SET total_recharge = total_recharge + %s WHERE user_id = %s', (amount, user_id))
+            connection.commit()
+            return True
+    except Exception as e:
+        print(f"更新用户累计充值金额时出错: {e}")
+        connection.rollback()
+        return False
+    finally:
+        connection.close()
+
+def get_user_total_withdraw(user_id):
+    """获取用户的累计提现金额"""
+    connection = get_db_connection()
+    if not connection:
+        return 0
+    
+    try:
+        with connection.cursor() as cursor:
+            # 先通过用户的user_id找到用户在数据库中的id
+            cursor.execute('SELECT total_withdraw FROM users WHERE user_id = %s', (user_id,))
+            user_result = cursor.fetchone()
+            
+            if user_result:
+                return user_result.get('total_withdraw', 0)
+            return 0
+    except Exception as e:
+        print(f"获取用户累计提现金额时出错: {e}")
+        return 0
+    finally:
+        connection.close()
+
+def update_user_total_withdraw(user_id, amount):
+    """更新用户的累计提现金额"""
+    connection = get_db_connection()
+    if not connection:
+        return False
+    
+    try:
+        with connection.cursor() as cursor:
+            # 先通过用户的user_id找到用户在数据库中的id
+            cursor.execute('UPDATE users SET total_withdraw = total_withdraw + %s WHERE user_id = %s', (amount, user_id))
+            connection.commit()
+            return True
+    except Exception as e:
+        print(f"更新用户累计提现金额时出错: {e}")
+        connection.rollback()
+        return False
+    finally:
+        connection.close()

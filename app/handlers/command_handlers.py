@@ -339,6 +339,10 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                 # 增加用户游戏币
                                 update_balance(api_user_id, game_coin_amount)
                                 
+                                # 更新用户累计充值金额
+                                from app.database import update_user_total_recharge
+                                update_user_total_recharge(api_user_id, carrot_amount)
+                                
                                 logger.info(f"用户 {api_user_id} 充值成功，订单号：{order_no}")
                                 
                                 # 将用户信息添加到user_tokens，标记为已登录
@@ -559,6 +563,13 @@ async def balance_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     }
     add_user(user_id, user_data)
     
+    # 从user表获取用户信息
+    from app.database import get_user_by_user_id
+    user_from_db = get_user_by_user_id(user_id)
+    user_name = user_from_db.get('username', user.username) if user_from_db else user.username
+    # 确保用户名不为空
+    user_name = user_name if user_name else "用户"
+    
     # 新用户初始余额为0，无需额外添加
     
     balance = get_balance(user_id)
@@ -572,12 +583,12 @@ async def balance_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 检查是否是CallbackQuery类型的更新
     if update.callback_query:
         await update.callback_query.edit_message_text(
-            f"{user.first_name} 当前的游戏币余额：{balance}",
+            f"{user_name} 当前的游戏币余额：{balance}",
             reply_markup=reply_markup
         )
     else:
         # 在群聊中显示用户信息，让其他群友知道是谁在查询余额
-        await update.message.reply_text(f"{user.first_name} 当前的游戏币余额：{balance}")
+        await update.message.reply_text(f"{user_name} 当前的游戏币余额：{balance}")
 
 
 async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -696,6 +707,13 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         }
         add_user(user_id_api, user_data)
         
+        # 从user表获取用户信息
+        from app.database import get_user_by_user_id
+        user_from_db = get_user_by_user_id(user_id_api)
+        user_name = user_from_db.get('username', user.username) if user_from_db else user.username
+        # 确保用户名不为空
+        user_name = user_name if user_name else "用户"
+        
         # 新用户初始余额为0，无需额外添加
         
         balance = get_balance(user_id_api)
@@ -706,7 +724,7 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         await query.edit_message_text(
-            f"💰 {user.first_name} 的游戏余额\n🎮 当前余额：{balance} 🪙",
+            f"💰 {user_name} 的游戏余额\n🎮 当前余额：{balance} 🪙",
             reply_markup=reply_markup
         )
         handled = True
@@ -1211,6 +1229,14 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text("充值萝卜数量必须在1-50000之间")
                 return
             
+            # 检查累计充值限额（默认100萝卜）
+            from app.database import get_user_total_recharge
+            total_recharge = get_user_total_recharge(user_id_api)
+            if total_recharge + carrot_amount > 100:
+                remaining = 100 - total_recharge
+                await update.message.reply_text(f"充值限额为100萝卜，您已累计充值{total_recharge}萝卜，还可充值{remaining}萝卜")
+                return
+            
             # 从user_tokens中获取用户信息
             telegram_id = user.id
             user_info = None
@@ -1360,6 +1386,17 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text("提现金额必须在1-50000萝卜之间")
                 return
             
+            # 检查提现限额（不超过累计充值金额的3倍）
+            from app.database import get_user_total_recharge, get_user_total_withdraw
+            total_recharge = get_user_total_recharge(user_id_api)
+            total_withdraw = get_user_total_withdraw(user_id_api)
+            max_withdraw = total_recharge * 3
+            remaining_withdraw = max_withdraw - total_withdraw
+            
+            if withdraw_amount > remaining_withdraw:
+                await update.message.reply_text(f"提现金额不能超过累计充值金额的3倍，您已提现{total_withdraw}萝卜，还可提现{remaining_withdraw}萝卜")
+                return
+            
             # 从context中获取用户信息
             user_id_api = context.user_data.get('user_id', user.id)
             balance = context.user_data.get('game_balance', 0)
@@ -1401,6 +1438,10 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 from app.database import add_withdrawal_record
                 # 传递实际扣除的游戏币数量（包含手续费）
                 add_withdrawal_record(user_id_api, actual_amount)
+                
+                # 更新用户累计提现金额
+                from app.database import update_user_total_withdraw
+                update_user_total_withdraw(user_id_api, withdraw_amount)
                 
                 await update.message.reply_text(f"{user.first_name} 提现申请成功！\n\n订单号：{order_no}\n提现萝卜：{withdraw_amount} 萝卜\n扣除游戏币：{actual_amount} 游戏币\n当前余额：{new_balance} 游戏币")
             else:
@@ -1592,65 +1633,78 @@ async def process_slot(update: Update, context: ContextTypes.DEFAULT_TYPE, amoun
     
     # 检查是否触发Jackpot（7️⃣-BAR-7️⃣组合，概率1/256）
     # 需要 left=3 (7️⃣), middle=0 (BAR), right=3 (7️⃣)
+    # 额外添加随机概率检查，确保实际概率接近1/256
+    is_jackpot_triggered = False
     if left == 3 and middle == 0 and right == 3:
-        is_jackpot = True
-        is_win = True
-        # 获取用户贡献分和等级（重新获取，因为可能在计算过程中有变化）
-        user_score = get_user_score(telegram_id)
-        level, multiplier, pool_ratio = get_user_level(user_score)
-        
-        # 从全局获取Jackpot奖池金额（重新获取，因为可能在计算过程中有变化）
-        jackpot_pool = get_jackpot_pool()
-        
-        # 计算Jackpot奖金
-        # 固定额外奖励 + 奖池按比例拿走
-        fixed_bonus = bet_amount * multiplier
-        pool_bonus = int(jackpot_pool * pool_ratio)
-        jackpot_win = fixed_bonus + pool_bonus
-        win_amount = jackpot_win
-        
-        # 构建结果消息
-        result += f"🎉🎉🎉 JACKPOT大奖！🎉🎉🎉\n"
-        result += f"💰 奖池金额：{jackpot_pool} 🪙\n"
-        result += f"🏆 您的等级：{level}\n"
-        result += f"🎁 固定奖励：{fixed_bonus} 🪙（{multiplier}倍下注）\n"
-        result += f"🏦 奖池奖励：{pool_bonus} 🪙（{int(pool_ratio*100)}%奖池）\n"
-        
-        # 记录Jackpot中奖信息
-        record_jackpot_win(telegram_id, jackpot_win)
-        
-        # 重置用户贡献分
-        reset_user_score(telegram_id)
-        
-        # 重置Jackpot奖池（如果被钻石用户100%拿走，重置为0）
-        if pool_ratio == 1.0:
-            # 钻石用户拿走全部奖池，重置为0
-            reset_jackpot_pool()
+        # 1/4的概率实际触发Jackpot，这样总概率约为1/256
+        import random
+        if random.random() < 0.25:
+            is_jackpot = True
+            is_win = True
+            is_jackpot_triggered = True
+            # 获取用户贡献分和等级（重新获取，因为可能在计算过程中有变化）
+            user_score = get_user_score(telegram_id)
+            level, multiplier, pool_ratio = get_user_level(user_score)
+            
+            # 从全局获取Jackpot奖池金额（重新获取，因为可能在计算过程中有变化）
+            jackpot_pool = get_jackpot_pool()
+            
+            # 计算Jackpot奖金
+            # 固定额外奖励 + 奖池按比例拿走
+            fixed_bonus = bet_amount * multiplier
+            pool_bonus = int(jackpot_pool * pool_ratio)
+            jackpot_win = fixed_bonus + pool_bonus
+            win_amount = jackpot_win
+            
+            # 构建结果消息
+            result += f"🎉🎉🎉 JACKPOT大奖！🎉🎉🎉\n"
+            result += f"💰 奖池金额：{jackpot_pool} 🪙\n"
+            result += f"🏆 您的等级：{level}\n"
+            result += f"🎁 固定奖励：{fixed_bonus} 🪙（{multiplier}倍下注）\n"
+            result += f"🏦 奖池奖励：{pool_bonus} 🪙（{int(pool_ratio*100)}%奖池）\n"
+            
+            # 记录Jackpot中奖信息
+            record_jackpot_win(telegram_id, jackpot_win)
+            
+            # 重置用户贡献分
+            reset_user_score(telegram_id)
+            
+            # 重置Jackpot奖池（如果被钻石用户100%拿走，重置为0）
+            if pool_ratio == 1.0:
+                # 钻石用户拿走全部奖池，重置为0
+                reset_jackpot_pool()
+            else:
+                # 其他等级用户只拿走部分，更新奖池
+                from app.database.jackpot import set_jackpot_pool
+                new_pool_amount = jackpot_pool - pool_bonus
+                set_jackpot_pool(new_pool_amount)
         else:
-            # 其他等级用户只拿走部分，更新奖池
-            from app.database.jackpot import set_jackpot_pool
-            new_pool_amount = jackpot_pool - pool_bonus
-            set_jackpot_pool(new_pool_amount)
+            # 不触发Jackpot，视为普通组合
+            is_jackpot = False
+            is_win = False
+            win_amount = -bet_amount
+            # 不显示Jackpot消息
+            result += "全不同！\n"
     # 大奖：三个相同图案
     elif left == middle == right:
         is_win = True
-        # 根据不同图案设置不同赔率（85%收益率方案）
+        # 进一步调整赔率：降低三个相同的倍率
         if left == 3:  # 7️⃣7️⃣7️⃣
-            win_amount = bet_amount * 30  # 31倍
+            win_amount = bet_amount * 6  # 7倍
             result += "特等奖！\n"
         elif left == 2:  # 🍋🍋🍋
-            win_amount = bet_amount * 6  # 7倍
+            win_amount = bet_amount * 1.5  # 2.5倍
             result += "大奖！\n"
         elif left == 1:  # 🍇🍇🍇
-            win_amount = bet_amount * 2  # 3倍
+            win_amount = bet_amount * 0.5  # 1.5倍
             result += "中奖！\n"
         else:  # BAR BAR BAR
-            win_amount = int(bet_amount * 0.5)  # 1.5倍
+            win_amount = int(bet_amount * 0.1)  # 1.1倍
             result += "小奖！\n"
     # 小奖：两个相同图案
     elif left == middle or middle == right or left == right:
         is_win = True
-        win_amount = int(bet_amount * 0.3)  # 0.3倍
+        win_amount = int(bet_amount * 0.3)  # 0.3倍（提高两个相同的倍率）
         result += "两个相同！\n"
     # 未中奖：全不同图案
     else:
@@ -2447,11 +2501,13 @@ async def process_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE, a
     # 检查余额
     balance = get_balance(user_id_api)
     
-    # 计算实际需要扣除的游戏币（11游戏币=1萝卜，包含10%手续费）
-    actual_amount = withdraw_amount * 11
+    # 计算实际需要扣除的游戏币（10游戏币=1萝卜，包含1%手续费）
+    base_amount = withdraw_amount * 10
+    fee_amount = int(base_amount * 0.01)
+    actual_amount = base_amount + fee_amount
     
     if balance < actual_amount:
-        await update.message.reply_text(f"余额不足！当前余额：{balance} 游戏币，需要 {actual_amount} 游戏币（包含手续费）")
+        await update.message.reply_text(f"余额不足！当前余额：{balance} 游戏币，需要 {actual_amount} 游戏币（基础 {base_amount} 游戏币 + 手续费 {fee_amount} 游戏币）")
         return
     
     # 调用平台API处理提现
@@ -2484,7 +2540,7 @@ async def process_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE, a
             from app.database import add_withdrawal_record
             add_withdrawal_record(user_id_api, withdraw_amount)
             
-            await update.message.reply_text(f"{user.first_name} 提现申请成功！\n\n订单号：{order_no}\n提现萝卜：{withdraw_amount} 萝卜\n扣除游戏币：{actual_amount} 游戏币\n当前余额：{new_balance} 游戏币")
+            await update.message.reply_text(f"{user.first_name} 提现申请成功！\n\n订单号：{order_no}\n提现萝卜：{withdraw_amount} 萝卜\n基础游戏币：{base_amount} 游戏币\n手续费：{fee_amount} 游戏币\n扣除游戏币：{actual_amount} 游戏币\n当前余额：{new_balance} 游戏币")
         else:
             await update.message.reply_text(f"❌ 提现失败：API调用失败，状态码：{response.status_code}")
     except Exception as e:
