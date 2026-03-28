@@ -155,6 +155,7 @@ async def get_user_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             # 构建用户信息消息
             message = (
+                f"# 个人信息凭证\n\n"
                 f"🎬 用户名: `{username}`\n\n"
                 f"• 🆔 用户ID: `{user_id}`\n\n"
                 f"• 🔑 Token: `{token}`\n\n"
@@ -411,7 +412,17 @@ async def user_pseudonym(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     # 提示用户输入新笔名
-    await update.callback_query.edit_message_text("✏️ 请输入新的笔名：")
+    keyboard = [
+        [
+            InlineKeyboardButton("⬅️ 返回上一步", callback_data="back_to_previous"),
+            InlineKeyboardButton("❌ 取消", callback_data="cancel_operation")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.callback_query.edit_message_text(
+        "✏️ 请输入新的笔名：",
+        reply_markup=reply_markup
+    )
     
     # 存储当前状态，等待用户输入
     context.user_data['current_operation'] = 'change_pseudonym'

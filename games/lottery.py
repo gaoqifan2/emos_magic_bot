@@ -601,6 +601,7 @@ async def finish_prizes(update, context):
                     winners_text = f"{lottery_data['number']} 人"
                 
                 success_msg = (
+                    f"# 抽奖凭证\n\n"
                     f"✅ **抽奖创建成功！**\n\n"
                     f"🎲 **名称**：{payload['name']}\n"
                     f"⏰ **时间**：`{payload['time_start']}` 至 `{payload['time_end']}`\n"

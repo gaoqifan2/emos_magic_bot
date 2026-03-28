@@ -95,12 +95,21 @@ def init_db():
                     username VARCHAR(255) COMMENT '登录用户名',
                     first_name VARCHAR(255) COMMENT 'Telegram名字',
                     last_name VARCHAR(255) COMMENT 'Telegram姓氏',
+                    current_cycle_score INT DEFAULT 0 COMMENT '当前周期贡献分（每下注1币增加1分，中奖后归零）',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '注册时间',
                     INDEX idx_user_id (user_id),
                     INDEX idx_telegram_id (telegram_id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户信息表'
             ''')
             print("用户表创建成功，使用递增id作为主键，user_id作为唯一索引")
+            
+            # 为现有用户表添加current_cycle_score字段（如果不存在）
+            print("检查并添加current_cycle_score字段...")
+            cursor.execute('''
+                ALTER TABLE users 
+                ADD COLUMN IF NOT EXISTS current_cycle_score INT DEFAULT 0 COMMENT '当前周期贡献分（每下注1币增加1分，中奖后归零）'
+            ''')
+            print("current_cycle_score字段添加成功")
             
             # 创建余额表，使用用户表的id作为外键
             print("创建余额表...")
@@ -175,6 +184,31 @@ def init_db():
                 )
             ''')
             print("签到表创建成功")
+            
+            # 创建Jackpot奖池表（全局共享奖池）
+            print("创建Jackpot奖池表...")
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS jackpot_pool (
+                    id INT PRIMARY KEY DEFAULT 1,
+                    amount INT DEFAULT 500,
+                    total_contributions INT DEFAULT 0,
+                    total_payouts INT DEFAULT 0,
+                    last_winner_telegram_id BIGINT,
+                    last_win_amount INT,
+                    last_win_time TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    CHECK (id = 1)
+                )
+            ''')
+            print("Jackpot奖池表创建成功")
+            
+            # 初始化Jackpot奖池记录（如果不存在）
+            cursor.execute('''
+                INSERT INTO jackpot_pool (id, amount) 
+                VALUES (1, 0) 
+                ON DUPLICATE KEY UPDATE id=id
+            ''')
+            print("Jackpot奖池初始化完成")
         connection.commit()
         print("数据库表初始化完成")
     except Exception as e:
@@ -449,8 +483,8 @@ def add_game_record(user_id, game_type, bet_amount, result, win_amount):
     
     try:
         with connection.cursor() as cursor:
-            # 先通过用户的user_id找到用户在数据库中的id
-            cursor.execute('SELECT id FROM users WHERE user_id = %s', (user_id,))
+            # 先通过用户的user_id或telegram_id找到用户在数据库中的id
+            cursor.execute('SELECT id FROM users WHERE user_id = %s OR telegram_id = %s', (user_id, user_id))
             user_result = cursor.fetchone()
             
             if user_result:

@@ -1,6 +1,8 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from app.database import get_balance, update_balance, add_user, add_game_record, ensure_user_exists, get_last_checkin, update_checkin_time
+from app.database.jackpot import get_jackpot_pool, add_to_jackpot_pool, reset_jackpot_pool, record_jackpot_win
+from app.database.user_score import get_user_score, add_user_score, reset_user_score, get_user_level
 from app.utils.helpers import check_balance, process_daily_checkin
 from app.config import BOT_USERNAME, user_tokens, save_token_to_db, get_user_info
 import logging
@@ -810,10 +812,15 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "  - 掷骰子（1-6点）\n" 
             "  - 4-6点为'大'，1-3点为'小'\n" 
             "  - 赢：得2倍下注，输：扣掉下注\n\n"
-            "🎰 老虎机：\n" 
-            "  - 三个相同：赢5倍\n" 
-            "  - 两个相同：赢2倍\n" 
-            "  - 全不同：输\n\n"
+            "🎰 老虎机：\n"
+            "  - 三个7️⃣：赢30倍\n"
+            "  - 三个🍋：赢6倍\n"
+            "  - 三个🍇：赢2倍\n"
+            "  - 三个BAR：赢0.5倍\n"
+            "  - 两个相同：赢0.3倍\n"
+            "  - 7️⃣-BAR-7️⃣：触发Jackpot大奖！\n"
+            "  - 全不同：输\n"
+            "  - Jackpot：每局15%进入奖池，触发可获得奖池+60倍下注\n\n"
             "🃏 21点：\n" 
             "  - 不超过21点的前提下，让手牌点数比庄家大\n" 
             "  - 2-10：按牌面数值\n" 
@@ -1535,6 +1542,9 @@ async def process_slot(update: Update, context: ContextTypes.DEFAULT_TYPE, amoun
         await update.message.reply_text(f"余额不足！当前余额：{current_balance}")
         return
     
+    # 增加用户贡献分（每下注1币增加1分）
+    add_user_score(telegram_id, bet_amount)
+    
     # 发送 TG 内置老虎机
     slot_message = await update.message.reply_dice(emoji="🎰")
     
@@ -1563,54 +1573,116 @@ async def process_slot(update: Update, context: ContextTypes.DEFAULT_TYPE, amoun
     middle_symbol = symbols[middle]
     right_symbol = symbols[right]
     
+    # 获取用户贡献分和等级
+    user_score = get_user_score(telegram_id)
+    level, _, _ = get_user_level(user_score)
+    
+    # 获取当前奖池金额
+    jackpot_pool = get_jackpot_pool()
+    
     # 构建结果字符串
-    result = f"🎰 老虎机结果: {left_symbol} {middle_symbol} {right_symbol}"
+    result = f"#老虎机 结果\n\n"
+    result += f"🎰 结果: {left_symbol} {middle_symbol} {right_symbol}\n"
     
     # 判断中奖情况
     is_win = False
     win_amount = -bet_amount  # 默认输
+    is_jackpot = False
+    jackpot_win = 0
     
-    # 大奖：三个相同图案
-    if left == middle == right:
+    # 检查是否触发Jackpot（7️⃣-BAR-7️⃣组合，概率1/256）
+    # 需要 left=3 (7️⃣), middle=0 (BAR), right=3 (7️⃣)
+    if left == 3 and middle == 0 and right == 3:
+        is_jackpot = True
         is_win = True
-        # 根据不同图案设置不同赔率
+        # 获取用户贡献分和等级（重新获取，因为可能在计算过程中有变化）
+        user_score = get_user_score(telegram_id)
+        level, multiplier, pool_ratio = get_user_level(user_score)
+        
+        # 从全局获取Jackpot奖池金额（重新获取，因为可能在计算过程中有变化）
+        jackpot_pool = get_jackpot_pool()
+        
+        # 计算Jackpot奖金
+        # 固定额外奖励 + 奖池按比例拿走
+        fixed_bonus = bet_amount * multiplier
+        pool_bonus = int(jackpot_pool * pool_ratio)
+        jackpot_win = fixed_bonus + pool_bonus
+        win_amount = jackpot_win
+        
+        # 构建结果消息
+        result += f"🎉🎉🎉 JACKPOT大奖！🎉🎉🎉\n"
+        result += f"💰 奖池金额：{jackpot_pool} 🪙\n"
+        result += f"🏆 您的等级：{level}\n"
+        result += f"🎁 固定奖励：{fixed_bonus} 🪙（{multiplier}倍下注）\n"
+        result += f"🏦 奖池奖励：{pool_bonus} 🪙（{int(pool_ratio*100)}%奖池）\n"
+        
+        # 记录Jackpot中奖信息
+        record_jackpot_win(telegram_id, jackpot_win)
+        
+        # 重置用户贡献分
+        reset_user_score(telegram_id)
+        
+        # 重置Jackpot奖池（如果被钻石用户100%拿走，重置为0）
+        if pool_ratio == 1.0:
+            # 钻石用户拿走全部奖池，重置为0
+            reset_jackpot_pool()
+        else:
+            # 其他等级用户只拿走部分，更新奖池
+            from app.database.jackpot import set_jackpot_pool
+            new_pool_amount = jackpot_pool - pool_bonus
+            set_jackpot_pool(new_pool_amount)
+    # 大奖：三个相同图案
+    elif left == middle == right:
+        is_win = True
+        # 根据不同图案设置不同赔率（85%收益率方案）
         if left == 3:  # 7️⃣7️⃣7️⃣
-            win_amount = bet_amount * 49  # 50倍
-            result += " - 特等奖！"
+            win_amount = bet_amount * 30  # 31倍
+            result += "特等奖！\n"
         elif left == 2:  # 🍋🍋🍋
-            win_amount = bet_amount * 9  # 10倍
-            result += " - 大奖！"
+            win_amount = bet_amount * 6  # 7倍
+            result += "大奖！\n"
         elif left == 1:  # 🍇🍇🍇
-            win_amount = bet_amount * 4  # 5倍
-            result += " - 中奖！"
+            win_amount = bet_amount * 2  # 3倍
+            result += "中奖！\n"
         else:  # BAR BAR BAR
-            win_amount = bet_amount * 1  # 2倍
-            result += " - 小奖！"
+            win_amount = int(bet_amount * 0.5)  # 1.5倍
+            result += "小奖！\n"
     # 小奖：两个相同图案
     elif left == middle or middle == right or left == right:
         is_win = True
-        win_amount = int(bet_amount * 0.5)  # 0.5倍
-        result += " - 两个相同！"
+        win_amount = int(bet_amount * 0.3)  # 0.3倍
+        result += "两个相同！\n"
     # 未中奖：全不同图案
     else:
-        result += " - 全不同！"
+        result += "全不同！\n"
     
+    # 添加等级和奖池信息
+    result += f"🏆 当前等级：{level}\n"
+    result += f"💰 累计奖池：{jackpot_pool} 🪙\n"
+    
+    # 更新Jackpot奖池（每局抽水10%进入奖池，5%服务器费用）
+    if not is_jackpot and win_amount > 0:
+        jackpot_contribution = int(win_amount * 0.10)  # 10%抽水入池（基于赢取金额）
+        add_to_jackpot_pool(jackpot_contribution)
+        # 在结果消息中显示奖池抽水信息
+        result += f"🏦 奖池抽水：{jackpot_contribution} 🪙（10%）\n"
+
     # 更新余额
     if win_amount > 0:
-        # 计算1%的服务器费用，最少1游戏币
-        service_fee = max(1, int(win_amount * 0.01))
+        # 计算服务器费用（5%），最少1游戏币
+        service_fee = max(1, int(win_amount * 0.05))  # 5%服务器费用
         # 扣除服务器费用
         actual_win = win_amount - service_fee
         new_balance = update_balance(user_id, int(actual_win))
-        # 更新结果消息，添加服务器费用信息
-        result += f"\n💸 服务器费用：{service_fee} 🪙"
+        # 更新结果消息，添加费用信息
+        result += f"💸 服务器费用：{service_fee} 🪙\n"
     else:
         new_balance = update_balance(user_id, int(win_amount))  # 输了不需要扣除费用
-    
+
     # 保存游戏记录
     game_result = "win" if is_win else "lose"
     add_game_record(user_id, "slot", bet_amount, game_result, win_amount if is_win else 0)
-    
+
     # 发送结果
     if is_win:
         # 创建按钮
@@ -1619,7 +1691,10 @@ async def process_slot(update: Update, context: ContextTypes.DEFAULT_TYPE, amoun
              InlineKeyboardButton("🔙 返回", callback_data='games')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text(f"🎉 {user.first_name} 🎰\n{result}\n\n✨ 恭喜你赢了！获得 {win_amount} 🪙\n💰 当前余额：{new_balance} 🪙", reply_markup=reply_markup)
+        if is_jackpot:
+            await update.message.reply_text(f"🎉 {user.first_name} 🎰\n{result}\n\n🎊🎊🎊 恭喜中得JACKPOT！🎊🎊🎊\n✨ 获得 {actual_win} 🪙（已扣除服务器费用）\n💰 当前余额：{new_balance} 🪙", reply_markup=reply_markup, parse_mode="Markdown")
+        else:
+            await update.message.reply_text(f"🎉 {user.first_name} 🎰\n{result}\n\n✨ 恭喜你赢了！获得 {actual_win} 🪙（已扣除服务器费用）\n💰 当前余额：{new_balance} 🪙", reply_markup=reply_markup, parse_mode="Markdown")
     else:
         # 创建按钮
         keyboard = [
@@ -1627,7 +1702,7 @@ async def process_slot(update: Update, context: ContextTypes.DEFAULT_TYPE, amoun
              InlineKeyboardButton("🔙 返回", callback_data='games')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text(f"🎰 {user.first_name} 🎰\n{result}\n\n😢 很遗憾，你输了 {bet_amount} 🪙\n💰 当前余额：{new_balance} 🪙", reply_markup=reply_markup)
+        await update.message.reply_text(f"🎰 {user.first_name} 🎰\n{result}\n\n😢 很遗憾，你输了 {bet_amount} 🪙\n💰 当前余额：{new_balance} 🪙", reply_markup=reply_markup, parse_mode="Markdown")
 
 
 async def blackjack_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2206,7 +2281,11 @@ async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/start - 开始使用机器人\n\n"
         "📝 游戏规则\n"
         "1. 猜大小：4-6点为大，1-3点为小，赢了获得2倍下注\n"
-        "2. 老虎机：三个相同图案中奖，赔率根据图案不同\n"
+        "2. 老虎机：\n"
+        "   - 三个7️⃣：30倍 | 三个🍋：6倍 | 三个🍇：2倍\n"
+        "   - 三个BAR：0.5倍 | 两个相同：0.3倍\n"
+        "   - 7️⃣-BAR-7️⃣：触发Jackpot（奖池+60倍下注）\n"
+        "   - 每局15%进入Jackpot奖池\n"
         "3. 21点：接近21点但不超过，点数比庄家大\n\n"
         "🎮 提示\n"
         "- 所有游戏使用游戏币，需要先绑定账号\n"

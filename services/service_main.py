@@ -5,7 +5,7 @@ from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
-from config import user_tokens, Config
+from config import user_tokens, Config, WITHDRAW_LIMITS
 from utils.message_utils import auto_delete_message
 
 logger = logging.getLogger(__name__)
@@ -320,6 +320,39 @@ async def service_fund_transfer(update: Update, context: ContextTypes.DEFAULT_TY
         await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
         return
     
+    # 检查用户是否为服务商
+    is_service = False
+    try:
+        import httpx
+        headers = {"Authorization": f"Bearer {token}"}
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{Config.API_BASE_URL}/pay/base",
+                headers=headers,
+                timeout=10
+            )
+        
+        if response.status_code == 200:
+            service_info = response.json()
+            status = service_info.get('status')
+            if status == 'pass':
+                is_service = True
+            else:
+                is_service = False
+        else:
+            is_service = False
+    except Exception as e:
+        logger.error("检查服务商状态失败")
+        is_service = False
+    
+    if not is_service:
+        await update.callback_query.edit_message_text("❌ 只有服务商才能使用此功能！")
+        # 1分钟后自动消失
+        import asyncio
+        from utils.message_utils import auto_delete_message
+        asyncio.create_task(auto_delete_message(update, context, None, 60))
+        return
+    
     # 提示用户输入对方用户ID
     await update.callback_query.edit_message_text("💸 请输入对方用户ID（10位字符串，以e开头s结尾）：")
     
@@ -439,10 +472,16 @@ async def service_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 base_game_coin = max_carrot * 10
                 fee_game_coin = int(base_game_coin * 0.01)
                 total_game_coin = base_game_coin + fee_game_coin
+                # 计算税后萝卜数量（假设税率为0%，如需添加税率可在此修改）
+                tax_rate = 0
+                tax_carrot = int(max_carrot * tax_rate)
+                after_tax_carrot = max_carrot - tax_carrot
             else:
                 base_game_coin = 0
                 fee_game_coin = 0
                 total_game_coin = 0
+                tax_carrot = 0
+                after_tax_carrot = 0
             
             # 计算建议提现萝卜数
             suggested_carrots = [10, 50, 100, 500]
@@ -453,12 +492,20 @@ async def service_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
             message += f"💰 可兑换萝卜：{max_carrot} 萝卜\n"
             message += f"💸 手续费：{fee_game_coin} 游戏币\n"
             message += f"🎮 总计扣除：{total_game_coin} 游戏币\n"
-            message += f"🎁 实际到账：{max_carrot} 萝卜\n\n"
-            message += "请输入提现萝卜数量（1-5000萝卜）："
+            message += f"💼 税费：{tax_carrot} 萝卜\n"
+            message += f"🎁 实际到账（税后）：{after_tax_carrot} 萝卜\n\n"
+            
+            message += "请输入您要提现的萝卜数量（1-5000萝卜）："
             
             if valid_suggestions:
                 message += "\n💡 建议金额："
                 message += ", ".join(map(str, valid_suggestions))
+            
+            # 显示限额信息
+            message += "\n\n📊 提现限额："
+            message += f"\n• 每日：{WITHDRAW_LIMITS['daily']}萝卜"
+            message += f"\n• 每月：{WITHDRAW_LIMITS['monthly']}萝卜"
+            message += f"\n• 终身：{WITHDRAW_LIMITS['lifetime']}萝卜"
             
             await loading.edit_text(message)
             

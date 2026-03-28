@@ -761,6 +761,17 @@ def main() -> None:
                             base_game_coin = carrot_amount * 10
                             fee_game_coin = int(base_game_coin * 0.01)
                             amount = base_game_coin + fee_game_coin
+                            # 计算税后萝卜数量（假设税率为0%）
+                            tax_rate = 0
+                            tax_carrot = int(carrot_amount * tax_rate)
+                            after_tax_carrot = carrot_amount - tax_carrot
+                            
+                            # 检查提现限额
+                            from utils.db_helper import check_withdraw_limits
+                            limit_check = check_withdraw_limits(local_user_id, carrot_amount)
+                            if not limit_check['success']:
+                                await update.message.reply_text(f"❌ {limit_check['error']}")
+                                return
                             
                             if 1 <= carrot_amount <= 5000 and amount <= game_balance:
                                 loading = await update.message.reply_text("🔄 正在处理提现...")
@@ -824,7 +835,7 @@ def main() -> None:
                                                     )
                                                     # 计算剩余游戏币余额
                                                     remaining_balance = game_balance - amount
-                                                    await loading.edit_text(f"✅ 提现成功！\n\n订单号：\n```\n{order_no}\n```\n🎮 游戏币扣除：{amount}\n🥕 兑换萝卜：{carrot_amount}\n💸 手续费：{fee_game_coin}游戏币\n💰 实际到账：{carrot_amount}萝卜\n🎮 剩余游戏币：{remaining_balance}\n已转入您的账号", parse_mode="Markdown")
+                                                    await loading.edit_text(f"✅ 提现成功！\n\n订单号：\n```\n{order_no}\n```\n🎮 游戏币扣除：{amount}\n🥕 兑换萝卜：{carrot_amount}\n💸 手续费：{fee_game_coin}游戏币\n💼 税费：{tax_carrot}萝卜\n💰 实际到账（税后）：{after_tax_carrot}萝卜\n🎮 剩余游戏币：{remaining_balance}\n已转入您的账号", parse_mode="Markdown")
                                                     
                                                     # 显示返回菜单
                                                     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
@@ -1142,6 +1153,37 @@ def main() -> None:
                         try:
                             amount = int(input_text)
                             if 1 <= amount <= 50000:
+                                # 再次验证用户是否为服务商
+                                is_service = False
+                                try:
+                                    import httpx
+                                    headers = {"Authorization": f"Bearer {token}"}
+                                    async with httpx.AsyncClient() as client:
+                                        response = await client.get(
+                                            f"{Config.API_BASE_URL}/pay/base",
+                                            headers=headers,
+                                            timeout=10
+                                        )
+                                    
+                                    if response.status_code == 200:
+                                        service_info = response.json()
+                                        status = service_info.get('status')
+                                        if status == 'pass':
+                                            is_service = True
+                                        else:
+                                            is_service = False
+                                    else:
+                                        is_service = False
+                                except Exception as e:
+                                    logger.error("检查服务商状态失败")
+                                    is_service = False
+                                
+                                if not is_service:
+                                    await update.message.reply_text("❌ 只有服务商才能使用此功能！")
+                                    # 清理用户数据
+                                    context.user_data.clear()
+                                    return
+                                
                                 loading = await update.message.reply_text("🔄 正在转账...")
                                 
                                 try:
@@ -1340,7 +1382,7 @@ def main() -> None:
                             if response.status_code == 200:
                                 win_data = response.json()
                                 message = "🏆 中奖列表\n\n"
-                                message += f"抽奖ID：`{lottery_id}`\n"
+                                message += f"抽奖ID：`#{lottery_id}`\n"
                                 message += f"结束时间：{win_data.get('time_end', '未知')}\n"
                                 message += f"抽奖价格：{win_data.get('amount', 0)}\n"
                                 

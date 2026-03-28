@@ -584,6 +584,7 @@ async def create_redpacket(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 redpacket_type_display = "🧧 红包"
             
             message = (
+                f"# 红包凭证\n\n"
                 f"✅ 红包创建成功！\n\n"
                 f"{redpacket_type_display}\n"
                 f"💰 金额: {data['carrot']} 萝卜\n"

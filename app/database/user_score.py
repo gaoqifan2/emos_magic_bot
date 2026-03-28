@@ -1,0 +1,79 @@
+# 用户贡献分管理模块
+
+from app.database.db import get_db_connection
+
+def get_user_score(telegram_id):
+    """获取用户的当前贡献分"""
+    connection = get_db_connection()
+    if not connection:
+        return 0
+    
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute('''
+                SELECT current_cycle_score 
+                FROM users 
+                WHERE telegram_id = %s
+            ''', (telegram_id,))
+            result = cursor.fetchone()
+            return result['current_cycle_score'] if result else 0
+    except Exception as e:
+        print(f"获取用户贡献分失败: {e}")
+        return 0
+    finally:
+        connection.close()
+
+def add_user_score(telegram_id, score):
+    """增加用户的贡献分"""
+    connection = get_db_connection()
+    if not connection:
+        return False
+    
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute('''
+                UPDATE users 
+                SET current_cycle_score = current_cycle_score + %s
+                WHERE telegram_id = %s
+            ''', (score, telegram_id))
+            connection.commit()
+            return True
+    except Exception as e:
+        print(f"增加用户贡献分失败: {e}")
+        connection.rollback()
+        return False
+    finally:
+        connection.close()
+
+def reset_user_score(telegram_id):
+    """重置用户的贡献分（中奖后）"""
+    connection = get_db_connection()
+    if not connection:
+        return False
+    
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute('''
+                UPDATE users 
+                SET current_cycle_score = 0
+                WHERE telegram_id = %s
+            ''', (telegram_id,))
+            connection.commit()
+            return True
+    except Exception as e:
+        print(f"重置用户贡献分失败: {e}")
+        connection.rollback()
+        return False
+    finally:
+        connection.close()
+
+def get_user_level(score):
+    """根据贡献分获取用户等级"""
+    if score >= 10000:
+        return "钻石", 100, 1.0  # 100倍，100%奖池
+    elif score >= 2001:
+        return "黄金", 50, 0.5   # 50倍，50%奖池
+    elif score >= 501:
+        return "白银", 20, 0.2   # 20倍，20%奖池
+    else:
+        return "青铜", 5, 0.05    # 5倍，5%奖池

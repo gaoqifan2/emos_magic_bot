@@ -348,3 +348,85 @@ def update_withdraw_order_status(order_no: str, status: str,
         return False
     finally:
         conn.close()
+
+def check_withdraw_limits(user_id: int, carrot_amount: int) -> Dict[str, Any]:
+    """检查用户提现限额
+    
+    Args:
+        user_id: 用户ID
+        carrot_amount: 提现萝卜数量
+    
+    Returns:
+        dict: 包含限额检查结果的字典
+    """
+    from config import WITHDRAW_LIMITS
+    from datetime import datetime, timedelta
+    
+    conn = get_db_connection()
+    if not conn:
+        return {"success": False, "error": "数据库连接失败"}
+    
+    try:
+        with conn.cursor() as cursor:
+            # 获取今日开始时间
+            today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            # 获取本月开始时间
+            month_start = today.replace(day=1)
+            
+            # 查询今日提现总额
+            cursor.execute(
+                """SELECT COALESCE(SUM(carrot_amount), 0) FROM withdraw_orders 
+                   WHERE user_id = %s AND status = 'success' AND created_at >= %s""",
+                (user_id, today)
+            )
+            daily_total = cursor.fetchone()[0]
+            
+            # 查询本月提现总额
+            cursor.execute(
+                """SELECT COALESCE(SUM(carrot_amount), 0) FROM withdraw_orders 
+                   WHERE user_id = %s AND status = 'success' AND created_at >= %s""",
+                (user_id, month_start)
+            )
+            monthly_total = cursor.fetchone()[0]
+            
+            # 查询终身提现总额
+            cursor.execute(
+                """SELECT COALESCE(SUM(carrot_amount), 0) FROM withdraw_orders 
+                   WHERE user_id = %s AND status = 'success'""",
+                (user_id,)
+            )
+            lifetime_total = cursor.fetchone()[0]
+            
+            # 检查限额
+            if daily_total + carrot_amount > WITHDRAW_LIMITS['daily']:
+                return {
+                    "success": False, 
+                    "error": f"每日提现限额为{WITHDRAW_LIMITS['daily']}萝卜，今日已提现{daily_total}萝卜，无法再提现{carrot_amount}萝卜"
+                }
+            
+            if monthly_total + carrot_amount > WITHDRAW_LIMITS['monthly']:
+                return {
+                    "success": False, 
+                    "error": f"每月提现限额为{WITHDRAW_LIMITS['monthly']}萝卜，本月已提现{monthly_total}萝卜，无法再提现{carrot_amount}萝卜"
+                }
+            
+            if lifetime_total + carrot_amount > WITHDRAW_LIMITS['lifetime']:
+                return {
+                    "success": False, 
+                    "error": f"终身提现限额为{WITHDRAW_LIMITS['lifetime']}萝卜，已累计提现{lifetime_total}萝卜，无法再提现{carrot_amount}萝卜"
+                }
+            
+            return {
+                "success": True, 
+                "daily_total": daily_total, 
+                "monthly_total": monthly_total, 
+                "lifetime_total": lifetime_total,
+                "daily_limit": WITHDRAW_LIMITS['daily'],
+                "monthly_limit": WITHDRAW_LIMITS['monthly'],
+                "lifetime_limit": WITHDRAW_LIMITS['lifetime']
+            }
+    except Exception as e:
+        logger.error(f"检查提现限额失败: {e}")
+        return {"success": False, "error": "检查限额失败"}
+    finally:
+        conn.close()

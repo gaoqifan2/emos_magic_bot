@@ -773,8 +773,13 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
             
             if response.status_code == 200:
-                is_service = True
-                logger.info(f"用户是服务商")
+                service_info = response.json()
+                status = service_info.get('status')
+                if status == 'pass':
+                    is_service = True
+                    logger.info(f"用户是服务商")
+                else:
+                    logger.info(f"用户不是服务商，状态: {status}")
             else:
                 logger.info(f"用户不是服务商，状态码: {response.status_code}")
         except Exception as e:
@@ -1001,27 +1006,93 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 权限信息按钮
     if data == "menu_permission_info":
         logger.info(f"处理权限信息按钮")
-        # 显示权限信息
-        permission_message = (
-            "🔒 权限信息\n\n"
-            "基础权限：\n"
-            "• 🎬 观影权限: ✅ 有权限\n"
-            "• 📤 上传权限: ❌ 无权限\n"
-            "• 📥 下载权限: ❌ 无权限\n\n"
-            "其他信息：\n"
-            "• 🎭 角色: 普通用户\n"
-            "• 🖼️ 原图模式: ❌ 关闭\n\n"
-            "说明：\n"
-            "• 观影权限：是否可以观看视频\n"
-            "• 上传权限：是否可以上传资源\n"
-            "• 下载权限：是否可以下载资源"
-        )
+        # 获取用户信息
+        user_id = update.effective_user.id
+        user_info = user_tokens.get(user_id)
+        
+        if not user_info:
+            await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
+            return
+        
+        # 检查user_info是字典还是字符串
+        if isinstance(user_info, dict):
+            token = user_info.get('token')
+        else:
+            token = user_info
+        
+        if not token:
+            await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
+            return
+        
+        loading = await update.callback_query.edit_message_text("🔄 正在获取权限信息...")
+        
+        try:
+            # 从API获取用户信息
+            import requests
+            api_url = f"{Config.API_BASE_URL}/user"
+            headers = {"Authorization": f"Bearer {token}"}
+            response = requests.get(api_url, headers=headers, timeout=10)
+            
+            if response.status_code == 200:
+                user_data = response.json()
+                
+                # 从API返回的数据中提取权限信息
+                is_can_upload = user_data.get('is_can_upload', False)
+                is_can_down = user_data.get('is_can_down', False)
+                is_original_image = user_data.get('is_original_image', False)
+                
+                # 构建权限信息消息
+                permission_message = (
+                    "🔒 权限信息\n\n"
+                    "基础权限：\n"
+                    f"• 🎬 观影权限: {'✅ 有权限' if True else '❌ 无权限'}\n"
+                    f"• 📤 上传权限: {'✅ 有权限' if is_can_upload else '❌ 无权限'}\n"
+                    f"• 📥 下载权限: {'✅ 有权限' if is_can_down else '❌ 无权限'}\n\n"
+                    "其他信息：\n"
+                    "• 🎭 角色: 普通用户\n"
+                    f"• 🖼️ 原图模式: {'✅ 开启' if is_original_image else '❌ 关闭'}\n\n"
+                    "说明：\n"
+                    "• 观影权限：是否可以观看视频\n"
+                    "• 上传权限：是否可以上传资源\n"
+                    "• 下载权限：是否可以下载资源"
+                )
+            else:
+                # API调用失败，显示默认权限信息
+                permission_message = (
+                    "🔒 权限信息\n\n"
+                    "基础权限：\n"
+                    "• 🎬 观影权限: ✅ 有权限\n"
+                    "• 📤 上传权限: ❌ 无权限\n"
+                    "• 📥 下载权限: ❌ 无权限\n\n"
+                    "其他信息：\n"
+                    "• 🎭 角色: 普通用户\n"
+                    "• 🖼️ 原图模式: ❌ 关闭\n\n"
+                    "说明：\n"
+                    "• 观影权限：是否可以观看视频\n"
+                    "• 上传权限：是否可以上传资源\n"
+                    "• 下载权限：是否可以下载资源"
+                )
+        except Exception as e:
+            logger.error(f"获取权限信息失败: {e}")
+            # 异常时显示默认权限信息
+            permission_message = (
+                "🔒 权限信息\n\n"
+                "基础权限：\n"
+                "• 🎬 观影权限: ✅ 有权限\n"
+                "• 📤 上传权限: ❌ 无权限\n"
+                "• 📥 下载权限: ❌ 无权限\n\n"
+                "其他信息：\n"
+                "• 🎭 角色: 普通用户\n"
+                "• 🖼️ 原图模式: ❌ 关闭\n\n"
+                "说明：\n"
+                "• 观影权限：是否可以观看视频\n"
+                "• 上传权限：是否可以上传资源\n"
+                "• 下载权限：是否可以下载资源"
+            )
+        
         keyboard = [[InlineKeyboardButton("🔙 返回", callback_data="menu_user_main")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.callback_query.edit_message_text(
-            permission_message,
-            reply_markup=reply_markup
-        )
+        await loading.edit_text(permission_message, reply_markup=reply_markup)
         return
     
     # 修仙境界按钮
