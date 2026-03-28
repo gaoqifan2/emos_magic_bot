@@ -553,11 +553,13 @@ async def balance_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # 从 user_info 中获取用户信息
     user_id = user_info.get('user_id', telegram_id)
+    # 优先从user_info中获取username，而不是从user.username中获取
+    user_info_username = user_info.get('username', user.username) if isinstance(user_info, dict) else user.username
     
     # 检查用户是否存在，不存在则添加
     user_data = {
         'id': user_id,
-        'username': user.username,
+        'username': user_info_username,
         'first_name': user.first_name,
         'last_name': user.last_name
     }

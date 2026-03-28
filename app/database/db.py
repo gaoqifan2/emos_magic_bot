@@ -204,7 +204,7 @@ def init_db():
             
             # 初始化Jackpot奖池记录（如果不存在）
             cursor.execute('''
-                INSERT INTO jackpot_pool (id, amount) 
+                INSERT INTO jackpot_pool (id, pool_amount) 
                 VALUES (1, 0) 
                 ON DUPLICATE KEY UPDATE id=id
             ''')
@@ -288,9 +288,13 @@ def add_user(user_id, user_data):
                 # 确保用户有余额记录
                 user_id_db = existing_user['id']
                 cursor.execute('SELECT * FROM balances WHERE user_id = %s', (user_id_db,))
-                if not cursor.fetchone():
+                balance_record = cursor.fetchone()
+                if not balance_record:
                     # 如果余额记录不存在，创建一个，默认为0
-                    cursor.execute('INSERT INTO balances (user_id, balance) VALUES (%s, 0)', (user_id_db,))
+                    cursor.execute('INSERT INTO balances (user_id, balance, username) VALUES (%s, %s, %s)', (user_id_db, 0, username))
+                else:
+                    # 如果余额记录存在，更新username
+                    cursor.execute('UPDATE balances SET username = %s WHERE user_id = %s', (username, user_id_db))
                 
                 connection.commit()
     finally:
@@ -346,7 +350,11 @@ def update_balance(user_id, amount):
                 else:
                     # 如果余额不存在，初始化余额
                     new_balance = 0 + amount
-                    cursor.execute('INSERT INTO balances (user_id, balance) VALUES (%s, %s)', (user_id_db, new_balance))
+                    # 获取用户的username
+                    cursor.execute('SELECT username FROM users WHERE id = %s', (user_id_db,))
+                    user_result = cursor.fetchone()
+                    username = user_result.get('username', '') if user_result else ''
+                    cursor.execute('INSERT INTO balances (user_id, balance, username) VALUES (%s, %s, %s)', (user_id_db, new_balance, username))
             else:
                 # 如果用户不存在，创建用户并初始化余额
                 cursor.execute('''
@@ -357,7 +365,11 @@ def update_balance(user_id, amount):
                 user_id_db = cursor.lastrowid
                 # 初始化余额，默认为0
                 new_balance = 0 + amount
-                cursor.execute('INSERT INTO balances (user_id, balance) VALUES (%s, %s)', (user_id_db, new_balance))
+                # 获取用户的username（新创建的用户，username可能为空）
+                cursor.execute('SELECT username FROM users WHERE id = %s', (user_id_db,))
+                user_result = cursor.fetchone()
+                username = user_result.get('username', '') if user_result else ''
+                cursor.execute('INSERT INTO balances (user_id, balance, username) VALUES (%s, %s, %s)', (user_id_db, new_balance, username))
             
             connection.commit()
             return new_balance

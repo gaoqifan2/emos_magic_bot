@@ -33,9 +33,9 @@ def sync_user_to_balance():
                     
                     # 为用户创建balance记录，默认余额为0
                     cursor.execute('''
-                        INSERT INTO balances (user_id, balance) 
-                        VALUES (%s, %s)
-                    ''', (user_id, 0))
+                        INSERT INTO balances (user_id, balance, username) 
+                        VALUES (%s, %s, %s)
+                    ''', (user_id, 0, user_name))
                     
                     print(f"✅ 为用户 {user_name} (ID: {user_emos_id}) 创建了balance记录")
                 
