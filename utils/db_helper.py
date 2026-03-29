@@ -65,21 +65,62 @@ def ensure_user_exists(emos_user_id: str, token: str, telegram_id: Optional[int]
                     conn.commit()
                 return user_id
             else:
-                # 创建新用户
-                cursor.execute(
-                    "INSERT INTO users (user_id, telegram_id, token, username, first_name, last_name) VALUES (%s, %s, %s, %s, %s, %s)",
-                    (emos_user_id, telegram_id, token, username, first_name, last_name)
-                )
-                user_id = cursor.lastrowid
-                
-                # 创建余额记录，使用 emos_user_id（字符串）
-                cursor.execute(
-                    "INSERT INTO balances (user_id, balance, username) VALUES (%s, 0, %s)",
-                    (emos_user_id, username)
-                )
-                
-                conn.commit()
-                return user_id
+                try:
+                    # 创建新用户
+                    cursor.execute(
+                        "INSERT INTO users (user_id, telegram_id, token, username, first_name, last_name) VALUES (%s, %s, %s, %s, %s, %s)",
+                        (emos_user_id, telegram_id, token, username, first_name, last_name)
+                    )
+                    user_id = cursor.lastrowid
+                    
+                    # 创建余额记录，使用 emos_user_id（字符串）
+                    cursor.execute(
+                        "INSERT INTO balances (user_id, balance, username) VALUES (%s, 0, %s)",
+                        (emos_user_id, username)
+                    )
+                    
+                    conn.commit()
+                    return user_id
+                except pymysql.IntegrityError as e:
+                    # 处理唯一键冲突
+                    logger.warning(f"用户已存在，尝试获取现有用户ID: {e}")
+                    # 再次查询用户
+                    cursor.execute("SELECT id FROM users WHERE user_id = %s", (emos_user_id,))
+                    result = cursor.fetchone()
+                    if not result and telegram_id:
+                        cursor.execute("SELECT id FROM users WHERE telegram_id = %s", (telegram_id,))
+                        result = cursor.fetchone()
+                    if result:
+                        # 更新用户信息
+                        user_id = result[0]
+                        update_fields = []
+                        update_values = []
+                        
+                        if token:
+                            update_fields.append("token = %s")
+                            update_values.append(token)
+                        if telegram_id is not None:
+                            update_fields.append("telegram_id = %s")
+                            update_values.append(telegram_id)
+                        if username:
+                            update_fields.append("username = %s")
+                            update_values.append(username)
+                        if first_name:
+                            update_fields.append("first_name = %s")
+                            update_values.append(first_name)
+                        if last_name:
+                            update_fields.append("last_name = %s")
+                            update_values.append(last_name)
+                        
+                        if update_fields:
+                            update_query = f"UPDATE users SET {', '.join(update_fields)} WHERE id = %s"
+                            update_values.append(user_id)
+                            cursor.execute(update_query, update_values)
+                            conn.commit()
+                        return user_id
+                    else:
+                        logger.error(f"无法获取现有用户ID: {e}")
+                        return None
     except Exception as e:
         logger.error(f"操作用户失败: {e}")
         conn.rollback()

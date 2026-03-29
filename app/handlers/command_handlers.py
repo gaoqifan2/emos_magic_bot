@@ -2217,10 +2217,12 @@ async def process_blackjack(update: Update, context: ContextTypes.DEFAULT_TYPE, 
                     error_str = str(api_error).lower()
                     if 'rights' in error_str or 'permission' in error_str or 'admin' in error_str:
                         bonus_message += f"\n⚠️ 机器人需要【管理标签】权限才能在群里显示标签"
-                    elif 'not found' in error_str or 'member' in error_str:
+                    elif 'not found' in error_str and 'member' in error_str:
                         bonus_message += f"\n⚠️ 你还不在群里，无法设置群标签"
                     else:
-                        bonus_message += f"\n⚠️ 标签已记录，但群标签设置失败: {api_error}"
+                        bonus_message += f"\n⚠️ 标签已记录，但群标签设置失败"
+                    # 无论API是否成功，都显示标签获得信息
+                    bonus_message += f"\n🏷️ 获得标签：【{tag_name}】"
                 
                 # 无论是否在群聊，都显示标签获得信息
                 if chat_id:
@@ -2518,13 +2520,11 @@ async def hit_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     error_str = str(api_error).lower()
                     if 'rights' in error_str or 'permission' in error_str or 'admin' in error_str:
                         bonus_message += f"\n⚠️ 机器人需要【管理标签】权限才能在群里显示标签"
-                    elif 'not found' in error_str or 'member' in error_str:
+                    elif 'not found' in error_str and 'member' in error_str:
                         bonus_message += f"\n⚠️ 你还不在群里，无法设置群标签"
                     else:
                         bonus_message += f"\n⚠️ 标签已记录，但群标签设置失败"
-                
-                # 无论是否在群聊，都显示标签获得信息
-                if chat_id:
+                    # 无论API是否成功，都显示标签获得信息
                     bonus_message += f"\n🏷️ 获得标签：【{tag_name}】"
             except Exception as e:
                 logger.error(f"[五龙] 设置群标签失败: {e}")
@@ -2825,13 +2825,11 @@ async def stand_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     error_str = str(api_error).lower()
                     if 'rights' in error_str or 'permission' in error_str or 'admin' in error_str:
                         bonus_message += f"\n⚠️ 机器人需要【管理标签】权限才能在群里显示标签"
-                    elif 'not found' in error_str or 'member' in error_str:
+                    elif 'not found' in error_str and 'member' in error_str:
                         bonus_message += f"\n⚠️ 你还不在群里，无法设置群标签"
                     else:
-                        bonus_message += f"\n⚠️ 标签记录成功，但群标签设置失败"
-                
-                # 无论是否在群聊，都显示标签获得信息
-                if chat_id:
+                        bonus_message += f"\n⚠️ 标签已记录，但群标签设置失败"
+                    # 无论API是否成功，都显示标签获得信息
                     bonus_message += f"\n🏷️ 获得标签：【{tag_name}】"
             except Exception as e:
                 logger.error(f"[停牌] 设置群标签失败: {e}")
