@@ -385,7 +385,14 @@ def main() -> None:
             await process_blackjack(update, context, input_text)
             context.user_data['awaiting_blackjack'] = False
             return
-        
+
+        # 检查是否有游戏厅相关的文本输入需要处理（充值、提现等）
+        if 'current_operation' in context.user_data and context.user_data['current_operation'] in ['recharge_amount', 'withdraw_amount']:
+            from app.handlers.command_handlers import message_handler as game_message_handler
+            # 调用游戏厅的消息处理器处理充值或提现
+            await game_message_handler(update, context)
+            return
+
         if 'current_operation' in context.user_data:
                 operation = context.user_data['current_operation']
                 user_id = update.effective_user.id
@@ -699,10 +706,11 @@ def main() -> None:
                                                                 logger.error(f"解析过期时间失败: {e}")
                                                         
                                                         # 保存订单到本地数据库
-                                                        logger.info(f"开始创建充值订单: local_order_no={local_order_no}, platform_order_no={order_no}, local_user_id={local_user_id}")
+                                                        logger.info(f"开始创建充值订单: local_order_no={local_order_no}, platform_order_no={order_no}, emos_user_id={emos_user_id}, username={username}")
                                                         success = create_recharge_order(
                                                             order_no=local_order_no,
-                                                            local_user_id=local_user_id,
+                                                            emos_user_id=emos_user_id,
+                                                            username=username,
                                                             telegram_user_id=user_id,
                                                             carrot_amount=amount,
                                                             platform_order_no=order_no,

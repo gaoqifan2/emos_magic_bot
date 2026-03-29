@@ -3,7 +3,11 @@ import pymysql
 import socks
 import socket
 import os
+import logging
 from config import DB_CONFIG
+
+# 设置日志
+logger = logging.getLogger(__name__)
 
 # 代理配置（从环境变量读取，默认使用 Clash 端口）
 PROXY_HOST = os.getenv('DB_PROXY_HOST', '127.0.0.1')
@@ -90,14 +94,14 @@ def init_db():
                 CREATE TABLE IF NOT EXISTS users (
                     id INT AUTO_INCREMENT PRIMARY KEY COMMENT '自增主键，内部使用',
                     user_id VARCHAR(50) UNIQUE NOT NULL COMMENT '用户emosid，格式：e开头s结尾（如：e0E446ZE6s）',
-                    telegram_id BIGINT UNIQUE COMMENT 'Telegram用户ID',
-                    token VARCHAR(255) UNIQUE COMMENT '用户令牌，格式：1047_开头的字符串',
-                    username VARCHAR(255) COMMENT '登录用户名',
+                    telegram_id BIGINT UNIQUE COMMENT 'Telegram用户ID，即tg_id',
+                    token VARCHAR(255) COMMENT '用户令牌，格式：1047_开头的字符串',
+                    username VARCHAR(255) COMMENT 'EMOS用户名（从API返回的username）',
                     first_name VARCHAR(255) COMMENT 'Telegram名字',
                     last_name VARCHAR(255) COMMENT 'Telegram姓氏',
                     current_cycle_score INT DEFAULT 0 COMMENT '当前周期贡献分（每下注1币增加1分，中奖后归零）',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '注册时间',
-                    INDEX idx_user_id (user_id),
+                    UNIQUE KEY uk_user_id (user_id),
                     INDEX idx_telegram_id (telegram_id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户信息表'
             ''')
@@ -117,7 +121,7 @@ def init_db():
                 CREATE TABLE IF NOT EXISTS balances (
                     id INT AUTO_INCREMENT PRIMARY KEY COMMENT '自增主键',
                     user_id VARCHAR(50) NOT NULL COMMENT 'users表的user_id（形如e0E446ZE6s）',
-                    username VARCHAR(255) COMMENT '用户名标识',
+                    username VARCHAR(255) COMMENT 'EMOS用户名（从API返回的username）',
                     balance INT DEFAULT 0 COMMENT '游戏币余额（默认0币）',
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '最后更新时间',
                     UNIQUE KEY unique_user_id (user_id),
@@ -126,18 +130,22 @@ def init_db():
             ''')
             print("余额表创建成功")
             
-            # 创建游戏记录表，使用用户表的id作为外键
+            # 创建游戏记录表，使用用户表的user_id（字符串）作为标识
             print("创建游戏记录表...")
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS game_records (
                     id INT AUTO_INCREMENT PRIMARY KEY,
-                    user_id INT,
+                    user_id VARCHAR(50) NOT NULL COMMENT '关联users表的user_id（字符串格式）',
+                    username VARCHAR(255) COMMENT 'EMOS用户名（从API返回的username）',
                     game_type VARCHAR(50),
                     bet_amount INT,
                     result VARCHAR(50),
                     win_amount INT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                    INDEX idx_user_created (user_id, created_at),
+                    INDEX idx_game_type (game_type),
+                    INDEX idx_username (username),
+                    INDEX idx_user_id (user_id)
                 )
             ''')
             print("游戏记录表创建成功")
@@ -147,7 +155,7 @@ def init_db():
             try:
                 cursor.execute('''
                     ALTER TABLE game_records 
-                    ADD COLUMN IF NOT EXISTS username VARCHAR(255) COMMENT '用户名'
+                    ADD COLUMN IF NOT EXISTS username VARCHAR(255) COMMENT 'EMOS用户名（从API返回的username）'
                 ''')
                 print("username字段添加成功")
             except Exception as e:
@@ -188,36 +196,44 @@ def init_db():
             ''')
             print("提现记录表创建成功")
             
-            # 创建充值订单表，使用用户表的id作为外键
+            # 创建充值订单表，使用用户表的user_id（字符串）作为标识
             print("创建充值订单表...")
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS recharge_orders (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    order_no VARCHAR(50) UNIQUE NOT NULL,
-                    user_id INT,
-                    telegram_user_id BIGINT,
-                    carrot_amount INT,
-                    game_coin_amount INT,
-                    status VARCHAR(50) DEFAULT 'pending',
-                    platform_order_no VARCHAR(50) UNIQUE,
-                    pay_url TEXT,
-                    qrcode TEXT,
-                    expire_time TIMESTAMP,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-                )
+                    id INT AUTO_INCREMENT PRIMARY KEY COMMENT '订单ID',
+                    order_no VARCHAR(100) UNIQUE NOT NULL COMMENT '平台内部订单号',
+                    user_id VARCHAR(50) NOT NULL COMMENT '关联users表的user_id（字符串格式）',
+                    username VARCHAR(255) COMMENT 'EMOS用户名（从API返回的username）',
+                    telegram_user_id BIGINT NOT NULL COMMENT 'Telegram用户ID，即tg_id',
+                    carrot_amount INT NOT NULL COMMENT '充值萝卜数量（1-50000）',
+                    game_coin_amount INT NOT NULL COMMENT '获得游戏币数量',
+                    status VARCHAR(20) DEFAULT 'pending' COMMENT '订单状态：pending(待支付)/success(成功)/failed(失败)/closed(已关闭)',
+                    platform_order_no VARCHAR(255) COMMENT '支付平台返回的订单号',
+                    pay_url TEXT COMMENT '支付链接',
+                    qrcode TEXT COMMENT '支付二维码',
+                    expire_time TIMESTAMP NULL COMMENT '订单过期时间',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+                    INDEX idx_status (status),
+                    INDEX idx_telegram_user (telegram_user_id),
+                    INDEX idx_platform_no (platform_order_no),
+                    INDEX idx_created (created_at),
+                    INDEX idx_user_id (user_id),
+                    INDEX idx_username (username)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='充值订单表'
             ''')
             print("充值订单表创建成功")
             
-            # 创建签到表，使用用户表的id作为主键
+            # 创建签到表，使用用户表的user_id（字符串）作为主键
             print("创建签到表...")
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS daily_checkins (
-                    user_id INT PRIMARY KEY,
-                    last_checkin TIMESTAMP,
-                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-                )
+                    user_id VARCHAR(50) PRIMARY KEY COMMENT '关联users表的user_id（字符串格式）',
+                    last_checkin TIMESTAMP NOT NULL COMMENT '上次签到时间',
+                    checkin_streak INT DEFAULT 1 COMMENT '连续签到天数',
+                    total_checkins INT DEFAULT 1 COMMENT '总签到次数',
+                    INDEX idx_user_id (user_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='每日签到表'
             ''')
             print("签到表创建成功")
             
@@ -484,17 +500,11 @@ def get_last_checkin(user_id):
     
     try:
         with connection.cursor() as cursor:
-            # 先通过用户的user_id找到用户在数据库中的id
-            cursor.execute('SELECT id FROM users WHERE user_id = %s', (user_id,))
-            user_result = cursor.fetchone()
-            
-            if user_result:
-                user_id_db = user_result['id']
-                # 通过数据库id获取签到记录
-                cursor.execute('SELECT last_checkin FROM daily_checkins WHERE user_id = %s', (user_id_db,))
-                result = cursor.fetchone()
-                if result:
-                    return result['last_checkin']
+            # 直接使用user_id（字符串格式）查询签到记录
+            cursor.execute('SELECT last_checkin FROM daily_checkins WHERE user_id = %s', (user_id,))
+            result = cursor.fetchone()
+            if result:
+                return result['last_checkin']
             return None
     finally:
         connection.close()
@@ -569,22 +579,16 @@ def update_checkin_time(user_id, timestamp):
     
     try:
         with connection.cursor() as cursor:
-            # 先通过用户的user_id找到用户在数据库中的id
-            cursor.execute('SELECT id FROM users WHERE user_id = %s', (user_id,))
-            user_result = cursor.fetchone()
+            # 直接使用user_id（字符串格式）检查是否存在签到记录
+            cursor.execute('SELECT * FROM daily_checkins WHERE user_id = %s', (user_id,))
+            if cursor.fetchone():
+                # 更新签到时间
+                cursor.execute('UPDATE daily_checkins SET last_checkin = %s WHERE user_id = %s', (timestamp, user_id))
+            else:
+                # 插入新签到记录
+                cursor.execute('INSERT INTO daily_checkins (user_id, last_checkin) VALUES (%s, %s)', (user_id, timestamp))
             
-            if user_result:
-                user_id_db = user_result['id']
-                # 检查是否存在签到记录
-                cursor.execute('SELECT * FROM daily_checkins WHERE user_id = %s', (user_id_db,))
-                if cursor.fetchone():
-                    # 更新签到时间
-                    cursor.execute('UPDATE daily_checkins SET last_checkin = %s WHERE user_id = %s', (timestamp, user_id_db))
-                else:
-                    # 插入新签到记录
-                    cursor.execute('INSERT INTO daily_checkins (user_id, last_checkin) VALUES (%s, %s)', (user_id_db, timestamp))
-                
-                connection.commit()
+            connection.commit()
     finally:
         connection.close()
 
@@ -596,21 +600,22 @@ def add_game_record(user_id, game_type, bet_amount, result, win_amount, username
     
     try:
         with connection.cursor() as cursor:
-            # 先通过用户的user_id找到用户在数据库中的id和username
-            cursor.execute('SELECT id, username FROM users WHERE user_id = %s OR id = %s', (user_id, user_id))
+            # 先通过用户的user_id找到用户的username
+            cursor.execute('SELECT username FROM users WHERE user_id = %s', (user_id,))
             user_result = cursor.fetchone()
             
-            if user_result:
-                user_id_db = user_result['id']
-                # 如果没有传入username，使用数据库中的username
-                if username is None:
-                    username = user_result.get('username', '')
-                # 使用数据库id和username插入游戏记录
-                cursor.execute('''
-                    INSERT INTO game_records (user_id, username, game_type, bet_amount, result, win_amount) 
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                ''', (user_id_db, username, game_type, bet_amount, result, win_amount))
-                connection.commit()
+            # 如果没有传入username，使用数据库中的username
+            if username is None and user_result:
+                username = user_result.get('username', '')
+            elif username is None:
+                username = ''
+            
+            # 直接使用user_id（字符串格式）和username插入游戏记录
+            cursor.execute('''
+                INSERT INTO game_records (user_id, username, game_type, bet_amount, result, win_amount) 
+                VALUES (%s, %s, %s, %s, %s, %s)
+            ''', (user_id, username, game_type, bet_amount, result, win_amount))
+            connection.commit()
     finally:
         connection.close()
 
@@ -792,12 +797,13 @@ def ensure_user_exists(emos_user_id, token, telegram_id=None, username=None, fir
         print(f"  数据库连接已关闭")
 
 
-def add_recharge_order(order_no, user_id, telegram_user_id, carrot_amount, game_coin_amount, platform_order_no, pay_url, expire_time):
+def add_recharge_order(order_no, user_id, username, telegram_user_id, carrot_amount, game_coin_amount, platform_order_no, pay_url, expire_time):
     """添加充值订单
 
     Args:
         order_no: 本地订单号
-        user_id: 本地用户ID
+        user_id: 用户EMOS ID（字符串格式）
+        username: EMOS用户名
         telegram_user_id: Telegram用户ID
         carrot_amount: 萝卜数量
         game_coin_amount: 游戏币数量
@@ -814,15 +820,19 @@ def add_recharge_order(order_no, user_id, telegram_user_id, carrot_amount, game_
     
     try:
         with connection.cursor() as cursor:
+            logger.info(f"执行SQL插入: order_no={order_no}, platform_order_no={platform_order_no}")
             cursor.execute('''
-                INSERT INTO recharge_orders (order_no, user_id, telegram_user_id, carrot_amount, game_coin_amount, platform_order_no, pay_url, expire_time)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            ''', (order_no, user_id, telegram_user_id, carrot_amount, game_coin_amount, platform_order_no, pay_url, expire_time))
+                INSERT INTO recharge_orders (order_no, user_id, username, telegram_user_id, carrot_amount, game_coin_amount, platform_order_no, pay_url, expire_time)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ''', (order_no, user_id, username, telegram_user_id, carrot_amount, game_coin_amount, platform_order_no, pay_url, expire_time))
             connection.commit()
-            print(f"订单已保存到本地数据库: {order_no}")
+            logger.info(f"✅ 订单已保存到本地数据库: order_no={order_no}, platform_order_no={platform_order_no}")
             return True
     except Exception as e:
-        print(f"添加充值订单时出错: {e}")
+        logger.error(f"❌ 添加充值订单时出错: {e}")
+        logger.error(f"订单信息: order_no={order_no}, platform_order_no={platform_order_no}, user_id={user_id}")
+        import traceback
+        logger.error(traceback.format_exc())
         connection.rollback()
         return False
     finally:

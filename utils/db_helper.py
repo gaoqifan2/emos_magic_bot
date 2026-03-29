@@ -128,10 +128,21 @@ def ensure_user_exists(emos_user_id: str, token: str, telegram_id: Optional[int]
     finally:
         conn.close()
 
-def create_recharge_order(order_no: str, local_user_id: int, telegram_user_id: int, 
+def create_recharge_order(order_no: str, emos_user_id: str, username: str, telegram_user_id: int, 
                          carrot_amount: int, platform_order_no: Optional[str] = None,
                          pay_url: Optional[str] = None, expire_time: Optional[datetime] = None) -> bool:
-    """创建充值订单"""
+    """创建充值订单
+    
+    Args:
+        order_no: 本地订单号
+        emos_user_id: 用户的emos user_id（字符串格式）
+        username: EMOS用户名
+        telegram_user_id: Telegram用户ID
+        carrot_amount: 充值萝卜数量
+        platform_order_no: 平台订单号
+        pay_url: 支付链接
+        expire_time: 过期时间
+    """
     logger.info(f"开始创建充值订单: order_no={order_no}, platform_order_no={platform_order_no}")
     conn = get_db_connection()
     if not conn:
@@ -140,13 +151,13 @@ def create_recharge_order(order_no: str, local_user_id: int, telegram_user_id: i
     
     try:
         with conn.cursor() as cursor:
-            logger.info(f"执行SQL插入: order_no={order_no}, platform_order_no={platform_order_no}, user_id={local_user_id}")
+            logger.info(f"执行SQL插入: order_no={order_no}, platform_order_no={platform_order_no}, user_id={emos_user_id}, username={username}")
             cursor.execute(
                 """INSERT INTO recharge_orders 
-                   (order_no, user_id, telegram_user_id, carrot_amount, game_coin_amount, 
+                   (order_no, user_id, username, telegram_user_id, carrot_amount, game_coin_amount, 
                     status, platform_order_no, pay_url, expire_time, created_at, updated_at)
                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())""",
-                (order_no, local_user_id, telegram_user_id, carrot_amount, 
+                (order_no, emos_user_id, username, telegram_user_id, carrot_amount, 
                  carrot_amount * 10, 'pending', platform_order_no, pay_url, expire_time)
             )
             logger.info(f"SQL执行成功，影响行数: {cursor.rowcount}")
@@ -195,31 +206,26 @@ def update_recharge_order_status(platform_order_no: str, status: str,
                 )
                 result = cursor.fetchone()
                 if result:
-                    local_user_id = result[0]
+                    emos_user_id = result[0]
                     carrot_amount = result[1]
                     
-                    # 获取用户的字符串格式 user_id
-                    cursor.execute("SELECT user_id FROM users WHERE id = %s", (local_user_id,))
-                    user_result = cursor.fetchone()
-                    if user_result:
-                        emos_user_id = user_result[0]
-                        # 更新用户余额
-                        cursor.execute(
-                            """UPDATE balances 
-                               SET balance = balance + %s 
-                               WHERE user_id = %s""",
-                            (game_coin_amount, emos_user_id)
-                        )
+                    # 直接使用emos_user_id更新用户余额
+                    cursor.execute(
+                        """UPDATE balances 
+                           SET balance = balance + %s 
+                           WHERE user_id = %s""",
+                        (game_coin_amount, emos_user_id)
+                    )
                     
                     # 更新用户累计充值金额
                     cursor.execute(
                         """UPDATE users 
                            SET total_recharge = total_recharge + %s 
-                           WHERE id = %s""",
-                        (carrot_amount, local_user_id)
+                           WHERE user_id = %s""",
+                        (carrot_amount, emos_user_id)
                     )
                     
-                    logger.info(f"更新用户累计充值金额: user_id={local_user_id}, amount={carrot_amount}")
+                    logger.info(f"更新用户累计充值金额: user_id={emos_user_id}, amount={carrot_amount}")
             
             conn.commit()
             logger.info(f"充值订单状态已更新: {platform_order_no} -> {status}")
@@ -354,9 +360,17 @@ def get_user_balance(user_id: int) -> Optional[int]:
     finally:
         conn.close()
 
-def create_withdraw_order(order_no: str, user_id: int, telegram_user_id: int, 
+def create_withdraw_order(order_no: str, emos_user_id: str, telegram_user_id: int, 
                         game_coin_amount: int, carrot_amount: int) -> bool:
-    """创建提现订单"""
+    """创建提现订单
+    
+    Args:
+        order_no: 提现订单号
+        emos_user_id: 用户的emos user_id（字符串格式）
+        telegram_user_id: Telegram用户ID
+        game_coin_amount: 提现游戏币数量
+        carrot_amount: 获得萝卜数量
+    """
     conn = get_db_connection()
     if not conn:
         return False
@@ -368,7 +382,7 @@ def create_withdraw_order(order_no: str, user_id: int, telegram_user_id: int,
                    (order_no, user_id, telegram_user_id, game_coin_amount, 
                     carrot_amount, status)
                    VALUES (%s, %s, %s, %s, %s, %s)""",
-                (order_no, user_id, telegram_user_id, game_coin_amount, 
+                (order_no, emos_user_id, telegram_user_id, game_coin_amount, 
                  carrot_amount, 'pending')
             )
             conn.commit()
@@ -412,32 +426,27 @@ def update_withdraw_order_status(order_no: str, status: str,
                 )
                 result = cursor.fetchone()
                 if result:
-                    local_user_id = result[0]
+                    emos_user_id = result[0]
                     game_coin_amount = result[1]
                     carrot_amount = result[2]
                     
-                    # 获取用户的字符串格式 user_id
-                    cursor.execute("SELECT user_id FROM users WHERE id = %s", (local_user_id,))
-                    user_result = cursor.fetchone()
-                    if user_result:
-                        emos_user_id = user_result[0]
-                        # 更新用户余额
-                        cursor.execute(
-                            """UPDATE balances 
-                               SET balance = balance - %s 
-                               WHERE user_id = %s""",
-                            (game_coin_amount, emos_user_id)
-                        )
+                    # 直接使用emos_user_id更新用户余额
+                    cursor.execute(
+                        """UPDATE balances 
+                           SET balance = balance - %s 
+                           WHERE user_id = %s""",
+                        (game_coin_amount, emos_user_id)
+                    )
                     
                     # 更新用户累计提现金额
                     cursor.execute(
                         """UPDATE users 
                            SET total_withdraw = total_withdraw + %s 
-                           WHERE id = %s""",
-                        (carrot_amount, local_user_id)
+                           WHERE user_id = %s""",
+                        (carrot_amount, emos_user_id)
                     )
                     
-                    logger.info(f"更新用户累计提现金额: user_id={local_user_id}, amount={carrot_amount}")
+                    logger.info(f"更新用户累计提现金额: user_id={emos_user_id}, amount={carrot_amount}")
             
             conn.commit()
             logger.info(f"提现订单状态已更新: {order_no} -> {status}")
@@ -449,11 +458,11 @@ def update_withdraw_order_status(order_no: str, status: str,
     finally:
         conn.close()
 
-def check_withdraw_limits(user_id: int, carrot_amount: int) -> Dict[str, Any]:
+def check_withdraw_limits(emos_user_id: str, carrot_amount: int) -> Dict[str, Any]:
     """检查用户提现限额
     
     Args:
-        user_id: 用户ID
+        emos_user_id: 用户的emos user_id（字符串格式）
         carrot_amount: 提现萝卜数量
     
     Returns:
@@ -471,14 +480,14 @@ def check_withdraw_limits(user_id: int, carrot_amount: int) -> Dict[str, Any]:
             cursor.execute(
                 """SELECT COALESCE(SUM(carrot_amount), 0) FROM withdraw_orders 
                    WHERE user_id = %s AND status = 'success'""",
-                (user_id,)
+                (emos_user_id,)
             )
             lifetime_total = cursor.fetchone()[0]
             
             # 查询用户累计充值金额
             cursor.execute(
-                """SELECT total_recharge FROM users WHERE id = %s""",
-                (user_id,)
+                """SELECT total_recharge FROM users WHERE user_id = %s""",
+                (emos_user_id,)
             )
             user_result = cursor.fetchone()
             total_recharge = user_result[0] if user_result else 0

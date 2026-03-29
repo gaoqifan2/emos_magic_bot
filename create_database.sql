@@ -16,13 +16,13 @@ USE game_db;
 CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY COMMENT '自增主键，内部使用',
     user_id VARCHAR(50) UNIQUE NOT NULL COMMENT '用户emosid，格式：e开头s结尾（如：e0E446ZE6s）',
-    telegram_id BIGINT UNIQUE COMMENT 'Telegram用户ID',
-    token VARCHAR(255) UNIQUE COMMENT '用户令牌，格式：1047_开头的字符串',
-    username VARCHAR(255) COMMENT '登录用户名',
+    telegram_id BIGINT UNIQUE COMMENT 'Telegram用户ID，即tg_id',
+    token VARCHAR(255) COMMENT '用户令牌，格式：1047_开头的字符串',
+    username VARCHAR(255) COMMENT 'EMOS用户名（从API返回的username）',
     first_name VARCHAR(255) COMMENT 'Telegram名字',
     last_name VARCHAR(255) COMMENT 'Telegram姓氏',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '注册时间',
-    INDEX idx_user_id (user_id),
+    UNIQUE KEY uk_user_id (user_id),
     INDEX idx_telegram_id (telegram_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户信息表';
 
@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS balances (
     id INT AUTO_INCREMENT PRIMARY KEY COMMENT '自增主键',
     user_id VARCHAR(50) NOT NULL COMMENT 'users表的user_id（形如eK98R5PEMs）',
-    username VARCHAR(255) COMMENT '用户名标识',
+    username VARCHAR(255) COMMENT 'EMOS用户名（从API返回的username）',
     balance INT DEFAULT 0 COMMENT '游戏币余额（默认0币）',
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '最后更新时间',
     UNIQUE KEY unique_user_id (user_id),
@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS daily_checkins (
 CREATE TABLE IF NOT EXISTS game_records (
     id INT AUTO_INCREMENT PRIMARY KEY COMMENT '记录ID',
     user_id VARCHAR(50) NOT NULL COMMENT '关联users表的user_id（字符串格式）',
-    username VARCHAR(255) COMMENT '用户名',
+    username VARCHAR(255) COMMENT 'EMOS用户名（从API返回的username）',
     game_type VARCHAR(50) NOT NULL COMMENT '游戏类型：dice/slot/coinflip等',
     bet_amount INT NOT NULL COMMENT '下注金额',
     result VARCHAR(50) NOT NULL COMMENT '游戏结果：win/lose/draw',
@@ -75,7 +75,8 @@ CREATE TABLE IF NOT EXISTS recharge_orders (
     id INT AUTO_INCREMENT PRIMARY KEY COMMENT '订单ID',
     order_no VARCHAR(100) UNIQUE NOT NULL COMMENT '平台内部订单号',
     user_id VARCHAR(50) NOT NULL COMMENT '关联users表的user_id（字符串格式）',
-    telegram_user_id BIGINT NOT NULL COMMENT 'Telegram用户ID，方便查询',
+    username VARCHAR(255) COMMENT 'EMOS用户名（从API返回的username）',
+    telegram_user_id BIGINT NOT NULL COMMENT 'Telegram用户ID，即tg_id',
     carrot_amount INT NOT NULL COMMENT '充值萝卜数量（1-50000）',
     game_coin_amount INT NOT NULL COMMENT '获得游戏币数量',
     status VARCHAR(20) DEFAULT 'pending' COMMENT '订单状态：pending(待支付)/success(成功)/failed(失败)/closed(已关闭)',
@@ -89,7 +90,8 @@ CREATE TABLE IF NOT EXISTS recharge_orders (
     INDEX idx_telegram_user (telegram_user_id),
     INDEX idx_platform_no (platform_order_no),
     INDEX idx_created (created_at),
-    INDEX idx_user_id (user_id)
+    INDEX idx_user_id (user_id),
+    INDEX idx_username (username)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='充值订单表';
 
 -- =====================================================
@@ -99,7 +101,7 @@ CREATE TABLE IF NOT EXISTS withdraw_orders (
     id INT AUTO_INCREMENT PRIMARY KEY COMMENT '提现订单ID',
     order_no VARCHAR(100) UNIQUE NOT NULL COMMENT '提现订单号',
     user_id VARCHAR(50) NOT NULL COMMENT '关联users表的user_id（字符串格式）',
-    telegram_user_id BIGINT NOT NULL COMMENT 'Telegram用户ID',
+    telegram_user_id BIGINT NOT NULL COMMENT 'Telegram用户ID，即tg_id',
     game_coin_amount INT NOT NULL COMMENT '提现游戏币数量',
     carrot_amount INT NOT NULL COMMENT '获得萝卜数量',
     status VARCHAR(20) DEFAULT 'pending' COMMENT '订单状态：pending(待处理)/processing(处理中)/success(成功)/failed(失败)',
@@ -133,7 +135,7 @@ CREATE TABLE IF NOT EXISTS provider_config (
 CREATE TABLE IF NOT EXISTS user_streaks (
     id INT AUTO_INCREMENT PRIMARY KEY COMMENT '记录ID',
     user_id VARCHAR(50) NOT NULL COMMENT '关联users表的user_id（字符串格式）',
-    telegram_id BIGINT NOT NULL COMMENT 'Telegram用户ID',
+    telegram_id BIGINT NOT NULL COMMENT 'Telegram用户ID，即tg_id',
     game_type VARCHAR(50) NOT NULL COMMENT '游戏类型：blackjack/slot等',
     win_streak INT DEFAULT 0 COMMENT '当前连胜次数',
     max_streak INT DEFAULT 0 COMMENT '历史最高连胜',
@@ -151,7 +153,7 @@ CREATE TABLE IF NOT EXISTS user_streaks (
 CREATE TABLE IF NOT EXISTS user_tags (
     id INT AUTO_INCREMENT PRIMARY KEY COMMENT '记录ID',
     user_id VARCHAR(50) NOT NULL COMMENT '关联users表的user_id（字符串格式）',
-    telegram_id BIGINT NOT NULL COMMENT 'Telegram用户ID',
+    telegram_id BIGINT NOT NULL COMMENT 'Telegram用户ID，即tg_id',
     chat_id BIGINT NULL COMMENT '群组ID（可为空）',
     tag_name VARCHAR(50) NOT NULL COMMENT '标签名称',
     tag_level INT DEFAULT 1 COMMENT '标签等级',

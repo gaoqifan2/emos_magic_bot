@@ -5,13 +5,13 @@ import boto3
 
 @dataclass
 class Config:
-    # 正式Bot配置
-    BOT_TOKEN: str = "8682707944:AAGvauAZxz8BRxwFd2piaG3adi01zGQtydY"
-    BOT_USERNAME: str = "emosMagicBox_bot"
+    # # 正式Bot配置
+    # BOT_TOKEN: str = "8682707944:AAGvauAZxz8BRxwFd2piaG3adi01zGQtydY"
+    # BOT_USERNAME: str = "emosMagicBox_bot"
 
-    # # 测试bot
-    # BOT_TOKEN: str = "8714100893:AAFxkl8zL2bpdNzgEBJ9fIseNsAG8D-mSjI"
-    # BOT_USERNAME: str = "emosCheShiBox_bot"
+    # 测试bot
+    BOT_TOKEN: str = "8714100893:AAFxkl8zL2bpdNzgEBJ9fIseNsAG8D-mSjI"
+    BOT_USERNAME: str = "emosCheShiBox_bot"
     
     # API地址
     # 生产环境地址
@@ -112,22 +112,22 @@ SERVICE_PROVIDER_TOKEN = "1047_ow2NHeo3HyzDSxvl"
 
 # MySQL数据库配置（正式环境）
 DB_CONFIG = {
-    # #测试数据库
-    # "host": "66.235.105.125",
-    # "port": 3306,
-    # "user": "root",
-    # "password": "H_fans200109~",
-    # "database": "game_db_test",
-    # "charset": "utf8mb4"
-
-
-    #正式数据库
+    #测试数据库
     "host": "66.235.105.125",
     "port": 3306,
     "user": "root",
     "password": "H_fans200109~",
-    "database": "game_db",
+    "database": "game_db_test",
     "charset": "utf8mb4"
+
+
+    # #正式数据库
+    # "host": "66.235.105.125",
+    # "port": 3306,
+    # "user": "root",
+    # "password": "H_fans200109~",
+    # "database": "game_db",
+    # "charset": "utf8mb4"
 }
 
 # 提现限制配置

@@ -290,8 +290,80 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                         conn.close()
                 
                 if not order_info_db:
-                    await loading.edit_text(f"❌ 找不到订单信息：{order_no}")
-                    return
+                    # 订单找不到，尝试从API获取订单信息并重新保存
+                    logger.info(f"订单 {order_no} 不在本地数据库，尝试从API获取并重新保存")
+                    
+                    # 使用服务商token查询平台订单信息
+                    service_headers = {"Authorization": f"Bearer {SERVICE_PROVIDER_TOKEN}"}
+                    async with httpx.AsyncClient() as client:
+                        response = await client.get(
+                            f"{Config.API_BASE_URL}/pay/query?no={order_no}",
+                            headers=service_headers,
+                            timeout=10
+                        )
+                    
+                    if response.status_code != 200:
+                        await loading.edit_text(f"❌ 查询订单失败：{order_no}")
+                        return
+                    
+                    order_info = response.json()
+                    logger.info(f"从API获取到订单信息: {order_info}")
+                    
+                    # 从TG ID查找用户信息
+                    emos_user_id = None
+                    username = None
+                    conn = get_db_connection()
+                    if conn:
+                        try:
+                            with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+                                cursor.execute(
+                                    "SELECT user_id, username FROM users WHERE telegram_id = %s",
+                                    (tg_id,)
+                                )
+                                user_result = cursor.fetchone()
+                                if user_result:
+                                    emos_user_id = user_result.get('user_id')
+                                    username = user_result.get('username')
+                                    logger.info(f"从TG ID找到用户: emos_user_id={emos_user_id}, username={username}")
+                        finally:
+                            conn.close()
+                    
+                    if not emos_user_id:
+                        await loading.edit_text(f"❌ 找不到用户信息，订单号：{order_no}")
+                        return
+                    
+                    # 生成本地订单号
+                    import uuid
+                    from datetime import datetime, timedelta, timezone
+                    beijing_tz = timezone(timedelta(hours=8))
+                    local_order_no = f"R{datetime.now(beijing_tz).strftime('%Y%m%d')}{str(uuid.uuid4())[:8].upper()}"
+                    price = order_info.get('price_order', 0)
+                    game_coin = price * 10
+                    
+                    # 保存订单到数据库
+                    from app.database import add_recharge_order
+                    expire_time = datetime.now(beijing_tz) + timedelta(minutes=5)
+                    
+                    logger.info(f"重新保存订单: local_order_no={local_order_no}, platform_order_no={order_no}, user_id={emos_user_id}")
+                    save_result = add_recharge_order(
+                        order_no=local_order_no,
+                        user_id=emos_user_id,
+                        username=username,
+                        telegram_user_id=int(tg_id) if tg_id else None,
+                        carrot_amount=price,
+                        game_coin_amount=game_coin,
+                        platform_order_no=order_no,
+                        pay_url="",
+                        expire_time=expire_time
+                    )
+                    
+                    if not save_result:
+                        logger.error(f"重新保存订单失败: platform_order_no={order_no}")
+                        await loading.edit_text(f"❌ 保存订单失败：{order_no}")
+                        return
+                    
+                    logger.info(f"订单重新保存成功，查询新保存的订单")
+                    order_info_db = get_order_by_platform_no(order_no)
             
             local_user_id = order_info_db.get('user_id')
             logger.info(f"订单归属用户ID: {local_user_id}")
@@ -324,8 +396,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     actual_user_id = None
                     try:
                         with conn.cursor() as cursor:
+                            # local_user_id 是 EMOS user_id（字符串格式），应该查询 user_id 字段
                             cursor.execute(
-                                "SELECT id, token, telegram_id FROM users WHERE id = %s",
+                                "SELECT id, token, telegram_id FROM users WHERE user_id = %s",
                                 (local_user_id,)
                             )
                             user_result = cursor.fetchone()
@@ -363,7 +436,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     message += f"兑换游戏币：{game_coin} 🎮"
                     
                     logger.info(f"用户 {actual_user_id} 充值成功，订单号：{order_no}")
-                    await loading.edit_text(message, parse_mode="Markdown")
+                    
+                    # 创建按钮：前往游戏厅、继续充值
+                    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                    keyboard = [
+                        [InlineKeyboardButton("🎮 前往游戏厅", callback_data='game')],
+                        [InlineKeyboardButton("💰 继续充值", callback_data='recharge')]
+                    ]
+                    reply_markup = InlineKeyboardMarkup(keyboard)
+                    
+                    await loading.edit_text(message, parse_mode="Markdown", reply_markup=reply_markup)
                 else:
                     await loading.edit_text(f"❌ 订单状态：{status}，支付可能未完成")
             else:
