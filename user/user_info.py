@@ -67,14 +67,8 @@ async def get_user_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             # 格式化上传总量
             size_upload = user_data.get('size_upload', 0)
-            if size_upload >= 1099511627776:
-                size_display = f"{size_upload / 1099511627776:.2f} TB"
-            elif size_upload >= 1073741824:
-                size_display = f"{size_upload / 1073741824:.2f} GB"
-            elif size_upload >= 1048576:
-                size_display = f"{size_upload / 1048576:.2f} MB"
-            else:
-                size_display = f"{size_upload / 1024:.2f} KB"
+            from utils.helpers import format_upload_size
+            size_display = format_upload_size(size_upload)
             
             # 构建用户信息消息（宽体显示）
             user_id = user_data.get('user_id', '未知')

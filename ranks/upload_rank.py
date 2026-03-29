@@ -64,7 +64,8 @@ async def rank_upload_command(update: Update, context: ContextTypes.DEFAULT_TYPE
             for i, item in enumerate(data[:30], 1):
                 username = to_unicode(item.get('username', '未知用户'))
                 size = item.get('size', 0)
-                size_str = format_size(size)
+                from utils.helpers import format_upload_size
+                size_str = format_upload_size(size)
                 
                 if len(username) > 12:
                     username = username[:10] + ".."

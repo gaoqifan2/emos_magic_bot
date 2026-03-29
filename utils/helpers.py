@@ -62,6 +62,21 @@ def format_number(num: int) -> str:
     """格式化数字（加千位分隔符）"""
     return f"{num:,}"
 
+def format_upload_size(size: int) -> str:
+    """格式化上传量为1000进制的友好格式"""
+    units = ['', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y']
+    unit_index = 0
+    current_size = float(size)
+    
+    while current_size >= 1000 and unit_index < len(units) - 1:
+        current_size /= 1000
+        unit_index += 1
+    
+    if unit_index == 0:
+        return f"{int(current_size)}"
+    else:
+        return f"{current_size:.2f}{units[unit_index]}"
+
 def parse_command_args(text: str):
     """解析命令参数"""
     if not text:
