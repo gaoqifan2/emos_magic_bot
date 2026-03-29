@@ -1,7 +1,7 @@
 # 配置文件 - 使用魔盒的配置
 
 # 从魔盒导入配置
-from config import Config, user_tokens, SERVICE_PROVIDER_TOKEN
+from config import Config, user_tokens, SERVICE_PROVIDER_TOKEN, DEFAULT_GROUP_CHAT_ID
 
 # 机器人配置
 BOT_USERNAME = Config.BOT_USERNAME

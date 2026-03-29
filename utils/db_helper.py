@@ -30,20 +30,39 @@ def ensure_user_exists(emos_user_id: str, token: str, telegram_id: Optional[int]
     try:
         with conn.cursor() as cursor:
             # 检查用户是否存在
-            if telegram_id:
-                cursor.execute("SELECT id FROM users WHERE user_id = %s OR telegram_id = %s", (emos_user_id, telegram_id))
-            else:
-                cursor.execute("SELECT id FROM users WHERE user_id = %s", (emos_user_id,))
+            cursor.execute("SELECT id FROM users WHERE user_id = %s", (emos_user_id,))
             result = cursor.fetchone()
+            if not result and telegram_id:
+                cursor.execute("SELECT id FROM users WHERE telegram_id = %s", (telegram_id,))
+                result = cursor.fetchone()
             
             if result:
                 user_id = result[0]
-                # 更新用户信息
-                cursor.execute(
-                    "UPDATE users SET token = %s, telegram_id = %s, username = %s, first_name = %s, last_name = %s WHERE id = %s",
-                    (token, telegram_id, username, first_name, last_name, user_id)
-                )
-                conn.commit()
+                # 更新用户信息（只更新非空字段）
+                update_fields = []
+                update_values = []
+                
+                if token:
+                    update_fields.append("token = %s")
+                    update_values.append(token)
+                if telegram_id is not None:
+                    update_fields.append("telegram_id = %s")
+                    update_values.append(telegram_id)
+                if username:
+                    update_fields.append("username = %s")
+                    update_values.append(username)
+                if first_name:
+                    update_fields.append("first_name = %s")
+                    update_values.append(first_name)
+                if last_name:
+                    update_fields.append("last_name = %s")
+                    update_values.append(last_name)
+                
+                if update_fields:
+                    update_query = f"UPDATE users SET {', '.join(update_fields)} WHERE id = %s"
+                    update_values.append(user_id)
+                    cursor.execute(update_query, update_values)
+                    conn.commit()
                 return user_id
             else:
                 # 创建新用户
@@ -53,10 +72,10 @@ def ensure_user_exists(emos_user_id: str, token: str, telegram_id: Optional[int]
                 )
                 user_id = cursor.lastrowid
                 
-                # 创建余额记录
+                # 创建余额记录，使用 emos_user_id（字符串）
                 cursor.execute(
                     "INSERT INTO balances (user_id, balance, username) VALUES (%s, 0, %s)",
-                    (user_id, username)
+                    (emos_user_id, username)
                 )
                 
                 conn.commit()
@@ -135,26 +154,31 @@ def update_recharge_order_status(platform_order_no: str, status: str,
                 )
                 result = cursor.fetchone()
                 if result:
-                    user_id = result[0]
+                    local_user_id = result[0]
                     carrot_amount = result[1]
                     
-                    # 更新用户余额
-                    cursor.execute(
-                        """UPDATE balances 
-                           SET balance = balance + %s 
-                           WHERE user_id = %s""",
-                        (game_coin_amount, user_id)
-                    )
+                    # 获取用户的字符串格式 user_id
+                    cursor.execute("SELECT user_id FROM users WHERE id = %s", (local_user_id,))
+                    user_result = cursor.fetchone()
+                    if user_result:
+                        emos_user_id = user_result[0]
+                        # 更新用户余额
+                        cursor.execute(
+                            """UPDATE balances 
+                               SET balance = balance + %s 
+                               WHERE user_id = %s""",
+                            (game_coin_amount, emos_user_id)
+                        )
                     
                     # 更新用户累计充值金额
                     cursor.execute(
                         """UPDATE users 
                            SET total_recharge = total_recharge + %s 
                            WHERE id = %s""",
-                        (carrot_amount, user_id)
+                        (carrot_amount, local_user_id)
                     )
                     
-                    logger.info(f"更新用户累计充值金额: user_id={user_id}, amount={carrot_amount}")
+                    logger.info(f"更新用户累计充值金额: user_id={local_user_id}, amount={carrot_amount}")
             
             conn.commit()
             logger.info(f"充值订单状态已更新: {platform_order_no} -> {status}")
@@ -174,15 +198,12 @@ def get_user_by_telegram_id(telegram_user_id: int) -> Optional[Dict[str, Any]]:
     
     try:
         with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+            # 直接查询用户表中的 telegram_id
             cursor.execute(
                 """SELECT u.*, b.balance 
                    FROM users u 
-                   LEFT JOIN balances b ON u.id = b.user_id 
-                   WHERE u.id IN (
-                       SELECT user_id FROM recharge_orders 
-                       WHERE telegram_user_id = %s 
-                       LIMIT 1
-                   )""",
+                   LEFT JOIN balances b ON u.user_id = b.user_id 
+                   WHERE u.telegram_id = %s""",
                 (telegram_user_id,)
             )
             return cursor.fetchone()
@@ -273,9 +294,16 @@ def get_user_balance(user_id: int) -> Optional[int]:
     
     try:
         with conn.cursor() as cursor:
+            # 先获取用户的字符串格式 user_id
+            cursor.execute("SELECT user_id FROM users WHERE id = %s", (user_id,))
+            user_result = cursor.fetchone()
+            if not user_result:
+                return None
+            emos_user_id = user_result[0]
+            
             cursor.execute(
                 "SELECT balance FROM balances WHERE user_id = %s",
-                (user_id,)
+                (emos_user_id,)
             )
             result = cursor.fetchone()
             return result[0] if result else None
@@ -343,27 +371,32 @@ def update_withdraw_order_status(order_no: str, status: str,
                 )
                 result = cursor.fetchone()
                 if result:
-                    user_id = result[0]
+                    local_user_id = result[0]
                     game_coin_amount = result[1]
                     carrot_amount = result[2]
                     
-                    # 更新用户余额
-                    cursor.execute(
-                        """UPDATE balances 
-                           SET balance = balance - %s 
-                           WHERE user_id = %s""",
-                        (game_coin_amount, user_id)
-                    )
+                    # 获取用户的字符串格式 user_id
+                    cursor.execute("SELECT user_id FROM users WHERE id = %s", (local_user_id,))
+                    user_result = cursor.fetchone()
+                    if user_result:
+                        emos_user_id = user_result[0]
+                        # 更新用户余额
+                        cursor.execute(
+                            """UPDATE balances 
+                               SET balance = balance - %s 
+                               WHERE user_id = %s""",
+                            (game_coin_amount, emos_user_id)
+                        )
                     
                     # 更新用户累计提现金额
                     cursor.execute(
                         """UPDATE users 
                            SET total_withdraw = total_withdraw + %s 
                            WHERE id = %s""",
-                        (carrot_amount, user_id)
+                        (carrot_amount, local_user_id)
                     )
                     
-                    logger.info(f"更新用户累计提现金额: user_id={user_id}, amount={carrot_amount}")
+                    logger.info(f"更新用户累计提现金额: user_id={local_user_id}, amount={carrot_amount}")
             
             conn.commit()
             logger.info(f"提现订单状态已更新: {order_no} -> {status}")

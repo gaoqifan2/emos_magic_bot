@@ -13,12 +13,6 @@ echo.
 echo 代理配置: %DB_PROXY_HOST%:%DB_PROXY_PORT%
 echo.
 
-:: 检查锁文件
-if exist bot.lock (
-    echo 检测到锁文件，尝试清理...
-    del /f bot.lock 2>nul
-)
-
 echo 启动机器人...
 python main.py
 

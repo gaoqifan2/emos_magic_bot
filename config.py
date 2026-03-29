@@ -77,6 +77,12 @@ GROUP_ALLOWED_COMMANDS = [
 # 全局变量 - 存储用户token
 user_tokens = {}
 
+# 默认群聊ID（用于设置群标签）
+# 旧群ID（测试群）
+# DEFAULT_GROUP_CHAT_ID = -1003833383798
+# 新群ID（正式群）
+DEFAULT_GROUP_CHAT_ID = -1003750565627  # 用户提供的正式群聊ID
+
 def get_user_token(user_id):
     """从user_tokens中获取用户的token字符串
     
@@ -114,7 +120,7 @@ DB_CONFIG = {
     # "database": "game_db_test",
     # "charset": "utf8mb4"
 
-    
+
     #正式数据库
     "host": "66.235.105.125",
     "port": 3306,

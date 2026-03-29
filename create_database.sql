@@ -30,21 +30,24 @@ CREATE TABLE IF NOT EXISTS users (
 -- 2. balances（余额表）
 -- =====================================================
 CREATE TABLE IF NOT EXISTS balances (
-    user_id INT PRIMARY KEY COMMENT '关联users表的id',
+    id INT AUTO_INCREMENT PRIMARY KEY COMMENT '自增主键',
+    user_id VARCHAR(50) NOT NULL COMMENT 'users表的user_id（形如eK98R5PEMs）',
+    username VARCHAR(255) COMMENT '用户名标识',
     balance INT DEFAULT 0 COMMENT '游戏币余额（默认0币）',
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '最后更新时间',
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    UNIQUE KEY unique_user_id (user_id),
+    INDEX idx_username (username)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户余额表';
 
 -- =====================================================
 -- 3. daily_checkins（签到表）
 -- =====================================================
 CREATE TABLE IF NOT EXISTS daily_checkins (
-    user_id INT PRIMARY KEY COMMENT '关联users表的id',
+    user_id VARCHAR(50) PRIMARY KEY COMMENT '关联users表的user_id（字符串格式）',
     last_checkin TIMESTAMP NOT NULL COMMENT '上次签到时间',
     checkin_streak INT DEFAULT 1 COMMENT '连续签到天数',
     total_checkins INT DEFAULT 1 COMMENT '总签到次数',
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    INDEX idx_user_id (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='每日签到表';
 
 -- =====================================================
@@ -52,15 +55,17 @@ CREATE TABLE IF NOT EXISTS daily_checkins (
 -- =====================================================
 CREATE TABLE IF NOT EXISTS game_records (
     id INT AUTO_INCREMENT PRIMARY KEY COMMENT '记录ID',
-    user_id INT NOT NULL COMMENT '关联users表的id',
+    user_id VARCHAR(50) NOT NULL COMMENT '关联users表的user_id（字符串格式）',
+    username VARCHAR(255) COMMENT '用户名',
     game_type VARCHAR(50) NOT NULL COMMENT '游戏类型：dice/slot/coinflip等',
     bet_amount INT NOT NULL COMMENT '下注金额',
     result VARCHAR(50) NOT NULL COMMENT '游戏结果：win/lose/draw',
     win_amount INT NOT NULL COMMENT '赢得的金额（负数表示输）',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '游戏时间',
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     INDEX idx_user_created (user_id, created_at),
-    INDEX idx_game_type (game_type)
+    INDEX idx_game_type (game_type),
+    INDEX idx_username (username),
+    INDEX idx_user_id (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='游戏记录表';
 
 -- =====================================================
@@ -69,7 +74,7 @@ CREATE TABLE IF NOT EXISTS game_records (
 CREATE TABLE IF NOT EXISTS recharge_orders (
     id INT AUTO_INCREMENT PRIMARY KEY COMMENT '订单ID',
     order_no VARCHAR(100) UNIQUE NOT NULL COMMENT '平台内部订单号',
-    user_id INT NOT NULL COMMENT '关联users表的id',
+    user_id VARCHAR(50) NOT NULL COMMENT '关联users表的user_id（字符串格式）',
     telegram_user_id BIGINT NOT NULL COMMENT 'Telegram用户ID，方便查询',
     carrot_amount INT NOT NULL COMMENT '充值萝卜数量（1-50000）',
     game_coin_amount INT NOT NULL COMMENT '获得游戏币数量',
@@ -80,11 +85,11 @@ CREATE TABLE IF NOT EXISTS recharge_orders (
     expire_time TIMESTAMP NULL COMMENT '订单过期时间',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     INDEX idx_status (status),
     INDEX idx_telegram_user (telegram_user_id),
     INDEX idx_platform_no (platform_order_no),
-    INDEX idx_created (created_at)
+    INDEX idx_created (created_at),
+    INDEX idx_user_id (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='充值订单表';
 
 -- =====================================================
@@ -93,7 +98,7 @@ CREATE TABLE IF NOT EXISTS recharge_orders (
 CREATE TABLE IF NOT EXISTS withdraw_orders (
     id INT AUTO_INCREMENT PRIMARY KEY COMMENT '提现订单ID',
     order_no VARCHAR(100) UNIQUE NOT NULL COMMENT '提现订单号',
-    user_id INT NOT NULL COMMENT '关联users表的id',
+    user_id VARCHAR(50) NOT NULL COMMENT '关联users表的user_id（字符串格式）',
     telegram_user_id BIGINT NOT NULL COMMENT 'Telegram用户ID',
     game_coin_amount INT NOT NULL COMMENT '提现游戏币数量',
     carrot_amount INT NOT NULL COMMENT '获得萝卜数量',
@@ -102,9 +107,9 @@ CREATE TABLE IF NOT EXISTS withdraw_orders (
     admin_note TEXT COMMENT '管理员备注',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     INDEX idx_status (status),
-    INDEX idx_telegram_user (telegram_user_id)
+    INDEX idx_telegram_user (telegram_user_id),
+    INDEX idx_user_id (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='提现订单表';
 
 -- =====================================================
@@ -123,7 +128,42 @@ CREATE TABLE IF NOT EXISTS provider_config (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='服务商配置表';
 
 -- =====================================================
--- 8. 初始化数据
+-- 8. user_streaks（用户连胜记录表）
+-- =====================================================
+CREATE TABLE IF NOT EXISTS user_streaks (
+    id INT AUTO_INCREMENT PRIMARY KEY COMMENT '记录ID',
+    user_id VARCHAR(50) NOT NULL COMMENT '关联users表的user_id（字符串格式）',
+    telegram_id BIGINT NOT NULL COMMENT 'Telegram用户ID',
+    game_type VARCHAR(50) NOT NULL COMMENT '游戏类型：blackjack/slot等',
+    win_streak INT DEFAULT 0 COMMENT '当前连胜次数',
+    max_streak INT DEFAULT 0 COMMENT '历史最高连胜',
+    last_win_time TIMESTAMP NULL COMMENT '上次胜利时间',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    UNIQUE KEY unique_user_game (user_id, game_type),
+    INDEX idx_telegram_id (telegram_id),
+    INDEX idx_game_type (game_type),
+    INDEX idx_user_id (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户连胜记录表';
+
+-- =====================================================
+-- 9. user_tags（用户群标签记录表）
+-- =====================================================
+CREATE TABLE IF NOT EXISTS user_tags (
+    id INT AUTO_INCREMENT PRIMARY KEY COMMENT '记录ID',
+    user_id VARCHAR(50) NOT NULL COMMENT '关联users表的user_id（字符串格式）',
+    telegram_id BIGINT NOT NULL COMMENT 'Telegram用户ID',
+    chat_id BIGINT NULL COMMENT '群组ID（可为空）',
+    tag_name VARCHAR(50) NOT NULL COMMENT '标签名称',
+    tag_level INT DEFAULT 1 COMMENT '标签等级',
+    awarded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '获得时间',
+    UNIQUE KEY unique_user_chat_tag (telegram_id, chat_id, tag_name),
+    INDEX idx_telegram_id (telegram_id),
+    INDEX idx_chat_id (chat_id),
+    INDEX idx_user_id (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户群标签记录表';
+
+-- =====================================================
+-- 10. 初始化数据
 -- =====================================================
 
 -- 初始化服务商配置
@@ -148,3 +188,5 @@ DESCRIBE game_records;
 DESCRIBE recharge_orders;
 DESCRIBE withdraw_orders;
 DESCRIBE provider_config;
+DESCRIBE user_streaks;
+DESCRIBE user_tags;

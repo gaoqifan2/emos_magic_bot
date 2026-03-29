@@ -111,14 +111,18 @@ def init_db():
             ''')
             print("current_cycle_score字段添加成功")
             
-            # 创建余额表，使用用户表的id作为外键
+            # 创建余额表，使用 users 表的 user_id（字符串）作为标识
             print("创建余额表...")
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS balances (
-                    user_id INT PRIMARY KEY,
-                    balance INT DEFAULT 100,
-                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-                )
+                    id INT AUTO_INCREMENT PRIMARY KEY COMMENT '自增主键',
+                    user_id VARCHAR(50) NOT NULL COMMENT 'users表的user_id（形如e0E446ZE6s）',
+                    username VARCHAR(255) COMMENT '用户名标识',
+                    balance INT DEFAULT 0 COMMENT '游戏币余额（默认0币）',
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '最后更新时间',
+                    UNIQUE KEY unique_user_id (user_id),
+                    INDEX idx_username (username)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户余额表'
             ''')
             print("余额表创建成功")
             
@@ -137,6 +141,38 @@ def init_db():
                 )
             ''')
             print("游戏记录表创建成功")
+            
+            # 检查并添加username字段（如果不存在）
+            print("检查并添加username字段...")
+            try:
+                cursor.execute('''
+                    ALTER TABLE game_records 
+                    ADD COLUMN IF NOT EXISTS username VARCHAR(255) COMMENT '用户名'
+                ''')
+                print("username字段添加成功")
+            except Exception as e:
+                print(f"添加username字段时出错（可能已存在）: {e}")
+            
+            # 检查并删除telegram_id字段（如果存在）
+            print("检查并删除telegram_id字段...")
+            try:
+                cursor.execute('''
+                    ALTER TABLE game_records 
+                    DROP COLUMN IF EXISTS telegram_id
+                ''')
+                print("telegram_id字段删除成功")
+            except Exception as e:
+                print(f"删除telegram_id字段时出错（可能不存在）: {e}")
+            
+            # 添加username索引（如果不存在）
+            print("检查并添加username索引...")
+            try:
+                cursor.execute('''
+                    CREATE INDEX IF NOT EXISTS idx_username ON game_records(username)
+                ''')
+                print("username索引添加成功")
+            except Exception as e:
+                print(f"添加username索引时出错（可能已存在）: {e}")
             
             # 创建提现记录表，使用用户表的id作为外键
             print("创建提现记录表...")
@@ -224,11 +260,37 @@ def get_user_by_telegram_id(telegram_id):
         return None
     
     try:
-        with connection.cursor() as cursor:
-            # 通过 telegram_id 字段查询用户
-            cursor.execute('SELECT * FROM users WHERE telegram_id = %s', (telegram_id,))
-            user = cursor.fetchone()
-            return user
+        cursor = connection.cursor()
+        # 通过 telegram_id 字段查询用户
+        cursor.execute('SELECT id, user_id, telegram_id, username, first_name, last_name FROM users WHERE telegram_id = %s', (telegram_id,))
+        row = cursor.fetchone()
+        if row:
+            # DictCursor 返回字典
+            if isinstance(row, dict):
+                return {
+                    'id': row.get('id'),
+                    'user_id': row.get('user_id'),
+                    'telegram_id': row.get('telegram_id'),
+                    'username': row.get('username'),
+                    'first_name': row.get('first_name'),
+                    'last_name': row.get('last_name')
+                }
+            else:
+                # 元组形式
+                return {
+                    'id': row[0],
+                    'user_id': row[1],
+                    'telegram_id': row[2],
+                    'username': row[3],
+                    'first_name': row[4],
+                    'last_name': row[5]
+                }
+        return None
+    except Exception as e:
+        print(f"get_user_by_telegram_id 错误: {e}")
+        import traceback
+        print(traceback.format_exc())
+        return None
     finally:
         connection.close()
 
@@ -239,11 +301,37 @@ def get_user_by_user_id(user_id):
         return None
     
     try:
-        with connection.cursor() as cursor:
-            # 通过 user_id 字段查询用户
-            cursor.execute('SELECT * FROM users WHERE user_id = %s', (user_id,))
-            user = cursor.fetchone()
-            return user
+        cursor = connection.cursor()
+        # 通过 user_id 字段查询用户
+        cursor.execute('SELECT id, user_id, telegram_id, username, first_name, last_name FROM users WHERE user_id = %s', (user_id,))
+        row = cursor.fetchone()
+        if row:
+            # DictCursor 返回字典
+            if isinstance(row, dict):
+                return {
+                    'id': row.get('id'),
+                    'user_id': row.get('user_id'),
+                    'telegram_id': row.get('telegram_id'),
+                    'username': row.get('username'),
+                    'first_name': row.get('first_name'),
+                    'last_name': row.get('last_name')
+                }
+            else:
+                # 元组形式
+                return {
+                    'id': row[0],
+                    'user_id': row[1],
+                    'telegram_id': row[2],
+                    'username': row[3],
+                    'first_name': row[4],
+                    'last_name': row[5]
+                }
+        return None
+    except Exception as e:
+        print(f"get_user_by_user_id 错误: {e}")
+        import traceback
+        print(traceback.format_exc())
+        return None
     finally:
         connection.close()
 
@@ -271,11 +359,8 @@ def add_user(user_id, user_data):
                     VALUES (%s, %s, %s, %s, %s, %s)
                 ''', (user_id, telegram_id, token, username, user_data.get('first_name', ''), user_data.get('last_name', '')))
                 
-                # 获取生成的用户id
-                user_id_db = cursor.lastrowid
-                
-                # 为新用户初始化余额，默认为0
-                cursor.execute('INSERT INTO balances (user_id, balance, username) VALUES (%s, %s, %s)', (user_id_db, 0, username))
+                # 为新用户初始化余额，使用 user_id（字符串），默认为0
+                cursor.execute('INSERT INTO balances (user_id, balance, username) VALUES (%s, %s, %s)', (user_id, 0, username))
                 
                 connection.commit()
             else:
@@ -285,94 +370,109 @@ def add_user(user_id, user_data):
                     WHERE user_id = %s
                 ''', (token, username, user_id))
                 
-                # 确保用户有余额记录
-                user_id_db = existing_user['id']
-                cursor.execute('SELECT * FROM balances WHERE user_id = %s', (user_id_db,))
+                # 确保用户有余额记录，使用 user_id（字符串）
+                cursor.execute('SELECT * FROM balances WHERE user_id = %s', (user_id,))
                 balance_record = cursor.fetchone()
                 if not balance_record:
                     # 如果余额记录不存在，创建一个，默认为0
-                    cursor.execute('INSERT INTO balances (user_id, balance, username) VALUES (%s, %s, %s)', (user_id_db, 0, username))
+                    cursor.execute('INSERT INTO balances (user_id, balance, username) VALUES (%s, %s, %s)', (user_id, 0, username))
                 else:
                     # 如果余额记录存在，更新username
-                    cursor.execute('UPDATE balances SET username = %s WHERE user_id = %s', (username, user_id_db))
+                    cursor.execute('UPDATE balances SET username = %s WHERE user_id = %s', (username, user_id))
                 
                 connection.commit()
     finally:
         connection.close()
 
 def get_balance(user_id):
-    """获取用户余额"""
+    """获取用户余额
+    
+    Args:
+        user_id: users表的user_id（如e0E446ZE6s）
+    """
     connection = get_db_connection()
     if not connection:
         return 0
     
     try:
-        with connection.cursor() as cursor:
-            # 先通过用户的user_id找到用户在数据库中的id
-            cursor.execute('SELECT id FROM users WHERE user_id = %s', (user_id,))
-            user_result = cursor.fetchone()
-            
-            if user_result:
-                user_id_db = user_result['id']
-                # 通过数据库id获取余额
-                cursor.execute('SELECT balance FROM balances WHERE user_id = %s', (user_id_db,))
-                balance_result = cursor.fetchone()
-                if balance_result:
-                    return balance_result['balance']
-            
-            # 如果用户不存在或余额记录不存在，默认为0
-            return 0
+        cursor = connection.cursor()
+        
+        # 直接使用user_id查询余额
+        cursor.execute('SELECT balance FROM balances WHERE user_id = %s', (user_id,))
+        balance_result = cursor.fetchone()
+        if balance_result:
+            if isinstance(balance_result, dict):
+                return balance_result.get('balance', 0)
+            else:
+                return balance_result[0]
+        
+        # 如果余额记录不存在，默认为0
+        return 0
+    except Exception as e:
+        print(f"获取余额失败: {e}")
+        import traceback
+        print(traceback.format_exc())
+        return 0
     finally:
         connection.close()
 
 def update_balance(user_id, amount):
-    """更新用户余额"""
+    """更新用户余额
+    
+    Args:
+        user_id: users表的user_id（如e0E446ZE6s）
+        amount: 要增加的金额（可以是负数）
+    """
     connection = get_db_connection()
     if not connection:
         return 0
     
     try:
-        with connection.cursor() as cursor:
-            # 先通过用户的user_id找到用户在数据库中的id
-            cursor.execute('SELECT id FROM users WHERE user_id = %s', (user_id,))
-            user_result = cursor.fetchone()
-            
-            if user_result:
-                user_id_db = user_result['id']
-                # 检查余额是否存在
-                cursor.execute('SELECT balance FROM balances WHERE user_id = %s', (user_id_db,))
-                balance_result = cursor.fetchone()
-                
-                if balance_result:
-                    # 更新余额
-                    new_balance = balance_result['balance'] + amount
-                    cursor.execute('UPDATE balances SET balance = %s WHERE user_id = %s', (new_balance, user_id_db))
-                else:
-                    # 如果余额不存在，初始化余额
-                    new_balance = 0 + amount
-                    # 获取用户的username
-                    cursor.execute('SELECT username FROM users WHERE id = %s', (user_id_db,))
-                    user_result = cursor.fetchone()
-                    username = user_result.get('username', '') if user_result else ''
-                    cursor.execute('INSERT INTO balances (user_id, balance, username) VALUES (%s, %s, %s)', (user_id_db, new_balance, username))
+        cursor = connection.cursor()
+        
+        # 检查用户是否存在
+        cursor.execute('SELECT username FROM users WHERE user_id = %s', (user_id,))
+        user_result = cursor.fetchone()
+        
+        if not user_result:
+            # 如果用户不存在，创建用户
+            cursor.execute('''
+                INSERT INTO users (user_id, token, username, first_name, last_name) 
+                VALUES (%s, %s, %s, %s, %s)
+            ''', (user_id, None, '', '', ''))
+            username = ''
+        else:
+            # 处理字典或元组形式的结果
+            if isinstance(user_result, dict):
+                username = user_result.get('username', '')
             else:
-                # 如果用户不存在，创建用户并初始化余额
-                cursor.execute('''
-                    INSERT INTO users (user_id, token, username, first_name, last_name) 
-                    VALUES (%s, %s, %s, %s, %s)
-                ''', (user_id, None, '', '', ''))
-                # 获取生成的用户id
-                user_id_db = cursor.lastrowid
-                # 初始化余额，默认为0
-                new_balance = 0 + amount
-                # 获取用户的username（新创建的用户，username可能为空）
-                cursor.execute('SELECT username FROM users WHERE id = %s', (user_id_db,))
-                user_result = cursor.fetchone()
-                username = user_result.get('username', '') if user_result else ''
-                cursor.execute('INSERT INTO balances (user_id, balance, username) VALUES (%s, %s, %s)', (user_id_db, new_balance, username))
-            
-            connection.commit()
-            return new_balance
+                username = user_result[0] if user_result[0] else ''
+        
+        # 检查余额是否存在
+        cursor.execute('SELECT balance FROM balances WHERE user_id = %s', (user_id,))
+        balance_result = cursor.fetchone()
+        
+        if balance_result:
+            # 更新余额
+            if isinstance(balance_result, dict):
+                current_balance = balance_result.get('balance', 0)
+            else:
+                current_balance = balance_result[0]
+            new_balance = current_balance + amount
+            cursor.execute('UPDATE balances SET balance = %s, username = %s WHERE user_id = %s', (new_balance, username, user_id))
+        else:
+            # 如果余额不存在，初始化余额
+            new_balance = 0 + amount
+            cursor.execute('INSERT INTO balances (user_id, username, balance) VALUES (%s, %s, %s)', (user_id, username, new_balance))
+        
+        connection.commit()
+        return new_balance
+    except Exception as e:
+        print(f"更新余额失败: {e}")
+        import traceback
+        print(traceback.format_exc())
+        connection.rollback()
+        return 0
     finally:
         connection.close()
 
@@ -436,26 +536,23 @@ def update_user_token(telegram_id, token, first_name='', last_name=''):
                         WHERE user_id = %s
                     ''', (token, username, telegram_user_id, first_name, last_name, user_id_api))
                     
-                    # 确保用户有余额记录
-                    user_id_db = existing_user['id']
-                    cursor.execute('SELECT * FROM balances WHERE user_id = %s', (user_id_db,))
+                    # 确保用户有余额记录，使用 user_id（字符串）
+                    cursor.execute('SELECT * FROM balances WHERE user_id = %s', (user_id_api,))
                     balance_result = cursor.fetchone()
                     if not balance_result:
                         # 如果余额记录不存在，创建一个，默认为0
-                        cursor.execute('INSERT INTO balances (user_id, balance, username) VALUES (%s, %s, %s)', (user_id_db, 0, username))
+                        cursor.execute('INSERT INTO balances (user_id, balance, username) VALUES (%s, %s, %s)', (user_id_api, 0, username))
                     else:
                         # 如果余额记录存在，更新username
-                        cursor.execute('UPDATE balances SET username = %s WHERE user_id = %s', (username, user_id_db))
+                        cursor.execute('UPDATE balances SET username = %s WHERE user_id = %s', (username, user_id_api))
                 else:
                     # 用户不存在，创建用户
                     cursor.execute('''
                         INSERT INTO users (user_id, telegram_id, token, username, first_name, last_name) 
                         VALUES (%s, %s, %s, %s, %s, %s)
                     ''', (user_id_api, telegram_user_id, token, username, first_name, last_name))
-                    # 获取生成的用户id
-                    user_id_db = cursor.lastrowid
-                    # 为新用户初始化余额，默认为0
-                    cursor.execute('INSERT INTO balances (user_id, balance, username) VALUES (%s, %s, %s)', (user_id_db, 0, username))
+                    # 为新用户初始化余额，使用 user_id（字符串），默认为0
+                    cursor.execute('INSERT INTO balances (user_id, balance, username) VALUES (%s, %s, %s)', (user_id_api, 0, username))
             
             connection.commit()
     except Exception as e:
@@ -491,7 +588,7 @@ def update_checkin_time(user_id, timestamp):
     finally:
         connection.close()
 
-def add_game_record(user_id, game_type, bet_amount, result, win_amount):
+def add_game_record(user_id, game_type, bet_amount, result, win_amount, username=None):
     """添加游戏记录"""
     connection = get_db_connection()
     if not connection:
@@ -499,17 +596,20 @@ def add_game_record(user_id, game_type, bet_amount, result, win_amount):
     
     try:
         with connection.cursor() as cursor:
-            # 先通过用户的user_id或telegram_id找到用户在数据库中的id
-            cursor.execute('SELECT id FROM users WHERE user_id = %s OR telegram_id = %s', (user_id, user_id))
+            # 先通过用户的user_id找到用户在数据库中的id和username
+            cursor.execute('SELECT id, username FROM users WHERE user_id = %s OR id = %s', (user_id, user_id))
             user_result = cursor.fetchone()
             
             if user_result:
                 user_id_db = user_result['id']
-                # 使用数据库id插入游戏记录
+                # 如果没有传入username，使用数据库中的username
+                if username is None:
+                    username = user_result.get('username', '')
+                # 使用数据库id和username插入游戏记录
                 cursor.execute('''
-                    INSERT INTO game_records (user_id, game_type, bet_amount, result, win_amount) 
-                    VALUES (%s, %s, %s, %s, %s)
-                ''', (user_id_db, game_type, bet_amount, result, win_amount))
+                    INSERT INTO game_records (user_id, username, game_type, bet_amount, result, win_amount) 
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                ''', (user_id_db, username, game_type, bet_amount, result, win_amount))
                 connection.commit()
     finally:
         connection.close()
@@ -523,19 +623,20 @@ def add_withdrawal_record(user_id, amount):
     try:
         with connection.cursor() as cursor:
             # 先通过用户的user_id找到用户在数据库中的id
-            cursor.execute('SELECT id FROM users WHERE user_id = %s', (user_id,))
+            cursor.execute('SELECT id, username FROM users WHERE user_id = %s', (user_id,))
             user_result = cursor.fetchone()
             
             if user_result:
                 user_id_db = user_result['id']
-                # 检查余额是否足够
-                cursor.execute('SELECT balance FROM balances WHERE user_id = %s', (user_id_db,))
+                username = user_result.get('username', '')
+                # 检查余额是否足够 - 使用正确的user_id格式
+                cursor.execute('SELECT balance FROM balances WHERE user_id = %s', (user_id,))
                 balance_result = cursor.fetchone()
                 
                 if balance_result and balance_result['balance'] >= amount:
-                    # 扣除余额
+                    # 扣除余额 - 使用正确的user_id格式
                     new_balance = balance_result['balance'] - amount
-                    cursor.execute('UPDATE balances SET balance = %s WHERE user_id = %s', (new_balance, user_id_db))
+                    cursor.execute('UPDATE balances SET balance = %s, username = %s WHERE user_id = %s', (new_balance, username, user_id))
                     
                     # 添加提现记录
                     cursor.execute('''
@@ -599,70 +700,91 @@ def ensure_user_exists(emos_user_id, token, telegram_id=None, username=None, fir
         print("  数据库连接失败")
         return None
     
+    def get_value(row, index, key):
+        """辅助函数：从查询结果中获取值（支持字典和元组）"""
+        if row is None:
+            return None
+        if isinstance(row, dict):
+            return row.get(key)
+        else:
+            return row[index] if index < len(row) else None
+    
     try:
-        with connection.cursor() as cursor:
-            # 检查用户是否存在
-            if telegram_id:
-                print(f"  检查用户是否存在：user_id={emos_user_id} 或 telegram_id={telegram_id}")
-                cursor.execute("SELECT id, user_id, telegram_id FROM users WHERE user_id = %s OR telegram_id = %s", (emos_user_id, telegram_id))
-            else:
-                print(f"  检查用户是否存在：user_id={emos_user_id}")
-                cursor.execute("SELECT id, user_id, telegram_id FROM users WHERE user_id = %s", (emos_user_id,))
+        cursor = connection.cursor()
+        # 检查用户是否存在
+        # 优先通过 telegram_id 查找，确保每个Telegram账号对应独立用户
+        if telegram_id:
+            print(f"  优先通过 telegram_id={telegram_id} 查找用户")
+            cursor.execute("SELECT id, user_id, telegram_id FROM users WHERE telegram_id = %s", (telegram_id,))
             result = cursor.fetchone()
             
-            if result:
-                user_id = result['id']
-                print(f"  用户已存在：id={user_id}, user_id={result['user_id']}, telegram_id={result['telegram_id']}")
-                # 更新用户信息，确保username不为None
-                print(f"  更新用户信息：token={token}, telegram_id={telegram_id}, username={username}")
-                # 只有当username不为None时才更新
-                if username is not None:
-                    cursor.execute(
-                        "UPDATE users SET token = %s, telegram_id = %s, username = %s, first_name = %s, last_name = %s WHERE id = %s",
-                        (token, telegram_id, username, first_name, last_name, user_id)
-                    )
-                else:
-                    # 不更新username字段
-                    cursor.execute(
-                        "UPDATE users SET token = %s, telegram_id = %s, first_name = %s, last_name = %s WHERE id = %s",
-                        (token, telegram_id, first_name, last_name, user_id)
-                    )
-                # 确保用户有余额记录并更新username
-                cursor.execute('SELECT * FROM balances WHERE user_id = %s', (user_id,))
-                balance_result = cursor.fetchone()
-                if not balance_result:
-                    # 如果余额记录不存在，创建一个，默认为0
-                    cursor.execute('INSERT INTO balances (user_id, balance, username) VALUES (%s, %s, %s)', (user_id, 0, username))
-                else:
-                    # 如果余额记录存在，更新username
-                    cursor.execute('UPDATE balances SET username = %s WHERE user_id = %s', (username, user_id))
-                
-                connection.commit()
-                print(f"  用户更新成功：id={user_id}")
-                return user_id
+            if not result:
+                # 如果通过 telegram_id 找不到，再通过 emos_user_id 查找
+                print(f"  通过 telegram_id 未找到，尝试通过 user_id={emos_user_id} 查找")
+                cursor.execute("SELECT id, user_id, telegram_id FROM users WHERE user_id = %s", (emos_user_id,))
+                result = cursor.fetchone()
+        else:
+            print(f"  检查用户是否存在：user_id={emos_user_id}")
+            cursor.execute("SELECT id, user_id, telegram_id FROM users WHERE user_id = %s", (emos_user_id,))
+            result = cursor.fetchone()
+        
+        if result:
+            user_id = get_value(result, 0, 'id')
+            result_user_id = get_value(result, 1, 'user_id')
+            result_telegram_id = get_value(result, 2, 'telegram_id')
+            print(f"  用户已存在：id={user_id}, user_id={result_user_id}, telegram_id={result_telegram_id}")
+            # 更新用户信息，确保username不为None
+            print(f"  更新用户信息：token={token}, telegram_id={telegram_id}, username={username}")
+            # 只有当username不为None时才更新
+            if username is not None:
+                cursor.execute(
+                    "UPDATE users SET token = %s, telegram_id = %s, username = %s, first_name = %s, last_name = %s WHERE id = %s",
+                    (token, telegram_id, username, first_name, last_name, user_id)
+                )
             else:
-                # 创建新用户，确保username不为None
-                print(f"  用户不存在，创建新用户：user_id={emos_user_id}, telegram_id={telegram_id}")
-                # 确保username不为None
-                safe_username = username if username is not None else ''
+                # 不更新username字段
                 cursor.execute(
-                    "INSERT INTO users (user_id, telegram_id, token, username, first_name, last_name) VALUES (%s, %s, %s, %s, %s, %s)",
-                    (emos_user_id, telegram_id, token, safe_username, first_name, last_name)
+                    "UPDATE users SET token = %s, telegram_id = %s, first_name = %s, last_name = %s WHERE id = %s",
+                    (token, telegram_id, first_name, last_name, user_id)
                 )
-                user_id = cursor.lastrowid
-                print(f"  新用户创建成功：id={user_id}")
-                
-                # 创建余额记录
-                cursor.execute(
-                    "INSERT INTO balances (user_id, balance, username) VALUES (%s, %s, %s)",
-                    (user_id, 0, safe_username)
-                )
-                print(f"  余额记录创建成功：user_id={user_id}, balance=0")
-                
-                connection.commit()
-                return user_id
+            # 确保用户有余额记录并更新username，使用 emos_user_id（字符串）
+            cursor.execute('SELECT * FROM balances WHERE user_id = %s', (emos_user_id,))
+            balance_result = cursor.fetchone()
+            if not balance_result:
+                # 如果余额记录不存在，创建一个，默认为0
+                cursor.execute('INSERT INTO balances (user_id, balance, username) VALUES (%s, %s, %s)', (emos_user_id, 0, username))
+            else:
+                # 如果余额记录存在，更新username
+                cursor.execute('UPDATE balances SET username = %s WHERE user_id = %s', (username, emos_user_id))
+            
+            connection.commit()
+            print(f"  用户更新成功：id={user_id}")
+            return user_id
+        else:
+            # 创建新用户，确保username不为None
+            print(f"  用户不存在，创建新用户：user_id={emos_user_id}, telegram_id={telegram_id}")
+            # 确保username不为None
+            safe_username = username if username is not None else ''
+            cursor.execute(
+                "INSERT INTO users (user_id, telegram_id, token, username, first_name, last_name) VALUES (%s, %s, %s, %s, %s, %s)",
+                (emos_user_id, telegram_id, token, safe_username, first_name, last_name)
+            )
+            user_id_db = cursor.lastrowid
+            print(f"  新用户创建成功：id={user_id_db}")
+            
+            # 创建余额记录 - 使用 emos_user_id（users.user_id）而不是自增id
+            cursor.execute(
+                "INSERT INTO balances (user_id, balance, username) VALUES (%s, %s, %s)",
+                (emos_user_id, 0, safe_username)
+            )
+            print(f"  余额记录创建成功：user_id={emos_user_id}, balance=0")
+            
+            connection.commit()
+            return user_id_db
     except Exception as e:
         print(f"  操作用户失败: {e}")
+        import traceback
+        print(traceback.format_exc())
         connection.rollback()
         return None
     finally:
