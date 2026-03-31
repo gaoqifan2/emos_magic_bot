@@ -944,54 +944,6 @@ async def process_guess_result(update: Update, dice_value: int, amount: int, gue
         for key in keys_to_clear:
             if key in context.user_data:
                 del context.user_data[key]
-    
-    # 判断大小（一个骰子规则：4-6为大，1-3为小）
-    if dice_value in [4, 5, 6]:
-        actual_result = "大"
-    else:
-        actual_result = "小"
-    
-    # 处理结果
-    from app.database import update_balance, get_balance
-    if guess == actual_result:
-        # 赢了，获得相同金额
-        win_amount = amount
-        service_fee = int(win_amount * 0.1)
-        net_win = win_amount - service_fee
-        update_balance(emos_user_id, net_win)
-        new_balance = get_balance(emos_user_id)
-        result_text = (
-            f"🎮 猜大小游戏结果\n\n"
-            f"您选择：{guess}\n"
-            f"🎲 骰子点数：{dice_value} ({actual_result})\n\n"
-            f"🎉 您赢了！\n"
-            f"获得：{win_amount} 🪙\n"
-            f"服务费：{service_fee} 🪙\n"
-            f"实际到账：{net_win} 🪙\n"
-            f"当前余额：{new_balance} 🪙"
-        )
-    else:
-        # 输了，失去下注金额
-        update_balance(emos_user_id, -amount)
-        new_balance = get_balance(emos_user_id)
-        result_text = (
-            f"🎮 猜大小游戏结果\n\n"
-            f"您选择：{guess}\n"
-            f"🎲 骰子点数：{dice_value} ({actual_result})\n\n"
-            f"😢 您输了！\n"
-            f"扣除：{amount} 🪙\n"
-            f"当前余额：{new_balance} 🪙"
-        )
-    
-    # 发送结果
-    await update.effective_message.reply_text(result_text)
-    
-    # 清除保存的下注信息
-    keys_to_clear = ['guess_amount', 'guess_choice', 'guess_emos_user_id', 
-                     'guess_user_id']
-    for key in keys_to_clear:
-        if key in context.user_data:
-            del context.user_data[key]
 
 # 群聊下注命令处理器
 async def guess_bet_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1542,7 +1494,7 @@ async def create_shoot_game_with_buttons(update: Update, context: ContextTypes.D
         'end_time': datetime.now() + timedelta(minutes=1),
         'chat_id': chat_id,
         'message_id': None,
-        'status': 'waiting'
+        'status': 'playing'  # 直接设为playing，因为按钮是给所有人点击的
     }
     
     # 创建选择按钮
@@ -2975,33 +2927,14 @@ async def shoot_callback_handler(update: Update, context: ContextTypes.DEFAULT_T
                 'choice': user_choice
             }
             
-            # 检查是否所有玩家都已出拳
-            total_players = len(game['players'])
-            players_with_choice = sum(1 for p in game['players'].values() if p['choice'] is not None)
-            
-            await query.answer(f"✅ 您选择了{user_choice}！已参与游戏（{players_with_choice}/{total_players}人已出拳）")
-            
-            # 如果所有玩家都已出拳，立即开始游戏
-            if players_with_choice == total_players and game['status'] == 'playing':
-                await query.edit_message_text(f"🎮 所有玩家已出拳！游戏开始...")
-                await start_shoot_group_game(chat_id, context)
+            await query.answer(f"✅ 您选择了{user_choice}！已参与游戏")
         else:
-            # 更新用户选择
+            # 用户已经在游戏中，更新选择
             if game['players'][user_id]['choice'] is not None:
-                await query.answer(f"✅ 您已出拳，等待其他玩家...")
+                await query.answer(f"✅ 您已出拳！")
             else:
                 game['players'][user_id]['choice'] = user_choice
-                
-                # 检查是否所有玩家都已出拳
-                total_players = len(game['players'])
-                players_with_choice = sum(1 for p in game['players'].values() if p['choice'] is not None)
-                
-                await query.answer(f"✅ 您选择了{user_choice}！（{players_with_choice}/{total_players}人已出拳）")
-                
-                # 如果所有玩家都已出拳，立即开始游戏
-                if players_with_choice == total_players and game['status'] == 'playing':
-                    await query.edit_message_text(f"🎮 所有玩家已出拳！游戏开始...")
-                    await start_shoot_group_game(chat_id, context)
+                await query.answer(f"✅ 您选择了{user_choice}！")
         
         return
     
@@ -3606,6 +3539,26 @@ async def end_shoot_game(chat_id: str, application):
             await application.bot.send_message(
                 chat_id=game['chat_id'],
                 text=f"🎮 猜拳游戏时间到！\n\n参与人数：{player_count} 人\n游戏开始！"
+            )
+            await start_shoot_group_game(chat_id, application)
+            return
+    elif game['status'] == 'playing':
+        # 带按钮的游戏，时间到了直接开始结算
+        player_count = len(game['players'])
+        # 检查是否有玩家选择了出拳（至少有创建者）
+        players_with_choice = sum(1 for p in game['players'].values() if p['choice'] is not None)
+        
+        if players_with_choice == 0:
+            # 没有人选择，结束游戏
+            await application.bot.send_message(
+                chat_id=game['chat_id'],
+                text=f"🎮 猜拳游戏结束\n\n无人参与，游戏自动结束"
+            )
+        else:
+            # 有人选择了，开始结算
+            await application.bot.send_message(
+                chat_id=game['chat_id'],
+                text=f"🎮 猜拳游戏时间到！\n\n参与人数：{players_with_choice} 人\n游戏开始！"
             )
             await start_shoot_group_game(chat_id, application)
             return

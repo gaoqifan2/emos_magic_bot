@@ -1020,6 +1020,7 @@ async def hit_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # 获取游戏状态（使用全局字典）
         from main import blackjack_games
+        import random
         user_id_key = update.effective_user.id
         if user_id_key not in blackjack_games:
             await query.edit_message_text("游戏已结束，请重新开始")
