@@ -566,126 +566,169 @@ async def guess_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # 检查是否是群聊
     if update.message.chat.type in ['group', 'supergroup']:
-        # 群聊模式 - 参与庄家游戏
-        if len(args) != 2:
-            await update.message.reply_text("请输入猜测的大小和金额，例如：`/guess 大 10`\n\n直接复制：`/guess 大 10`", parse_mode='Markdown')
-            return
-        
-        guess = args[0]
-        if guess not in ['大', '小']:
-            await update.message.reply_text("猜测必须是「大」或「小」")
-            return
-        
-        try:
-            amount = int(args[1])
-            if amount <= 0:
-                await update.message.reply_text("下注金额必须大于0")
+        # 检查是否有正在进行的庄家游戏
+        if chat_id in guess_games:
+            # 有正在进行的庄家游戏 - 参与庄家游戏
+            if len(args) != 2:
+                await update.message.reply_text("请输入猜测的大小和金额，例如：`/guess 大 10`\n\n直接复制：`/guess 大 10`", parse_mode='Markdown')
                 return
-        except ValueError:
-            await update.message.reply_text("请输入有效的数字")
-            return
+            
+            guess = args[0]
+            if guess not in ['大', '小']:
+                await update.message.reply_text("猜测必须是「大」或「小」")
+                return
+            
+            try:
+                amount = int(args[1])
+                if amount <= 0:
+                    await update.message.reply_text("下注金额必须大于0")
+                    return
+            except ValueError:
+                await update.message.reply_text("请输入有效的数字")
+                return
         
-        # 检查是否有正在进行的游戏
-        if chat_id not in guess_games:
-            await update.message.reply_text("❌ 当前没有正在进行的猜大小游戏，请先使用 `/createguess` 命令创建游戏")
-            return
-        
-        game = guess_games[chat_id]
-        if game['status'] != 'waiting':
-            await update.message.reply_text("❌ 游戏已经开始或已结束")
-            return
-        
-        # 检查用户是否已登录
-        from app.config import user_tokens
-        if user_id not in user_tokens:
-            await update.message.reply_text("❌ 请先使用 /start 命令登录！")
-            return
-        
-        # 检查是否是庄家自己
-        if game['banker'] == user_id:
-            await update.message.reply_text("❌ 庄家不能参与自己的游戏！")
-            return
-        
-        # 检查用户是否已经下注过
-        if user_id in game['bets']:
-            await update.message.reply_text("❌ 您已经下注过了！")
-            return
-        
-        # 获取用户emos_id
-        user_info = user_tokens[user_id]
-        emos_user_id = user_info.get('user_id', str(user_id))
-        
-        # 检查用户余额
-        from app.database import get_balance
-        balance = get_balance(emos_user_id)
-        if balance < amount:
-            await update.message.reply_text(f"游戏币不足！当前余额：{balance}")
-            return
-        
-        # 添加用户下注
-        game['bets'][user_id] = {
-            'amount': amount,
-            'guess': guess,
-            'user_name': update.effective_user.first_name
-        }
-        
-        # 更新总金额
-        if guess == '大':
-            game['big_total'] += amount
-        else:
-            game['small_total'] += amount
-        
-        # 计算实时赔率
-        total_bets = game['big_total'] + game['small_total']
-        if total_bets > 0:
-            big_odds = total_bets / game['big_total'] if game['big_total'] > 0 else 1.0
-            small_odds = total_bets / game['small_total'] if game['small_total'] > 0 else 1.0
-        else:
-            big_odds = 1.0
-            small_odds = 1.0
-        
-        player_count = len(game['bets'])
-        
-        # 回复用户
-        await update.message.reply_text(
-            f"✅ 下注成功！\n\n"
-            f"🎮 猜大小游戏\n"
-            f"庄家：{game['banker_name']}\n"
-            f"您的猜测：{guess}\n"
-            f"下注金额：{amount} 🪙\n\n"
-            f"📊 当前赔率：\n"
-            f"猜大：{big_odds:.1f}倍\n"
-            f"猜小：{small_odds:.1f}倍\n\n"
-            f"👥 参与人数：{player_count} 人\n"
-            f"⏰ 等待开奖..."
-        )
-        
-        # 更新群聊中的游戏信息
-        try:
-            from __main__ import application
-            text = (
-                f"🎮 猜大小游戏（庄家模式）\n\n"
+            game = guess_games[chat_id]
+            if game['status'] != 'waiting':
+                await update.message.reply_text("❌ 游戏已经开始或已结束")
+                return
+            
+            # 检查用户是否已登录
+            from app.config import user_tokens
+            if user_id not in user_tokens:
+                await update.message.reply_text("❌ 请先使用 /start 命令登录！")
+                return
+            
+            # 检查是否是庄家自己
+            if game['banker'] == user_id:
+                await update.message.reply_text("❌ 庄家不能参与自己的游戏！")
+                return
+            
+            # 检查用户是否已经下注过
+            if user_id in game['bets']:
+                await update.message.reply_text("❌ 您已经下注过了！")
+                return
+            
+            # 获取用户emos_id
+            user_info = user_tokens[user_id]
+            emos_user_id = user_info.get('user_id', str(user_id))
+            
+            # 检查用户余额
+            from app.database import get_balance
+            balance = get_balance(emos_user_id)
+            if balance < amount:
+                await update.message.reply_text(f"游戏币不足！当前余额：{balance}")
+                return
+            
+            # 添加用户下注
+            game['bets'][user_id] = {
+                'amount': amount,
+                'guess': guess,
+                'user_name': update.effective_user.first_name
+            }
+            
+            # 更新总金额
+            if guess == '大':
+                game['big_total'] += amount
+            else:
+                game['small_total'] += amount
+            
+            # 计算实时赔率
+            total_bets = game['big_total'] + game['small_total']
+            if total_bets > 0:
+                big_odds = total_bets / game['big_total'] if game['big_total'] > 0 else 1.0
+                small_odds = total_bets / game['small_total'] if game['small_total'] > 0 else 1.0
+            else:
+                big_odds = 1.0
+                small_odds = 1.0
+            
+            player_count = len(game['bets'])
+            
+            # 回复用户
+            await update.message.reply_text(
+                f"✅ 下注成功！\n\n"
+                f"🎮 猜大小游戏\n"
                 f"庄家：{game['banker_name']}\n"
-                f"下注金额：{game['amount']} 🪙\n\n"
+                f"您的猜测：{guess}\n"
+                f"下注金额：{amount} 🪙\n\n"
                 f"📊 当前赔率：\n"
                 f"猜大：{big_odds:.1f}倍\n"
                 f"猜小：{small_odds:.1f}倍\n\n"
-                f"💰 当前下注：\n"
-                f"猜大：{game['big_total']} 🪙\n"
-                f"猜小：{game['small_total']} 🪙\n\n"
-                f"👥 参与人数：{player_count} 人\n\n"
-                f"⏰ 5分钟后自动开奖\n\n"
-                f"💡 发送 `/guess 大 金额` 或 `/guess 小 金额` 参与下注"
+                f"👥 参与人数：{player_count} 人\n"
+                f"⏰ 等待开奖..."
             )
             
-            await application.bot.edit_message_text(
-                chat_id=game['chat_id'],
-                message_id=game['message_id'],
-                text=text,
-                parse_mode="Markdown"
-            )
-        except Exception as e:
-            logger.error(f"更新群聊消息失败: {e}")
+            # 更新群聊中的游戏信息
+            try:
+                from __main__ import application
+                text = (
+                    f"🎮 猜大小游戏（庄家模式）\n\n"
+                    f"庄家：{game['banker_name']}\n"
+                    f"下注金额：{game['amount']} 🪙\n\n"
+                    f"📊 当前赔率：\n"
+                    f"猜大：{big_odds:.1f}倍\n"
+                    f"猜小：{small_odds:.1f}倍\n\n"
+                    f"💰 当前下注：\n"
+                    f"猜大：{game['big_total']} 🪙\n"
+                    f"猜小：{game['small_total']} 🪙\n\n"
+                    f"👥 参与人数：{player_count} 人\n\n"
+                    f"⏰ 5分钟后自动开奖\n\n"
+                    f"💡 发送 `/guess 大 金额` 或 `/guess 小 金额` 参与下注"
+                )
+                
+                await application.bot.edit_message_text(
+                    chat_id=game['chat_id'],
+                    message_id=game['message_id'],
+                    text=text,
+                    parse_mode="Markdown"
+                )
+            except Exception as e:
+                logger.error(f"更新群聊消息失败: {e}")
+        else:
+            # 没有正在进行的庄家游戏 - 自己玩（像私聊一样，使用官方骰子）
+            if len(args) != 2:
+                await update.message.reply_text("请输入下注金额和猜测的大小，例如：`/guess 10 大`\n\n直接复制：`/guess 10 大`", parse_mode='Markdown')
+                return
+            
+            try:
+                amount = int(args[0])
+                if amount <= 0:
+                    await update.message.reply_text("下注金额必须大于0")
+                    return
+            except ValueError:
+                await update.message.reply_text("请输入有效的数字")
+                return
+            
+            guess = args[1]
+            if guess not in ['大', '小']:
+                await update.message.reply_text("猜测必须是「大」或「小」")
+                return
+            
+            # 检查用户是否已登录
+            from app.config import user_tokens
+            if user_id not in user_tokens:
+                await update.message.reply_text("❌ 请先使用 /start 命令登录！")
+                return
+            
+            # 获取用户emos_id
+            user_info = user_tokens[user_id]
+            emos_user_id = user_info.get('user_id', str(user_id))
+            
+            # 检查用户余额
+            from app.database import get_balance
+            balance = get_balance(emos_user_id)
+            if balance < amount:
+                await update.message.reply_text(f"游戏币不足！当前余额：{balance}")
+                return
+            
+            # 保存下注信息，等待骰子结果
+            context.user_data['guess_amount'] = amount
+            context.user_data['guess_choice'] = guess
+            context.user_data['guess_emos_user_id'] = emos_user_id
+            context.user_data['guess_user_id'] = user_id
+            
+            # 发送Telegram官方骰子
+            await update.message.reply_dice()
+            return
     else:
         # 私聊模式 - 与机器人猜大小
         if len(args) != 2:
