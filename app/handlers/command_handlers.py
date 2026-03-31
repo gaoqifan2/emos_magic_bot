@@ -300,8 +300,10 @@ async def guess_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await process_guess(update, context, context.args[0], context.args[1])
     elif len(context.args) == 1:
         # 只有金额，等待用户输入猜测的大小
-        context.user_data['awaiting_guess'] = True
-        context.user_data['guess_amount'] = context.args[0]
+        # 使用全局字典存储状态
+        from main import step_input_states
+        import time
+        step_input_states[user_id] = {'game': 'guess', 'data': {'amount': context.args[0]}, 'timestamp': time.time()}
         await update.message.reply_text(
             f"🎲 猜大小游戏\n\n"
             f"已收到下注金额：{context.args[0]} 🪙\n\n"
@@ -312,7 +314,10 @@ async def guess_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     else:
         # 没有参数，等待用户输入
-        context.user_data['awaiting_guess'] = True
+        # 使用全局字典存储状态
+        from main import step_input_states
+        import time
+        step_input_states[user_id] = {'game': 'guess', 'data': {}, 'timestamp': time.time()}
         await update.message.reply_text(
             "🎲 猜大小游戏\n\n"
             "请输入下注金额和猜测的大小，例如：`10 大`\n"
@@ -987,14 +992,18 @@ async def process_blackjack(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    # 存储游戏状态
-    context.user_data['blackjack'] = {
+    # 存储游戏状态到全局字典
+    from main import blackjack_games
+    import time
+    user_id_key = update.effective_user.id
+    blackjack_games[user_id_key] = {
         'player_cards': player_cards,
         'dealer_cards': dealer_cards,
         'amount': amount,
         'user_id': user_id_str,
         'local_user_id': local_user_id,
-        'username': username
+        'username': username,
+        'timestamp': time.time()
     }
     
     await update.message.reply_text(initial_message, reply_markup=reply_markup)
@@ -1009,12 +1018,14 @@ async def hit_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data.startswith('hit_'):
         amount = int(data.split('_')[1])
         
-        # 获取游戏状态
-        if 'blackjack' not in context.user_data:
+        # 获取游戏状态（使用全局字典）
+        from main import blackjack_games
+        user_id_key = update.effective_user.id
+        if user_id_key not in blackjack_games:
             await query.edit_message_text("游戏已结束，请重新开始")
             return
         
-        game = context.user_data['blackjack']
+        game = blackjack_games[user_id_key]
         player_cards = game['player_cards']
         dealer_cards = game['dealer_cards']
         user_id = game['user_id']
@@ -1074,7 +1085,7 @@ async def hit_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             from app.database import add_game_record
             add_game_record(user_id, 'blackjack', amount, 'lose', -amount, username)
             await query.edit_message_text(result_message)
-            del context.user_data['blackjack']
+            del blackjack_games[user_id_key]
         else:
             # 继续游戏
             message = (
@@ -1103,12 +1114,14 @@ async def stand_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data.startswith('stand_'):
         amount = int(data.split('_')[1])
         
-        # 获取游戏状态
-        if 'blackjack' not in context.user_data:
+        # 获取游戏状态（使用全局字典）
+        from main import blackjack_games
+        user_id_key = update.effective_user.id
+        if user_id_key not in blackjack_games:
             await query.edit_message_text("游戏已结束，请重新开始")
             return
         
-        game = context.user_data['blackjack']
+        game = blackjack_games[user_id_key]
         player_cards = game['player_cards']
         dealer_cards = game['dealer_cards']
         user_id = game['user_id']
@@ -1281,7 +1294,7 @@ async def stand_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             add_game_record(user_id, 'blackjack', amount, 'draw', 0, username)
         
         await query.edit_message_text(result_message)
-        del context.user_data['blackjack']
+        del blackjack_games[user_id_key]
 
 
 async def daily_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):

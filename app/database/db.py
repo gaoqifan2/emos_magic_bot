@@ -114,7 +114,11 @@ def init_connection_pool():
     """初始化连接池"""
     global connection_pool
     if connection_pool is None:
-        connection_pool = DatabaseConnectionPool(max_connections=10)
+        # 根据VPS资源调整连接池大小
+        # 建议: 2-4核CPU -> 20-50连接, 4-8核CPU -> 50-100连接
+        import os
+        max_conn = int(os.getenv('DB_MAX_CONNECTIONS', '50'))
+        connection_pool = DatabaseConnectionPool(max_connections=max_conn)
     return connection_pool
 
 # 延迟初始化

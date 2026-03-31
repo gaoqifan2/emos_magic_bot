@@ -212,8 +212,14 @@ file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelnam
 # 配置根日志
 logging.basicConfig(
     level=logging.INFO,
-    handlers=[console_handler, file_handler]
+    handlers=[console_handler, file_handler],
+    force=True
 )
+
+# 设置第三方库的日志级别为WARNING，减少不必要的日志输出
+logging.getLogger('telegram').setLevel(logging.WARNING)
+logging.getLogger('httpx').setLevel(logging.WARNING)
+logging.getLogger('httpcore').setLevel(logging.WARNING)
 
 # 获取logger实例
 logger = logging.getLogger(__name__)
@@ -242,6 +248,22 @@ async def post_init_wrapper(application):
     logger.info("启动猜拳游戏检查任务...")
     application.create_task(check_shoot_games_task(application))
     logger.info("猜拳游戏检查任务已启动")
+    
+    # 启动游戏状态清理任务
+    logger.info("启动游戏状态清理任务...")
+    application.create_task(cleanup_game_states_task())
+    logger.info("游戏状态清理任务已启动")
+
+
+# 游戏状态清理任务
+async def cleanup_game_states_task():
+    """定期清理过期的游戏状态"""
+    while True:
+        try:
+            cleanup_expired_game_states()
+        except Exception as e:
+            logger.error(f"清理游戏状态失败: {e}")
+        await asyncio.sleep(60)  # 每分钟检查一次
 
 
 # 猜大小游戏检查任务函数
@@ -792,6 +814,42 @@ async def guess_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # 全局字典存储等待中的猜大小游戏（用于群聊）
 # 格式: {chat_id: {user_id: {'amount': int, 'guess': str, 'emos_user_id': str, 'message_id': int}}}
 private_guess_games = {}
+
+# 全局字典存储分步输入状态（用于群聊和私聊）
+# 格式: {user_id: {'game': str, 'data': dict, 'timestamp': float}}
+# game: 'guess', 'slot', 'blackjack', 'shoot'
+step_input_states = {}
+
+# 全局字典存储21点游戏状态（用于群聊和私聊）
+# 格式: {user_id: {'player_cards': list, 'dealer_cards': list, 'amount': int, 'user_id': str, 'username': str, 'timestamp': float}}
+blackjack_games = {}
+
+# 游戏状态过期时间（秒）
+GAME_STATE_TIMEOUT = 600  # 10分钟
+
+def cleanup_expired_game_states():
+    """清理过期的游戏状态，防止内存泄漏"""
+    import time
+    current_time = time.time()
+    
+    # 清理分步输入状态
+    expired_users = []
+    for user_id, state in step_input_states.items():
+        if current_time - state.get('timestamp', 0) > GAME_STATE_TIMEOUT:
+            expired_users.append(user_id)
+    for user_id in expired_users:
+        del step_input_states[user_id]
+    
+    # 清理21点游戏状态
+    expired_users = []
+    for user_id, game in blackjack_games.items():
+        if current_time - game.get('timestamp', 0) > GAME_STATE_TIMEOUT:
+            expired_users.append(user_id)
+    for user_id in expired_users:
+        del blackjack_games[user_id]
+    
+    if expired_users:
+        logger.info(f"清理了 {len(expired_users)} 个过期游戏状态")
 
 async def handle_dice_result(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """处理骰子结果"""
@@ -1632,29 +1690,29 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     input_text = update.message.text.strip()
     
     # 首先检查是否有游戏状态需要处理
-    # 检查是否在等待猜大小游戏的输入
-    if 'awaiting_guess' in context.user_data and context.user_data['awaiting_guess']:
+    # 检查是否在等待猜大小游戏的输入（使用全局字典）
+    user_id = update.effective_user.id
+    if user_id in step_input_states and step_input_states[user_id].get('game') == 'guess':
         from app.handlers.command_handlers import process_guess
         parts = input_text.split()
+        state_data = step_input_states[user_id]['data']
+        
         if len(parts) == 2:
             # 输入了金额和猜测，例如：10 大
             amount, guess = parts
             await process_guess(update, context, amount, guess)
             # 清除状态
-            context.user_data['awaiting_guess'] = False
-            if 'guess_amount' in context.user_data:
-                del context.user_data['guess_amount']
+            del step_input_states[user_id]
         elif len(parts) == 1:
             # 只输入了一个值
-            if 'guess_amount' in context.user_data:
+            if 'amount' in state_data:
                 # 已经有金额，这个值应该是猜测
-                amount = context.user_data['guess_amount']
+                amount = state_data['amount']
                 guess = parts[0]
                 if guess in ['大', '小']:
                     await process_guess(update, context, amount, guess)
                     # 清除状态
-                    context.user_data['awaiting_guess'] = False
-                    del context.user_data['guess_amount']
+                    del step_input_states[user_id]
                 else:
                     await update.message.reply_text("猜测必须是「大」或「小」，请重新输入")
                     # 不清除状态，让用户重新输入
@@ -1667,7 +1725,9 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         # 不清除状态，让用户重新输入
                     else:
                         # 存储金额，等待用户输入猜测
-                        context.user_data['guess_amount'] = str(amount)
+                        import time
+                        step_input_states[user_id]['data']['amount'] = str(amount)
+                        step_input_states[user_id]['timestamp'] = time.time()
                         await update.message.reply_text(f"已收到下注金额：{amount} 🪙\n\n请输入猜测的大小：`大` 或 `小`", parse_mode='Markdown')
                         # 不清除状态，继续等待猜测
                 except ValueError:
@@ -3587,9 +3647,22 @@ def main() -> None:
     # 创建应用
     print("[DEBUG] 正在创建Application...")
     print(f"[DEBUG] BOT_TOKEN starts with: {Config.BOT_TOKEN[:20]}")
+    
+    # 配置并发参数以支持多玩家
+    # 使用更高的worker数量来处理并发请求
+    from telegram.ext import Defaults
+    import os
+    
+    # 从环境变量读取并发配置，默认使用较高值以充分利用VPS资源
+    concurrent_workers = int(os.getenv('BOT_CONCURRENT_WORKERS', '32'))
+    connection_pool_size = int(os.getenv('BOT_CONNECTION_POOL_SIZE', '16'))
+    
+    print(f"[DEBUG] 并发配置: workers={concurrent_workers}, pool_size={connection_pool_size}")
+    
     application = Application.builder() \
         .token(Config.BOT_TOKEN) \
         .post_init(post_init_wrapper) \
+        .concurrent_updates(True) \
         .build()
     print("[DEBUG] Application创建完成")
     
