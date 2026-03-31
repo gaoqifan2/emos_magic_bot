@@ -412,15 +412,44 @@ async def service_recharge(update: Update, context: ContextTypes.DEFAULT_TYPE):
     token = user_info.get('token') if isinstance(user_info, dict) else user_info
     
     if not token:
-        await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
+        # 生成授权链接，添加操作状态参数
+        unique_id = "e0E446ZE6s"
+        bot_username = BOT_USERNAME
+        # 添加操作状态参数，以便绑定后恢复
+        auth_link = f"https://t.me/emospg_bot?start=link_{unique_id}-{bot_username}-recharge"
+        
+        # 创建绑定提示按钮
+        keyboard = [
+            [InlineKeyboardButton("🔐 绑定账号", url=auth_link)],
+            [InlineKeyboardButton("🔙 返回", callback_data='back')]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        if hasattr(update, 'callback_query') and update.callback_query:
+            await update.callback_query.edit_message_text(
+                "❌ 请先登录！发送 /start 登录",
+                reply_markup=reply_markup
+            )
+        else:
+            await update.message.reply_text(
+                "❌ 请先登录！发送 /start 登录",
+                reply_markup=reply_markup
+            )
         return
     
-    loading = await update.callback_query.edit_message_text("🔄 正在查询充值限额...")
+    loading = None
+    if hasattr(update, 'callback_query') and update.callback_query:
+        loading = await update.callback_query.edit_message_text("🔄 正在查询充值限额...")
+    else:
+        loading = await update.message.reply_text("🔄 正在查询充值限额...")
+    
+    # 初始化变量，确保except块可以访问
+    local_user_id = context.user_data.get('local_user_id')
+    emos_user_id = context.user_data.get('emos_user_id')
     
     try:
         # 尝试从本地数据库获取用户信息
-        local_user_id = context.user_data.get('local_user_id')
-        if not local_user_id:
+        if not local_user_id or not emos_user_id:
             # 从用户信息中获取本地用户ID
             user_headers = {"Authorization": f"Bearer {token}"}
             async with httpx.AsyncClient() as client:
@@ -433,27 +462,37 @@ async def service_recharge(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if user_response.status_code == 200:
                 user_info = user_response.json()
                 emos_user_id = user_info.get('user_id')
+                username = user_info.get('username')
                 from utils.db_helper import ensure_user_exists
                 local_user_id = ensure_user_exists(
                     emos_user_id=emos_user_id,
                     token=token,
                     telegram_id=user_id,
-                    username=user_info.get('username'),
+                    username=username,
                     first_name=update.effective_user.first_name,
                     last_name=update.effective_user.last_name
                 )
                 context.user_data['local_user_id'] = local_user_id
+                context.user_data['emos_user_id'] = emos_user_id
+                context.user_data['username'] = username
+            else:
+                logger.error(f"获取用户信息失败: status={user_response.status_code}, body={user_response.text}")
+                if hasattr(update, 'callback_query') and update.callback_query:
+                    await loading.edit_text("❌ 获取用户信息失败，请重新登录后重试")
+                else:
+                    await loading.edit_text("❌ 获取用户信息失败，请重新登录后重试")
+                return
         
         # 获取用户累计充值记录
         from app.database import get_user_total_recharge
-        total_recharge = get_user_total_recharge(local_user_id)
+        total_recharge = get_user_total_recharge(emos_user_id)
         
         # 计算剩余可充值萝卜数
         max_recharge = 100  # 累计充值限额为100萝卜
         remaining_recharge = max_recharge - total_recharge
         
         # 记录日志，方便调试
-        print(f"Debug: local_user_id={local_user_id}, total_recharge={total_recharge}, remaining_recharge={remaining_recharge}")
+        print(f"Debug: emos_user_id={emos_user_id}, local_user_id={local_user_id}, total_recharge={total_recharge}, remaining_recharge={remaining_recharge}")
         
         # 提示用户输入充值金额
         message = f"💸 充值中心\n\n"
@@ -463,19 +502,39 @@ async def service_recharge(update: Update, context: ContextTypes.DEFAULT_TYPE):
         message += f"• 剩余可充：{remaining_recharge} 萝卜\n\n"
         message += "请输入充值金额（1-50000萝卜）："
         
-        await loading.edit_text(message)
+        # 创建按钮：返回上一步
+        keyboard = [
+            [InlineKeyboardButton("🔙 返回上一步", callback_data='back')]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        if hasattr(update, 'callback_query') and update.callback_query:
+            await loading.edit_text(message, reply_markup=reply_markup)
+        else:
+            await loading.edit_text(message, reply_markup=reply_markup)
         
         # 存储当前状态，等待用户输入
         context.user_data['current_operation'] = 'service_recharge_amount'
         context.user_data['token'] = token
         context.user_data['local_user_id'] = local_user_id
+        context.user_data['emos_user_id'] = emos_user_id
         context.user_data['total_recharge'] = total_recharge
         context.user_data['remaining_recharge'] = remaining_recharge
     except Exception as e:
         # 即使查询失败，也允许用户输入充值金额
-        await loading.edit_text("💸 请输入充值金额（1-50000萝卜）：")
+        logger.error(f"充值中心查询失败: {e}")
+        error_message = "💸 请输入充值金额（1-50000萝卜）："
+        if hasattr(update, 'callback_query') and update.callback_query:
+            await loading.edit_text(error_message)
+        else:
+            await loading.edit_text(error_message)
         context.user_data['current_operation'] = 'service_recharge_amount'
         context.user_data['token'] = token
+        # 如果之前有emos_user_id，保留它
+        if emos_user_id:
+            context.user_data['emos_user_id'] = emos_user_id
+        if local_user_id:
+            context.user_data['local_user_id'] = local_user_id
 
 async def service_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """提现专区"""
@@ -484,16 +543,44 @@ async def service_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
     token = user_info.get('token') if isinstance(user_info, dict) else user_info
     
     if not token:
-        await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
+        # 生成授权链接，添加操作状态参数
+        unique_id = "e0E446ZE6s"
+        bot_username = BOT_USERNAME
+        # 添加操作状态参数，以便绑定后恢复
+        auth_link = f"https://t.me/emospg_bot?start=link_{unique_id}-{bot_username}-withdraw"
+        
+        # 创建绑定提示按钮
+        keyboard = [
+            [InlineKeyboardButton("🔐 绑定账号", url=auth_link)],
+            [InlineKeyboardButton("🔙 返回", callback_data='back')]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        if hasattr(update, 'callback_query') and update.callback_query:
+            await update.callback_query.edit_message_text(
+                "❌ 请先登录！发送 /start 登录",
+                reply_markup=reply_markup
+            )
+        else:
+            await update.message.reply_text(
+                "❌ 请先登录！发送 /start 登录",
+                reply_markup=reply_markup
+            )
         return
     
-    loading = await update.callback_query.edit_message_text("🔄 正在查询游戏余额...")
+    loading = None
+    if hasattr(update, 'callback_query') and update.callback_query:
+        loading = await update.callback_query.edit_message_text("🔄 正在查询游戏余额...")
+    else:
+        loading = await update.message.reply_text("🔄 正在查询游戏余额...")
     
     try:
         # 尝试从本地数据库获取游戏余额
         from utils.db_helper import get_user_balance
         local_user_id = context.user_data.get('local_user_id')
-        if not local_user_id:
+        emos_user_id = context.user_data.get('emos_user_id')
+        
+        if not local_user_id or not emos_user_id:
             # 从用户信息中获取本地用户ID
             user_headers = {"Authorization": f"Bearer {token}"}
             async with httpx.AsyncClient() as client:
@@ -506,28 +593,35 @@ async def service_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if user_response.status_code == 200:
                 user_info = user_response.json()
                 emos_user_id = user_info.get('user_id')
+                username = user_info.get('username')
                 from utils.db_helper import ensure_user_exists
                 local_user_id = ensure_user_exists(
                     emos_user_id=emos_user_id,
                     token=token,
                     telegram_id=user_id,
-                    username=user_info.get('username'),
+                    username=username,
                     first_name=update.effective_user.first_name,
                     last_name=update.effective_user.last_name
                 )
                 context.user_data['local_user_id'] = local_user_id
+                context.user_data['emos_user_id'] = emos_user_id
+                context.user_data['username'] = username
         
         # 获取游戏余额
         game_balance = get_user_balance(local_user_id)
         
         if game_balance is not None:
-            # 获取用户累计充值和提现记录
+            # 获取用户累计充值和提现记录（使用emos_user_id）
             from app.database import get_user_total_recharge, get_user_total_withdraw
-            total_recharge = get_user_total_recharge(local_user_id)
-            total_withdraw = get_user_total_withdraw(local_user_id)
+            total_recharge = get_user_total_recharge(emos_user_id)
+            total_withdraw = get_user_total_withdraw(emos_user_id)
+            
+            # 确保值为整数（处理Decimal类型）
+            total_recharge = int(total_recharge) if total_recharge else 0
+            total_withdraw = int(total_withdraw) if total_withdraw else 0
             
             # 计算最大可提现萝卜数（不超过累计充值的3倍）
-            max_withdraw_from_recharge = int(total_recharge * 3)
+            max_withdraw_from_recharge = total_recharge * 3
             remaining_withdraw = max_withdraw_from_recharge - total_withdraw
             
             # 计算基于游戏余额的最大可提现萝卜数（11游戏币=1萝卜，包含1%手续费）
@@ -535,7 +629,7 @@ async def service_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             # 检查累计充值3倍的提现限额
             from utils.db_helper import check_withdraw_limits
-            limit_check = check_withdraw_limits(local_user_id, 0)  # 传入0表示检查当前状态
+            limit_check = check_withdraw_limits(emos_user_id, 0)  # 传入0表示检查当前状态
             
             if limit_check['success']:
                 # 取游戏余额和累计充值3倍限制中的较小值
@@ -548,16 +642,16 @@ async def service_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             if max_carrot > 0:
                 # 计算游戏币
-                base_game_coin = max_carrot * 10  # 基础游戏币
-                fee_game_coin = max_carrot * 1     # 手续费1游戏币/萝卜
+                base_game_coin = int(max_carrot) * 10  # 基础游戏币
+                fee_game_coin = int(max_carrot) * 1     # 手续费1游戏币/萝卜
                 
-                # 计算税费（假设税率为0%，如需添加税率可在此修改）
-                tax_rate = 0
-                tax_carrot = int(max_carrot * tax_rate)  # 税费萝卜数量
+                # 计算税费（1%税率）
+                tax_rate = 0.01
+                tax_carrot = int(int(max_carrot) * tax_rate)  # 税费萝卜数量
                 tax_game_coin = tax_carrot * 10  # 税费游戏币数量
                 
                 total_game_coin = base_game_coin + fee_game_coin + tax_game_coin  # 总扣除游戏币
-                after_tax_carrot = max_carrot - tax_carrot  # 税后萝卜数量
+                after_tax_carrot = int(max_carrot) - tax_carrot  # 税后萝卜数量
             else:
                 base_game_coin = 0
                 fee_game_coin = 0
@@ -567,22 +661,23 @@ async def service_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             # 计算建议提现萝卜数
             suggested_carrots = [10, 50, 100, 500]
-            valid_suggestions = [carrot for carrot in suggested_carrots if carrot <= max_carrot]
+            valid_suggestions = [carrot for carrot in suggested_carrots if carrot <= int(max_carrot)]
             
             # 提示用户输入提现萝卜数
-            message = f"💎 您的游戏余额：{game_balance} 🪙\n"
-            message += f"💰 可兑换萝卜：{after_tax_carrot} 萝卜（已扣税）\n"
-            message += f"💸 手续费：{fee_game_coin} 🪙\n"
-            message += f"💼 税费：{tax_game_coin} 🪙（{tax_rate*100}%）\n"
-            message += f"🪙 总计扣除：{total_game_coin} 🪙\n"
-            message += f"🎁 实际到账：{after_tax_carrot} 萝卜\n\n"
+            message = f"💎 您的游戏余额：{int(game_balance)} 🪙\n"
+            message += f"💰 可兑换萝卜：{int(max_carrot)} 萝卜\n"
+            message += f"💼 税费：{int(tax_carrot)} 萝卜（1%）\n"
+            message += f"🎁 税后可兑换：{int(after_tax_carrot)} 萝卜\n"
+            message += f"💸 手续费：{int(fee_game_coin)} 🪙\n"
+            message += f"🪙 总计扣除：{int(total_game_coin)} 🪙\n\n"
             
             # 显示提现限额信息
             message += "📊 提现限额：\n"
-            message += f"• 累计充值：{total_recharge} 萝卜\n"
-            message += f"• 累计提现：{total_withdraw} 萝卜\n"
-            message += f"• 可提现上限：{max_withdraw_from_recharge} 萝卜（累计充值的3倍）\n"
-            message += f"• 剩余可提现：{remaining_withdraw} 萝卜\n\n"
+            message += f"• 累计充值：{int(total_recharge)} 萝卜\n"
+            message += f"• 累计提现：{int(total_withdraw)} 萝卜\n"
+            message += f"• 可提现上限：{int(max_withdraw_from_recharge)} 萝卜（累计充值的3倍）\n"
+            message += f"• 剩余可提现：{int(remaining_withdraw)} 萝卜\n"
+            message += f"• 实际可提现：{int(min(after_tax_carrot, remaining_withdraw))} 萝卜\n\n"
             
             message += "请输入您要提现的萝卜数量："
             
@@ -590,13 +685,39 @@ async def service_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 message += "\n💡 建议金额："
                 message += ", ".join(map(str, valid_suggestions))
             
-            await loading.edit_text(message)
+            # 创建按钮：取消提现
+            keyboard = [
+                [InlineKeyboardButton("❌ 取消提现", callback_data='back')]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            if hasattr(update, 'callback_query') and update.callback_query:
+                await loading.edit_text(message, reply_markup=reply_markup)
+            else:
+                await loading.edit_text(message, reply_markup=reply_markup)
             
             # 存储当前状态，等待用户输入
             context.user_data['current_operation'] = 'service_withdraw_amount'
             context.user_data['token'] = token
             context.user_data['game_balance'] = game_balance
             context.user_data['local_user_id'] = local_user_id
+            context.user_data['total_recharge'] = total_recharge
+            context.user_data['total_withdraw'] = total_withdraw
+            context.user_data['remaining_withdraw'] = remaining_withdraw
+            # 确保emos_user_id也被保存
+            if 'emos_user_id' not in context.user_data:
+                from app.database import get_db_connection
+                conn = get_db_connection()
+                if conn:
+                    try:
+                        with conn.cursor() as cursor:
+                            cursor.execute("SELECT user_id FROM users WHERE id = %s", (local_user_id,))
+                            result = cursor.fetchone()
+                            if result:
+                                emos_user_id = result['user_id'] if isinstance(result, dict) else result[0]
+                                context.user_data['emos_user_id'] = emos_user_id
+                    finally:
+                        conn.close()
         else:
             # 如果本地数据库查询失败，使用默认值
             message = "💎 请输入提现金额（1-5000萝卜）：\n\n"
@@ -604,24 +725,47 @@ async def service_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
             message += "• 11游戏币 = 1萝卜（包含手续费）\n"
             message += "• 提现限额：累计充值的3倍\n"
             message += "• 实际到账为税后金额\n"
-            await loading.edit_text(message)
+            
+            # 创建按钮：取消提现
+            keyboard = [
+                [InlineKeyboardButton("❌ 取消提现", callback_data='back')]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            if hasattr(update, 'callback_query') and update.callback_query:
+                await loading.edit_text(message, reply_markup=reply_markup)
+            else:
+                await loading.edit_text(message, reply_markup=reply_markup)
             context.user_data['current_operation'] = 'service_withdraw_amount'
             context.user_data['token'] = token
             context.user_data['game_balance'] = 50000  # 默认最大值
             context.user_data['local_user_id'] = local_user_id
     except Exception as e:
-        # 直接记录固定的错误信息，避免尝试编码包含emoji的异常信息
-        logger.error("查询游戏余额失败")
+        # 记录详细的错误信息
+        logger.error(f"查询游戏余额失败: {type(e).__name__}: {e}")
+        import traceback
+        logger.error(f"错误堆栈:\n{traceback.format_exc()}")
         # 即使查询失败，也允许用户输入提现金额
         message = "💎 请输入提现金额（1-5000萝卜）：\n\n"
         message += "📊 提现规则：\n"
         message += "• 11游戏币 = 1萝卜（包含手续费）\n"
         message += "• 提现限额：累计充值的3倍\n"
         message += "• 实际到账为税后金额\n"
-        await loading.edit_text(message)
+        
+        # 创建按钮：取消提现
+        keyboard = [
+            [InlineKeyboardButton("❌ 取消提现", callback_data='back')]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        if hasattr(update, 'callback_query') and update.callback_query:
+            await loading.edit_text(message, reply_markup=reply_markup)
+        else:
+            await loading.edit_text(message, reply_markup=reply_markup)
         context.user_data['current_operation'] = 'service_withdraw_amount'
         context.user_data['token'] = token
         context.user_data['game_balance'] = 50000  # 默认最大值
+        context.user_data['local_user_id'] = local_user_id
 
 async def service_game_center(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """游戏中心"""

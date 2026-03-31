@@ -717,6 +717,24 @@ async def get_user_info(user_id: str = Depends(verify_token)):
         "created_at": "2026-01-01 00:00:00"
     }
 
+# 更新笔名API
+@app.put("/api/user/pseudonym", tags=["用户 - 信息"])
+async def update_pseudonym(name: str, user_id: str = Depends(verify_token)):
+    """更新用户笔名"""
+    # 模拟更新笔名
+    db.users[user_id] = {
+        "user_id": user_id,
+        "username": "测试用户",
+        "pseudonym": name,
+        "carrot": 1000,
+        "created_at": "2026-01-01 00:00:00"
+    }
+    return {
+        "success": True,
+        "message": "笔名更新成功",
+        "pseudonym": name
+    }
+
 # 充值记录API
 @app.get("/api/game/recharge/records", tags=["游戏 - 充值记录"])
 async def get_recharge_records(user_id: str = Depends(verify_token)):

@@ -156,7 +156,7 @@ def create_recharge_order(order_no: str, emos_user_id: str, username: str, teleg
                 """INSERT INTO recharge_orders 
                    (order_no, user_id, username, telegram_user_id, carrot_amount, game_coin_amount, 
                     status, platform_order_no, pay_url, expire_time, created_at, updated_at)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())""",
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())""",
                 (order_no, emos_user_id, username, telegram_user_id, carrot_amount, 
                  carrot_amount * 10, 'pending', platform_order_no, pay_url, expire_time)
             )
@@ -361,7 +361,7 @@ def get_user_balance(user_id: int) -> Optional[int]:
         conn.close()
 
 def create_withdraw_order(order_no: str, emos_user_id: str, telegram_user_id: int, 
-                        game_coin_amount: int, carrot_amount: int) -> bool:
+                        game_coin_amount: int, carrot_amount: int, username: str = None) -> bool:
     """创建提现订单
     
     Args:
@@ -370,6 +370,7 @@ def create_withdraw_order(order_no: str, emos_user_id: str, telegram_user_id: in
         telegram_user_id: Telegram用户ID
         game_coin_amount: 提现游戏币数量
         carrot_amount: 获得萝卜数量
+        username: EMOS用户名
     """
     conn = get_db_connection()
     if not conn:
@@ -377,12 +378,21 @@ def create_withdraw_order(order_no: str, emos_user_id: str, telegram_user_id: in
     
     try:
         with conn.cursor() as cursor:
+            # 如果没有传入username，从users表获取
+            if username is None:
+                cursor.execute("SELECT username FROM users WHERE user_id = %s", (emos_user_id,))
+                user_result = cursor.fetchone()
+                if user_result:
+                    username = user_result.get('username', '')
+                else:
+                    username = ''
+            
             cursor.execute(
                 """INSERT INTO withdraw_orders 
-                   (order_no, user_id, telegram_user_id, game_coin_amount, 
+                   (order_no, user_id, username, telegram_user_id, game_coin_amount, 
                     carrot_amount, status)
-                   VALUES (%s, %s, %s, %s, %s, %s)""",
-                (order_no, emos_user_id, telegram_user_id, game_coin_amount, 
+                   VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+                (order_no, emos_user_id, username, telegram_user_id, game_coin_amount, 
                  carrot_amount, 'pending')
             )
             conn.commit()

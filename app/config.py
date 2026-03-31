@@ -13,12 +13,19 @@ API_USER_ENDPOINT = Config.API_USER_ENDPOINT
 # 从数据库加载 token
 def load_tokens_from_db():
     """从数据库加载所有用户的 token 到内存"""
+    print("[load_tokens] 开始加载用户token...")
+    import sys
+    sys.stdout.flush()
     try:
+        print("[load_tokens] 正在导入get_db_connection...")
+        sys.stdout.flush()
         from app.database import get_db_connection
         
+        print("[load_tokens] 正在获取数据库连接...")
+        sys.stdout.flush()
         connection = get_db_connection()
         if not connection:
-            print("数据库连接失败，跳过加载 token")
+            print("[load_tokens] 数据库连接失败，跳过加载 token")
             return
         
         try:
@@ -34,9 +41,6 @@ def load_tokens_from_db():
                 count = 0
                 for result in results:
                     try:
-                        # 打印每条记录的内容
-                        print(f"处理记录: {result}")
-                        
                         # 检查必要字段
                         if 'telegram_id' not in result or 'token' not in result:
                             print(f"记录缺少必要字段: {result}")
@@ -64,17 +68,25 @@ def load_tokens_from_db():
                         import traceback
                         print(f"错误堆栈: {traceback.format_exc()}")
                 
-                print(f"从数据库加载了 {count} 个用户的 token")
+                print(f"[load_tokens] 从数据库加载了 {count} 个用户的 token")
+                sys.stdout.flush()
         except Exception as e:
-            print(f"加载 token 时出错: {e}")
+            print(f"[load_tokens] 加载 token 时出错: {e}")
             import traceback
-            print(f"错误堆栈: {traceback.format_exc()}")
+            traceback.print_exc()
         finally:
+            print("[load_tokens] 正在关闭数据库连接...")
+            sys.stdout.flush()
             connection.close()
+            print("[load_tokens] 数据库连接已关闭")
+            sys.stdout.flush()
     except Exception as e:
-        print(f"导入数据库模块时出错: {e}")
+        print(f"[load_tokens] 导入数据库模块时出错: {e}")
         import traceback
-        print(f"错误堆栈: {traceback.format_exc()}")
+        traceback.print_exc()
+    
+    print("[load_tokens] 加载用户token完成!")
+    sys.stdout.flush()
 
 # 保存 token 到数据库
 def save_token_to_db(telegram_id, token, user_id=None, username=None, first_name='', last_name=''):

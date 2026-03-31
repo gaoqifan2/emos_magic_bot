@@ -77,6 +77,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     text = update.message.text
     logger.info(f"完整的start命令文本: {text}")
     
+
+    
     # 处理OAuth回调
     if text.startswith('/start oauth_callback'):
         # 提取回调参数
@@ -172,7 +174,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     await show_menu(update, "✅ 授权成功！\n\n欢迎使用综合机器人，请选择功能：")
             except Exception as e:
                 logger.error(f"获取用户信息失败: {e}")
-                await show_menu(update, "✅ 授权成功！\n\n欢迎使用综合机器人，请选择功能：")
+                # API调用失败，删除临时存储的user_tokens条目
+                if user_id in user_tokens:
+                    del user_tokens[user_id]
+                await update.message.reply_text("❌ 登录失败，请重新尝试登录。")
+                return
         else:
             logger.error("OAuth回调中没有token参数")
             await update.message.reply_text("❌ 授权失败，请重新尝试登录。")
@@ -430,17 +436,26 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     except Exception as db_error:
                         logger.error(f"更新本地订单失败: {db_error}")
                     
-                    message = f"✅ 充值成功！\n\n"
-                    message += f"订单号：`{order_no}`\n"
-                    message += f"支付萝卜：{price} 🥕\n"
-                    message += f"兑换游戏币：{game_coin} 🎮"
+                    # 计算剩余可充值额度
+                    from app.database import get_user_total_recharge
+                    total_recharge = get_user_total_recharge(local_user_id)
+                    max_recharge = 100  # 充值上限100萝卜
+                    remaining_recharge = max_recharge - total_recharge
+                    
+                    message = f"✅ {update.effective_user.first_name}，充值成功！\n\n"
+                    message += f"📋 订单号：`{order_no}`\n"
+                    message += f"🥕 充值萝卜：{price}\n"
+                    message += f"🪙 获得游戏币：{game_coin}\n\n"
+                    message += f"📊 剩余可充值额度：{remaining_recharge} 🥕\n"
+                    message += f"（累计充值{total_recharge} 🥕，上限{max_recharge} 🥕）\n\n"
+                    message += "🎮 您的游戏币已到账，可以开始游戏了！"
                     
                     logger.info(f"用户 {actual_user_id} 充值成功，订单号：{order_no}")
                     
                     # 创建按钮：前往游戏厅、继续充值
                     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
                     keyboard = [
-                        [InlineKeyboardButton("🎮 前往游戏厅", callback_data='game')],
+                        [InlineKeyboardButton("🎮 前往游戏厅", callback_data='games')],
                         [InlineKeyboardButton("💰 继续充值", callback_data='recharge')]
                     ]
                     reply_markup = InlineKeyboardMarkup(keyboard)

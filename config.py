@@ -57,6 +57,10 @@ BOT_COMMANDS = [
     ("game", "游戏厅"),
     ("balance", "查看余额"),
     ("guess", "猜大小游戏"),
+    ("createguess", "创建猜大小游戏"),
+    ("guess_bet", "群聊下注"),
+    ("gameshoot", "猜拳游戏"),
+
     ("slot", "老虎机游戏"),
     ("blackjack", "21点游戏"),
     ("hit", "要牌（21点）"),
@@ -69,9 +73,9 @@ BOT_COMMANDS = [
 # 空列表表示群聊中不允许任何命令
 GROUP_ALLOWED_COMMANDS = [
     "balance",     # 查看余额
-    "guess",       # 猜大小游戏
-    "slot",        # 老虎机游戏
-    "blackjack",   # 21点游戏
+    "createguess",   # 创建猜大小游戏
+    "guess_bet",         # 群聊下注
+    "gameshoot",   # 猜拳游戏
 ]
 
 # 全局变量 - 存储用户token
