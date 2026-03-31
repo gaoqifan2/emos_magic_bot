@@ -723,50 +723,78 @@ async def guess_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"游戏币不足！当前余额：{balance}")
             return
         
-        # 生成一个骰子的点数
-        import random
-        dice_value = random.randint(1, 6)
+        # 保存下注信息，等待骰子结果
+        context.user_data['guess_amount'] = amount
+        context.user_data['guess_choice'] = guess
+        context.user_data['guess_emos_user_id'] = emos_user_id
+        context.user_data['guess_user_id'] = user_id
         
-        # 判断大小（一个骰子规则：4-6为大，1-3为小）
-        if dice_value in [4, 5, 6]:
-            actual_result = "大"
-        else:
-            actual_result = "小"
-        
-        # 处理结果
-        from app.database import update_balance
-        if guess == actual_result:
-            # 赢了，获得相同金额
-            win_amount = amount
-            service_fee = int(win_amount * 0.1)
-            net_win = win_amount - service_fee
-            update_balance(emos_user_id, net_win)
-            new_balance = get_balance(emos_user_id)
-            result_text = (
-                f"🎮 猜大小游戏结果\n\n"
-                f"您选择：{guess}\n"
-                f"🎲 骰子点数：{dice_value} ({actual_result})\n\n"
-                f"🎉 您赢了！\n"
-                f"获得：{win_amount} 🪙\n"
-                f"服务费：{service_fee} 🪙\n"
-                f"实际到账：{net_win} 🪙\n"
-                f"当前余额：{new_balance} 🪙"
-            )
-        else:
-            # 输了，失去下注金额
-            update_balance(emos_user_id, -amount)
-            new_balance = get_balance(emos_user_id)
-            result_text = (
-                f"🎮 猜大小游戏结果\n\n"
-                f"您选择：{guess}\n"
-                f"🎲 骰子点数：{dice_value} ({actual_result})\n\n"
-                f"😢 您输了！\n"
-                f"扣除：{amount} 🪙\n"
-                f"当前余额：{new_balance} 🪙"
-            )
-        
-        # 发送结果
-        await update.message.reply_text(result_text)
+        # 发送Telegram官方骰子
+        await update.message.reply_dice()
+
+async def handle_dice_result(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """处理骰子结果"""
+    user_id = update.effective_user.id
+    
+    # 检查是否有等待中的猜大小游戏
+    if 'guess_amount' not in context.user_data:
+        return
+    
+    # 获取骰子点数
+    dice_value = update.effective_message.dice.value
+    
+    # 获取保存的下注信息
+    amount = context.user_data['guess_amount']
+    guess = context.user_data['guess_choice']
+    emos_user_id = context.user_data['guess_emos_user_id']
+    
+    # 判断大小（一个骰子规则：4-6为大，1-3为小）
+    if dice_value in [4, 5, 6]:
+        actual_result = "大"
+    else:
+        actual_result = "小"
+    
+    # 处理结果
+    from app.database import update_balance, get_balance
+    if guess == actual_result:
+        # 赢了，获得相同金额
+        win_amount = amount
+        service_fee = int(win_amount * 0.1)
+        net_win = win_amount - service_fee
+        update_balance(emos_user_id, net_win)
+        new_balance = get_balance(emos_user_id)
+        result_text = (
+            f"🎮 猜大小游戏结果\n\n"
+            f"您选择：{guess}\n"
+            f"🎲 骰子点数：{dice_value} ({actual_result})\n\n"
+            f"🎉 您赢了！\n"
+            f"获得：{win_amount} 🪙\n"
+            f"服务费：{service_fee} 🪙\n"
+            f"实际到账：{net_win} 🪙\n"
+            f"当前余额：{new_balance} 🪙"
+        )
+    else:
+        # 输了，失去下注金额
+        update_balance(emos_user_id, -amount)
+        new_balance = get_balance(emos_user_id)
+        result_text = (
+            f"🎮 猜大小游戏结果\n\n"
+            f"您选择：{guess}\n"
+            f"🎲 骰子点数：{dice_value} ({actual_result})\n\n"
+            f"😢 您输了！\n"
+            f"扣除：{amount} 🪙\n"
+            f"当前余额：{new_balance} 🪙"
+        )
+    
+    # 发送结果
+    await update.effective_message.reply_text(result_text)
+    
+    # 清除保存的下注信息
+    keys_to_clear = ['guess_amount', 'guess_choice', 'guess_emos_user_id', 
+                     'guess_user_id']
+    for key in keys_to_clear:
+        if key in context.user_data:
+            del context.user_data[key]
 
 # 群聊下注命令处理器
 async def guess_bet_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -3601,7 +3629,14 @@ def main() -> None:
     application.add_handler(CommandHandler("guess", group_command_filter(guess_handler)))
     application.add_handler(CommandHandler("createguess", group_command_filter(createguess_handler)))
     application.add_handler(CallbackQueryHandler(guess_callback_handler, pattern="^guess_"))
-
+    
+    # 添加21点游戏按钮回调处理器
+    application.add_handler(CallbackQueryHandler(hit_handler, pattern="^hit_"))
+    application.add_handler(CallbackQueryHandler(stand_handler, pattern="^stand_"))
+    
+    # 添加骰子结果处理器
+    application.add_handler(MessageHandler(filters.Dice, handle_dice_result))
+    
     # 添加用户输入处理器（包含游戏消息处理）
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_user_input))
     

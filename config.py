@@ -48,31 +48,25 @@ BOT_COMMANDS = [
     ("playing", "正在播放"),
     ("rank_carrot", "萝卜榜"),
     ("redpocket", "创建红包"),
-    ("lottery", "创建抽奖"),
-    ("check_redpacket", "查询红包"),
-    ("lottery_cancel", "取消抽奖"),
     ("rank_upload", "上传榜"),
-    ("cancel", "取消操作"),
-    ("help", "帮助"),
-    ("game", "游戏厅"),
-    ("balance", "查看余额"),
-    ("guess", "猜大小游戏"),
-    ("createguess", "创建猜大小游戏"),
-    ("guess_bet", "群聊下注"),
     ("gameshoot", "猜拳游戏"),
-
     ("slot", "老虎机游戏"),
     ("blackjack", "21点游戏"),
-    ("hit", "要牌（21点）"),
-    ("stand", "停牌（21点）"),
-    ("daily", "每日签到"),
-    ("withdraw", "提现")
+    ("balance", "查看余额"),
+    ("guess", "猜大小游戏"),
+    ("createguess", "创建群聊猜大小游戏"),
+    ("guess_bet", "群聊猜大小下注"),
+    ("withdraw", "提现"),
+    ("help", "帮助"),
 ]
 
 # 群聊中允许的命令列表
 # 空列表表示群聊中不允许任何命令
 GROUP_ALLOWED_COMMANDS = [
     "balance",     # 查看余额
+    "guess", 
+    "slot",  
+    "blackjack",      # 21点游戏    
     "createguess",   # 创建猜大小游戏
     "guess_bet",         # 群聊下注
     "gameshoot",   # 猜拳游戏
