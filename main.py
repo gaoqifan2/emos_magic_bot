@@ -3871,7 +3871,7 @@ def main() -> None:
     application.add_handler(CallbackQueryHandler(stand_handler, pattern="^stand_"))
     
     # 添加骰子结果处理器
-    application.add_handler(MessageHandler(filters.Dice, handle_dice_result))
+    application.add_handler(MessageHandler(filters.Dice.ALL, handle_dice_result))
     
     # 添加用户输入处理器（包含游戏消息处理）
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_user_input))
