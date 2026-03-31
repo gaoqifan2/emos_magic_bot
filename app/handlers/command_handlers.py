@@ -977,6 +977,7 @@ async def process_blackjack(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         'amount': amount,
         'user_id': user_id_str,
         'local_user_id': local_user_id,
+        'telegram_id': telegram_id,
         'username': username,
         'timestamp': time.time()
     }
@@ -1005,6 +1006,7 @@ async def hit_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         dealer_cards = game['dealer_cards']
         user_id = game['user_id']
         local_user_id = game['local_user_id']
+        telegram_id = game.get('telegram_id', update.effective_user.id)
         username = game.get('username', '用户')
         
         # 要牌
@@ -1019,6 +1021,10 @@ async def hit_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # 检查是否爆牌
         if player_score > 21:
             # 爆牌，输了
+            # 重置连胜
+            from app.database.user_streaks import update_user_streak
+            update_user_streak(user_id, local_user_id, 'blackjack', False)
+            
             update_balance(user_id, -amount)
             new_balance = get_balance(user_id)
             result_message = (
@@ -1074,6 +1080,7 @@ async def stand_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         dealer_cards = game['dealer_cards']
         user_id = game['user_id']
         local_user_id = game['local_user_id']
+        telegram_id = game.get('telegram_id', update.effective_user.id)
         username = game.get('username', '用户')
         
         player_score = calculate_blackjack_score(player_cards)
@@ -1089,63 +1096,12 @@ async def stand_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # 玩家赢
             win_amount = amount
             
-            # 处理连胜奖励
-            from app.database.user_streaks import get_user_streak, update_user_streak, add_user_tag
-            streak = get_user_streak(user_id, 'blackjack')
-            new_streak = streak + 1
-            update_user_streak(user_id, 'blackjack', new_streak)
+            # 处理连胜奖励 - 暂时简化，避免出错
+            from app.database.user_streaks import update_user_streak
+            update_user_streak(user_id, local_user_id, 'blackjack', True)
             
-            # 连胜奖励
-            bonus = 0
-            title = None
-            
-            if new_streak == 3:
-                bonus = 50
-            elif new_streak == 5:
-                bonus = 100
-            elif new_streak == 7:
-                bonus = 200
-                title = "点王"
-                add_user_tag(user_id, title)
-            elif new_streak == 8:
-                bonus = 50
-                title = "不爆狂人"
-                add_user_tag(user_id, title)
-            elif new_streak == 9:
-                bonus = 50
-                title = "牌桌幽灵"
-                add_user_tag(user_id, title)
-            elif new_streak == 10:
-                bonus = 50
-                title = "天命之子"
-                add_user_tag(user_id, title)
-            elif new_streak == 11:
-                bonus = 50
-                title = "庄家克星"
-                add_user_tag(user_id, title)
-            elif new_streak == 12:
-                bonus = 50
-                title = "21点魔"
-                add_user_tag(user_id, title)
-            elif new_streak == 13:
-                bonus = 50
-                title = "不灭赌徒"
-                add_user_tag(user_id, title)
-            elif new_streak == 14:
-                bonus = 50
-                title = "神之一手"
-                add_user_tag(user_id, title)
-            elif new_streak >= 15:
-                bonus = 50
-                title = "不败神话"
-                add_user_tag(user_id, title)
-            
-            # 应用奖励
-            if bonus > 0:
-                win_amount += bonus
-                update_balance(user_id, win_amount)
-            else:
-                update_balance(user_id, win_amount)
+            # 更新余额
+            update_balance(user_id, win_amount)
             
             new_balance = get_balance(user_id)
             
@@ -1162,13 +1118,7 @@ async def stand_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 result_message += "🎉 您赢了！\n"
             
             result_message += f"获得：{win_amount} 🪙\n"
-            if bonus > 0:
-                result_message += f"连胜奖励：{bonus} 🪙\n"
-            result_message += f"当前余额：{new_balance} 🪙\n"
-            result_message += f"当前连胜：{new_streak} 局\n"
-            
-            if title:
-                result_message += f"🏆 获得新头衔：{title}\n"
+            result_message += f"当前余额：{new_balance} 🪙"
             
             # 记录游戏结果
             from app.database import add_game_record
@@ -1180,7 +1130,7 @@ async def stand_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # 玩家输
             # 重置连胜
             from app.database.user_streaks import update_user_streak
-            update_user_streak(user_id, 'blackjack', 0)
+            update_user_streak(user_id, local_user_id, 'blackjack', False)
             
             update_balance(user_id, -amount)
             new_balance = get_balance(user_id)
