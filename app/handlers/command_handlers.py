@@ -8,6 +8,40 @@ from app.utils.helpers import check_balance, process_daily_checkin
 from app.config import BOT_USERNAME, user_tokens, save_token_to_db, get_user_info, Config, API_BASE_URL, DEFAULT_GROUP_CHAT_ID
 import logging
 import httpx
+import random
+
+# 21点游戏牌相关定义
+SUITS = ['♠️', '♥️', '♣️', '♦️']
+VALUES = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K']
+
+def get_blackjack_card():
+    """获取一张21点游戏的牌"""
+    suit = random.choice(SUITS)
+    value_idx = random.randint(0, 12)
+    value = VALUES[value_idx]
+    if value == 'A':
+        point = 1
+    elif value in ['J', 'Q', 'K']:
+        point = 10
+    else:
+        point = int(value)
+    return {'value': value, 'point': point, 'suit': suit}
+
+def format_blackjack_card(card):
+    """格式化显示一张21点游戏的牌"""
+    return f"{card['suit']}{card['value']}"
+
+def format_blackjack_cards(cards):
+    """格式化显示多张21点游戏的牌"""
+    return ' '.join([format_blackjack_card(card) for card in cards])
+
+def calculate_blackjack_score(cards):
+    """计算21点游戏的牌点数"""
+    score = sum([card['point'] for card in cards])
+    has_ace = any([card['value'] == 'A' for card in cards])
+    if has_ace and score + 10 <= 21:
+        score += 10
+    return score
 
 # 配置日志
 logging.basicConfig(
@@ -835,13 +869,12 @@ async def blackjack_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # 直接处理参数
         await process_blackjack(update, context, context.args[0])
     else:
-        # 进入二级会话，等待用户输入
-        context.user_data['awaiting_blackjack'] = True
+        # 提示用户使用完整指令
         await update.message.reply_text(
             "🃏 21点游戏\n\n"
-            "请输入下注金额（纯数字），例如：`10`\n"
+            "请输入完整命令，例如：`/blackjack 10`\n"
             "输入后游戏将自动开始\n\n"
-            "直接复制：`10`",
+            "直接复制：`/blackjack 10`",
             parse_mode='Markdown'
         )
 
@@ -930,57 +963,19 @@ async def process_blackjack(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         await update.message.reply_text(f"游戏币不足！当前余额：{balance}")
         return
     
-    # 21点游戏逻辑
-    import random
-    
-    # 定义花色和牌面值
-    SUITS = ['♠️', '♥️', '♣️', '♦️']
-    VALUES = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K']
-    
-    def get_card():
-        """获取一张牌，返回(牌面值, 点数, 花色)"""
-        suit = random.choice(SUITS)
-        value_idx = random.randint(0, 12)
-        value = VALUES[value_idx]
-        # 计算点数
-        if value == 'A':
-            point = 1  # A默认为1，在calculate_score中再处理是否为11
-        elif value in ['J', 'Q', 'K']:
-            point = 10
-        else:
-            point = int(value)
-        return {'value': value, 'point': point, 'suit': suit}
-    
-    def format_card(card):
-        """格式化显示一张牌"""
-        return f"{card['suit']}{card['value']}"
-    
-    def format_cards(cards):
-        """格式化显示多张牌"""
-        return ' '.join([format_card(card) for card in cards])
-    
     # 发牌
-    player_cards = [get_card(), get_card()]
-    dealer_cards = [get_card(), get_card()]
+    player_cards = [get_blackjack_card(), get_blackjack_card()]
+    dealer_cards = [get_blackjack_card(), get_blackjack_card()]
     
     # 计算点数
-    def calculate_score(cards):
-        """计算牌的点数"""
-        score = sum([card['point'] for card in cards])
-        # A可以是1或11
-        has_ace = any([card['value'] == 'A' for card in cards])
-        if has_ace and score + 10 <= 21:
-            score += 10
-        return score
-    
-    player_score = calculate_score(player_cards)
-    dealer_score = calculate_score(dealer_cards)
+    player_score = calculate_blackjack_score(player_cards)
+    dealer_score = calculate_blackjack_score(dealer_cards)
     
     # 显示初始状态
     initial_message = (
         f"🎲 21点游戏\n\n"
-        f"您的牌：{format_cards(player_cards)} (点数：{player_score})\n"
-        f"庄家的牌：{format_card(dealer_cards[0])} 🂠\n\n"
+        f"您的牌：{format_blackjack_cards(player_cards)} (点数：{player_score})\n"
+        f"庄家的牌：{format_blackjack_card(dealer_cards[0])} 🂠\n\n"
         f"下注金额：{amount} 🪙\n\n"
         f"请选择："
     )
@@ -1020,7 +1015,6 @@ async def hit_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # 获取游戏状态（使用全局字典）
         from main import blackjack_games
-        import random
         user_id_key = update.effective_user.id
         if user_id_key not in blackjack_games:
             await query.edit_message_text("游戏已结束，请重新开始")
@@ -1033,41 +1027,11 @@ async def hit_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         local_user_id = game['local_user_id']
         username = game.get('username', '用户')
         
-        # 定义牌相关函数
-        SUITS = ['♠️', '♥️', '♣️', '♦️']
-        VALUES = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K']
-        
-        def get_card():
-            """获取一张牌"""
-            suit = random.choice(SUITS)
-            value_idx = random.randint(0, 12)
-            value = VALUES[value_idx]
-            if value == 'A':
-                point = 1
-            elif value in ['J', 'Q', 'K']:
-                point = 10
-            else:
-                point = int(value)
-            return {'value': value, 'point': point, 'suit': suit}
-        
-        def format_card(card):
-            return f"{card['suit']}{card['value']}"
-        
-        def format_cards(cards):
-            return ' '.join([format_card(card) for card in cards])
-        
-        def calculate_score(cards):
-            score = sum([card['point'] for card in cards])
-            has_ace = any([card['value'] == 'A' for card in cards])
-            if has_ace and score + 10 <= 21:
-                score += 10
-            return score
-        
         # 要牌
-        player_cards.append(get_card())
+        player_cards.append(get_blackjack_card())
         
-        player_score = calculate_score(player_cards)
-        dealer_score = calculate_score(dealer_cards)
+        player_score = calculate_blackjack_score(player_cards)
+        dealer_score = calculate_blackjack_score(dealer_cards)
         
         # 检查是否爆牌
         if player_score > 21:
@@ -1076,8 +1040,8 @@ async def hit_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             new_balance = get_balance(user_id)
             result_message = (
                 f"🎲 21点游戏结果\n\n"
-                f"您的牌：{format_cards(player_cards)} (点数：{player_score})\n"
-                f"庄家的牌：{format_cards(dealer_cards)} (点数：{dealer_score})\n\n"
+                f"您的牌：{format_blackjack_cards(player_cards)} (点数：{player_score})\n"
+                f"庄家的牌：{format_blackjack_cards(dealer_cards)} (点数：{dealer_score})\n\n"
                 f"💥 您爆牌了！\n"
                 f"扣除：{amount} 🪙\n"
                 f"当前余额：{new_balance} 🪙"
@@ -1091,8 +1055,8 @@ async def hit_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # 继续游戏
             message = (
                 f"🎲 21点游戏\n\n"
-                f"您的牌：{format_cards(player_cards)} (点数：{player_score})\n"
-                f"庄家的牌：{format_card(dealer_cards[0])} 🂠\n\n"
+                f"您的牌：{format_blackjack_cards(player_cards)} (点数：{player_score})\n"
+                f"庄家的牌：{format_blackjack_card(dealer_cards[0])} 🂠\n\n"
                 f"下注金额：{amount} 🪙\n\n"
                 f"请选择："
             )
@@ -1129,44 +1093,13 @@ async def stand_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         local_user_id = game['local_user_id']
         username = game.get('username', '用户')
         
-        # 定义牌相关函数
-        import random
-        SUITS = ['♠️', '♥️', '♣️', '♦️']
-        VALUES = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K']
-        
-        def get_card():
-            """获取一张牌"""
-            suit = random.choice(SUITS)
-            value_idx = random.randint(0, 12)
-            value = VALUES[value_idx]
-            if value == 'A':
-                point = 1
-            elif value in ['J', 'Q', 'K']:
-                point = 10
-            else:
-                point = int(value)
-            return {'value': value, 'point': point, 'suit': suit}
-        
-        def format_card(card):
-            return f"{card['suit']}{card['value']}"
-        
-        def format_cards(cards):
-            return ' '.join([format_card(card) for card in cards])
-        
-        def calculate_score(cards):
-            score = sum([card['point'] for card in cards])
-            has_ace = any([card['value'] == 'A' for card in cards])
-            if has_ace and score + 10 <= 21:
-                score += 10
-            return score
-        
-        player_score = calculate_score(player_cards)
-        dealer_score = calculate_score(dealer_cards)
+        player_score = calculate_blackjack_score(player_cards)
+        dealer_score = calculate_blackjack_score(dealer_cards)
         
         # 庄家要牌
         while dealer_score < 17:
-            dealer_cards.append(get_card())
-            dealer_score = calculate_score(dealer_cards)
+            dealer_cards.append(get_blackjack_card())
+            dealer_score = calculate_blackjack_score(dealer_cards)
         
         # 比较结果
         if dealer_score > 21 or player_score > dealer_score:
@@ -1236,8 +1169,8 @@ async def stand_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # 构建结果消息
             result_message = (
                 f"🎲 21点游戏结果\n\n"
-                f"您的牌：{format_cards(player_cards)} (点数：{player_score})\n"
-                f"庄家的牌：{format_cards(dealer_cards)} (点数：{dealer_score})\n\n"
+                f"您的牌：{format_blackjack_cards(player_cards)} (点数：{player_score})\n"
+                f"庄家的牌：{format_blackjack_cards(dealer_cards)} (点数：{dealer_score})\n\n"
             )
             
             if dealer_score > 21:
@@ -1270,8 +1203,8 @@ async def stand_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             new_balance = get_balance(user_id)
             result_message = (
                 f"🎲 21点游戏结果\n\n"
-                f"您的牌：{format_cards(player_cards)} (点数：{player_score})\n"
-                f"庄家的牌：{format_cards(dealer_cards)} (点数：{dealer_score})\n\n"
+                f"您的牌：{format_blackjack_cards(player_cards)} (点数：{player_score})\n"
+                f"庄家的牌：{format_blackjack_cards(dealer_cards)} (点数：{dealer_score})\n\n"
                 f"😢 您输了！\n"
                 f"扣除：{amount} 🪙\n"
                 f"当前余额：{new_balance} 🪙"
@@ -1284,8 +1217,8 @@ async def stand_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # 平局不影响连胜
             result_message = (
                 f"🎲 21点游戏结果\n\n"
-                f"您的牌：{format_cards(player_cards)} (点数：{player_score})\n"
-                f"庄家的牌：{format_cards(dealer_cards)} (点数：{dealer_score})\n\n"
+                f"您的牌：{format_blackjack_cards(player_cards)} (点数：{player_score})\n"
+                f"庄家的牌：{format_blackjack_cards(dealer_cards)} (点数：{dealer_score})\n\n"
                 f"🤝 平局！\n"
                 f"不扣除游戏币\n"
                 f"当前余额：{get_balance(user_id)} 🪙"
