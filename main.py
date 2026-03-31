@@ -730,14 +730,18 @@ async def guess_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text(f"游戏币不足！当前余额：{balance}")
                 return
             
-            # 保存下注信息，等待骰子结果
-            context.user_data['guess_amount'] = amount
-            context.user_data['guess_choice'] = guess
-            context.user_data['guess_emos_user_id'] = emos_user_id
-            context.user_data['guess_user_id'] = user_id
+            # 保存下注信息到全局字典（用于群聊中机器人发送骰子后的结算）
+            chat_id = update.effective_chat.id
+            if chat_id not in private_guess_games:
+                private_guess_games[chat_id] = {}
+            private_guess_games[chat_id][user_id] = {
+                'amount': amount,
+                'guess': guess,
+                'emos_user_id': emos_user_id
+            }
             
-            # 发送Telegram官方骰子
-            await update.message.reply_dice()
+            # 发送Telegram官方骰子（使用reply_to回复用户消息）
+            await update.message.reply_dice(reply_to_message=update.message)
             return
     else:
         # 私聊模式 - 与机器人猜大小
@@ -785,21 +789,103 @@ async def guess_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # 发送Telegram官方骰子
         await update.message.reply_dice()
 
+# 全局字典存储等待中的猜大小游戏（用于群聊）
+# 格式: {chat_id: {user_id: {'amount': int, 'guess': str, 'emos_user_id': str, 'message_id': int}}}
+private_guess_games = {}
+
 async def handle_dice_result(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """处理骰子结果"""
-    user_id = update.effective_user.id
-    
-    # 检查是否有等待中的猜大小游戏
-    if 'guess_amount' not in context.user_data:
-        return
+    chat_id = update.effective_chat.id
+    dice_message = update.effective_message
     
     # 获取骰子点数
-    dice_value = update.effective_message.dice.value
+    dice_value = dice_message.dice.value
     
-    # 获取保存的下注信息
-    amount = context.user_data['guess_amount']
-    guess = context.user_data['guess_choice']
-    emos_user_id = context.user_data['guess_emos_user_id']
+    # 检查是否是私聊模式（通过reply_to_message判断）
+    if dice_message.reply_to_message:
+        # 找到原始用户
+        original_user = dice_message.reply_to_message.from_user
+        original_user_id = original_user.id
+        
+        # 从全局字典中查找该用户的游戏
+        if chat_id in private_guess_games and original_user_id in private_guess_games[chat_id]:
+            game_data = private_guess_games[chat_id][original_user_id]
+            amount = game_data['amount']
+            guess = game_data['guess']
+            emos_user_id = game_data['emos_user_id']
+            
+            # 处理结果
+            await process_guess_result(update, dice_value, amount, guess, emos_user_id, original_user_id, chat_id)
+            
+            # 清除游戏数据
+            del private_guess_games[chat_id][original_user_id]
+            if not private_guess_games[chat_id]:
+                del private_guess_games[chat_id]
+            return
+    
+    # 检查当前用户是否有等待中的游戏（私聊模式）
+    user_id = update.effective_user.id
+    if 'guess_amount' in context.user_data:
+        # 私聊模式
+        amount = context.user_data['guess_amount']
+        guess = context.user_data['guess_choice']
+        emos_user_id = context.user_data['guess_emos_user_id']
+        
+        # 处理结果
+        await process_guess_result(update, dice_value, amount, guess, emos_user_id, user_id, chat_id, context)
+        return
+
+async def process_guess_result(update: Update, dice_value: int, amount: int, guess: str, 
+                               emos_user_id: str, user_id: int, chat_id: int, context=None):
+    """处理猜大小游戏结果"""
+    # 判断大小（一个骰子规则：4-6为大，1-3为小）
+    if dice_value in [4, 5, 6]:
+        actual_result = "大"
+    else:
+        actual_result = "小"
+    
+    # 处理结果
+    from app.database import update_balance, get_balance
+    if guess == actual_result:
+        # 赢了，获得相同金额
+        win_amount = amount
+        service_fee = int(win_amount * 0.1)
+        net_win = win_amount - service_fee
+        update_balance(emos_user_id, net_win)
+        new_balance = get_balance(emos_user_id)
+        result_text = (
+            f"🎮 猜大小游戏结果\n\n"
+            f"您选择：{guess}\n"
+            f"🎲 骰子点数：{dice_value} ({actual_result})\n\n"
+            f"🎉 您赢了！\n"
+            f"获得：{win_amount} 🪙\n"
+            f"服务费：{service_fee} 🪙\n"
+            f"实际到账：{net_win} 🪙\n"
+            f"当前余额：{new_balance} 🪙"
+        )
+    else:
+        # 输了，失去下注金额
+        update_balance(emos_user_id, -amount)
+        new_balance = get_balance(emos_user_id)
+        result_text = (
+            f"🎮 猜大小游戏结果\n\n"
+            f"您选择：{guess}\n"
+            f"🎲 骰子点数：{dice_value} ({actual_result})\n\n"
+            f"😢 您输了！\n"
+            f"扣除：{amount} 🪙\n"
+            f"当前余额：{new_balance} 🪙"
+        )
+    
+    # 发送结果
+    await update.effective_message.reply_text(result_text)
+    
+    # 清除context中的数据（如果是私聊模式）
+    if context:
+        keys_to_clear = ['guess_amount', 'guess_choice', 'guess_emos_user_id', 
+                         'guess_user_id']
+        for key in keys_to_clear:
+            if key in context.user_data:
+                del context.user_data[key]
     
     # 判断大小（一个骰子规则：4-6为大，1-3为小）
     if dice_value in [4, 5, 6]:
