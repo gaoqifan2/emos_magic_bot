@@ -28,6 +28,16 @@ if sys.platform == 'win32':
     except:
         pass
 
+# Fix for Python 3.13+ event loop issue
+if sys.version_info >= (3, 13):
+    try:
+        import signal
+        loop = asyncio.get_event_loop()
+        # 禁用信号处理
+        loop.add_signal_handler = lambda sig, handler: None
+    except:
+        pass
+
 # 北京时间 UTC+8
 beijing_tz = timezone(timedelta(hours=8))
 
