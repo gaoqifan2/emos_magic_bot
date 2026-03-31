@@ -1332,13 +1332,12 @@ async def gameshoot_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     if not args:
-        # 进入分步输入模式，等待用户输入金额
-        context.user_data['awaiting_shoot'] = True
+        # 没有参数，提示完整指令
         await update.message.reply_text(
             "✊ 猜拳游戏\n\n"
-            "请输入下注金额（纯数字），例如：`10`\n"
-            "输入后游戏将自动开始\n\n"
-            "直接复制：`10`",
+            "请输入完整命令，例如：\n"
+            "`/gameshoot 10`\n\n"
+            "直接复制：`/gameshoot 10`",
             parse_mode='Markdown'
         )
         return

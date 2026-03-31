@@ -332,32 +332,13 @@ async def guess_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(context.args) == 2:
         # 直接处理参数
         await process_guess(update, context, context.args[0], context.args[1])
-    elif len(context.args) == 1:
-        # 只有金额，等待用户输入猜测的大小
-        # 使用全局字典存储状态
-        from main import step_input_states
-        import time
-        step_input_states[user_id] = {'game': 'guess', 'data': {'amount': context.args[0]}, 'timestamp': time.time()}
-        await update.message.reply_text(
-            f"🎲 猜大小游戏\n\n"
-            f"已收到下注金额：{context.args[0]} 🪙\n\n"
-            f"请输入猜测的大小：`大` 或 `小`\n"
-            f"输入后将自动开始游戏\n\n"
-            f"直接复制：`大`",
-            parse_mode='Markdown'
-        )
     else:
-        # 没有参数，等待用户输入
-        # 使用全局字典存储状态
-        from main import step_input_states
-        import time
-        step_input_states[user_id] = {'game': 'guess', 'data': {}, 'timestamp': time.time()}
+        # 没有参数或参数不全，提示完整指令
         await update.message.reply_text(
             "🎲 猜大小游戏\n\n"
-            "请输入下注金额和猜测的大小，例如：`10 大`\n"
-            "或者先输入金额：`10`，再输入猜测：`大`\n"
-            "输入后将自动开始游戏\n\n"
-            "直接复制：`10 大`",
+            "请输入完整命令，例如：\n"
+            "`/guess 10 大` 或 `/guess 10 小`\n\n"
+            "直接复制：`/guess 10 大`",
             parse_mode='Markdown'
         )
 
@@ -563,13 +544,12 @@ async def slot_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # 直接处理参数
         await process_slot(update, context, context.args[0])
     else:
-        # 进入二级会话，等待用户输入
-        context.user_data['awaiting_slot'] = True
+        # 没有参数，提示完整指令
         await update.message.reply_text(
             "🎰 老虎机游戏\n\n"
-            "请输入下注金额（纯数字），例如：`10`\n"
-            "输入后游戏将自动开始\n\n"
-            "直接复制：`10`",
+            "请输入完整命令，例如：\n"
+            "`/slot 10`\n\n"
+            "直接复制：`/slot 10`",
             parse_mode='Markdown'
         )
 
@@ -1029,6 +1009,9 @@ async def hit_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # 要牌
         player_cards.append(get_blackjack_card())
+        
+        # 更新游戏状态到全局字典
+        blackjack_games[user_id_key]['player_cards'] = player_cards
         
         player_score = calculate_blackjack_score(player_cards)
         dealer_score = calculate_blackjack_score(dealer_cards)
