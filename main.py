@@ -1315,8 +1315,22 @@ async def gameshoot_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     args = context.args
     
+    # 检查用户是否已登录
+    from app.config import user_tokens
+    if user_id not in user_tokens:
+        await update.message.reply_text("❌ 请先使用 /start 命令登录！")
+        return
+    
     if not args:
-        await update.message.reply_text("请输入下注金额，例如：/gameshoot 10")
+        # 进入分步输入模式，等待用户输入金额
+        context.user_data['awaiting_shoot'] = True
+        await update.message.reply_text(
+            "✊ 猜拳游戏\n\n"
+            "请输入下注金额（纯数字），例如：`10`\n"
+            "输入后游戏将自动开始\n\n"
+            "直接复制：`10`",
+            parse_mode='Markdown'
+        )
         return
     
     try:
@@ -1326,12 +1340,6 @@ async def gameshoot_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
     except ValueError:
         await update.message.reply_text("请输入有效的数字")
-        return
-    
-    # 检查用户是否已登录
-    from app.config import user_tokens
-    if user_id not in user_tokens:
-        await update.message.reply_text("❌ 请先使用 /start 命令登录！")
         return
     
     # 获取用户emos_id
@@ -1702,6 +1710,24 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         from app.handlers.command_handlers import process_blackjack
         await process_blackjack(update, context, input_text)
         context.user_data['awaiting_blackjack'] = False
+        return
+    
+    # 检查是否在等待猜拳游戏的输入
+    if 'awaiting_shoot' in context.user_data and context.user_data['awaiting_shoot']:
+        # 验证输入是否为有效数字
+        try:
+            amount = int(input_text.strip())
+            if amount <= 0:
+                await update.message.reply_text("❌ 下注金额必须大于0，请重新输入")
+                return
+        except ValueError:
+            await update.message.reply_text("❌ 请输入有效的数字作为金额，请重新输入")
+            return
+        
+        # 设置参数并调用gameshoot_handler
+        context.args = [input_text.strip()]
+        await gameshoot_handler(update, context)
+        context.user_data['awaiting_shoot'] = False
         return
     
     # 检查是否有游戏厅相关的文本输入需要处理（充值、提现等）
