@@ -1629,23 +1629,59 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         from app.handlers.command_handlers import process_guess
         parts = input_text.split()
         if len(parts) == 2:
+            # 输入了金额和猜测，例如：10 大
             amount, guess = parts
             await process_guess(update, context, amount, guess)
-        elif len(parts) == 1 and 'guess_amount' in context.user_data:
-            # 只有猜测的大小，使用之前存储的金额
-            amount = context.user_data['guess_amount']
-            guess = parts[0]
-            await process_guess(update, context, amount, guess)
+            # 清除状态
+            context.user_data['awaiting_guess'] = False
+            if 'guess_amount' in context.user_data:
+                del context.user_data['guess_amount']
+        elif len(parts) == 1:
+            # 只输入了一个值
+            if 'guess_amount' in context.user_data:
+                # 已经有金额，这个值应该是猜测
+                amount = context.user_data['guess_amount']
+                guess = parts[0]
+                if guess in ['大', '小']:
+                    await process_guess(update, context, amount, guess)
+                    # 清除状态
+                    context.user_data['awaiting_guess'] = False
+                    del context.user_data['guess_amount']
+                else:
+                    await update.message.reply_text("猜测必须是「大」或「小」，请重新输入")
+                    # 不清除状态，让用户重新输入
+            else:
+                # 没有金额，这个值应该是金额
+                try:
+                    amount = int(parts[0])
+                    if amount <= 0:
+                        await update.message.reply_text("下注金额必须大于0，请重新输入")
+                        # 不清除状态，让用户重新输入
+                    else:
+                        # 存储金额，等待用户输入猜测
+                        context.user_data['guess_amount'] = str(amount)
+                        await update.message.reply_text(f"已收到下注金额：{amount} 🪙\n\n请输入猜测的大小：`大` 或 `小`", parse_mode='Markdown')
+                        # 不清除状态，继续等待猜测
+                except ValueError:
+                    await update.message.reply_text("请输入有效的数字作为金额，请重新输入")
+                    # 不清除状态，让用户重新输入
         else:
-            await update.message.reply_text("请输入正确的格式，例如：10 大")
-        # 清除状态
-        context.user_data['awaiting_guess'] = False
-        if 'guess_amount' in context.user_data:
-            del context.user_data['guess_amount']
+            await update.message.reply_text("请输入正确的格式，例如：`10 大` 或只输入 `10`")
+            # 不清除状态，让用户重新输入
         return
     
     # 检查是否在等待老虎机游戏的输入
     if 'awaiting_slot' in context.user_data and context.user_data['awaiting_slot']:
+        # 验证输入是否为有效数字
+        try:
+            amount = int(input_text.strip())
+            if amount <= 0:
+                await update.message.reply_text("❌ 下注金额必须大于0，请重新输入")
+                return
+        except ValueError:
+            await update.message.reply_text("❌ 请输入有效的数字作为金额，请重新输入")
+            return
+        
         from app.handlers.command_handlers import process_slot
         await process_slot(update, context, input_text)
         context.user_data['awaiting_slot'] = False
@@ -1653,6 +1689,16 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # 检查是否在等待21点游戏的输入
     if 'awaiting_blackjack' in context.user_data and context.user_data['awaiting_blackjack']:
+        # 验证输入是否为有效数字
+        try:
+            amount = int(input_text.strip())
+            if amount <= 0:
+                await update.message.reply_text("❌ 下注金额必须大于0，请重新输入")
+                return
+        except ValueError:
+            await update.message.reply_text("❌ 请输入有效的数字作为金额，请重新输入")
+            return
+        
         from app.handlers.command_handlers import process_blackjack
         await process_blackjack(update, context, input_text)
         context.user_data['awaiting_blackjack'] = False

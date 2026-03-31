@@ -301,11 +301,25 @@ async def guess_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # 只有金额，等待用户输入猜测的大小
         context.user_data['awaiting_guess'] = True
         context.user_data['guess_amount'] = context.args[0]
-        await update.message.reply_text(f"已收到下注金额：{context.args[0]} 🪙\n\n请输入猜测的大小：`大` 或 `小`\n\n直接复制：`大`", parse_mode='Markdown')
+        await update.message.reply_text(
+            f"🎲 猜大小游戏\n\n"
+            f"已收到下注金额：{context.args[0]} 🪙\n\n"
+            f"请输入猜测的大小：`大` 或 `小`\n"
+            f"输入后将自动开始游戏\n\n"
+            f"直接复制：`大`",
+            parse_mode='Markdown'
+        )
     else:
         # 没有参数，等待用户输入
         context.user_data['awaiting_guess'] = True
-        await update.message.reply_text("请输入下注金额和猜测的大小，例如：`10 大`\n\n直接复制：`10 大`", parse_mode='Markdown')
+        await update.message.reply_text(
+            "🎲 猜大小游戏\n\n"
+            "请输入下注金额和猜测的大小，例如：`10 大`\n"
+            "或者先输入金额：`10`，再输入猜测：`大`\n"
+            "输入后将自动开始游戏\n\n"
+            "直接复制：`10 大`",
+            parse_mode='Markdown'
+        )
 
 
 async def process_guess(update: Update, context: ContextTypes.DEFAULT_TYPE, amount: str, guess: str):
@@ -511,7 +525,13 @@ async def slot_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         # 进入二级会话，等待用户输入
         context.user_data['awaiting_slot'] = True
-        await update.message.reply_text("请输入下注金额，例如：`10`\n\n直接复制：`10`", parse_mode='Markdown')
+        await update.message.reply_text(
+            "🎰 老虎机游戏\n\n"
+            "请输入下注金额（纯数字），例如：`10`\n"
+            "输入后游戏将自动开始\n\n"
+            "直接复制：`10`",
+            parse_mode='Markdown'
+        )
 
 
 async def process_slot(update: Update, context: ContextTypes.DEFAULT_TYPE, amount: str):
@@ -811,7 +831,13 @@ async def blackjack_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         # 进入二级会话，等待用户输入
         context.user_data['awaiting_blackjack'] = True
-        await update.message.reply_text("请输入下注金额，例如：`10`\n\n直接复制：`10`", parse_mode='Markdown')
+        await update.message.reply_text(
+            "🃏 21点游戏\n\n"
+            "请输入下注金额（纯数字），例如：`10`\n"
+            "输入后游戏将自动开始\n\n"
+            "直接复制：`10`",
+            parse_mode='Markdown'
+        )
 
 
 async def process_blackjack(update: Update, context: ContextTypes.DEFAULT_TYPE, amount: str):
@@ -945,7 +971,8 @@ async def process_blackjack(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         'dealer_cards': dealer_cards,
         'amount': amount,
         'user_id': user_id_str,
-        'local_user_id': local_user_id
+        'local_user_id': local_user_id,
+        'username': username
     }
     
     await update.message.reply_text(initial_message, reply_markup=reply_markup)
@@ -970,6 +997,7 @@ async def hit_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         dealer_cards = game['dealer_cards']
         user_id = game['user_id']
         local_user_id = game['local_user_id']
+        username = game.get('username', '用户')
         
         # 要牌
         import random
@@ -1043,6 +1071,7 @@ async def stand_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         dealer_cards = game['dealer_cards']
         user_id = game['user_id']
         local_user_id = game['local_user_id']
+        username = game.get('username', '用户')
         
         # 计算点数
         def calculate_score(cards):
