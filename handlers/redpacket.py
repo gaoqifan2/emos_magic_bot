@@ -584,10 +584,8 @@ async def create_redpacket(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else:
                 redpacket_type_display = "🧧 红包"
             
-            # 获取用户余额
-            from app.database import get_balance
-            user_id_str = user_info.get('user_id', user_id)
-            balance = get_balance(user_id_str)
+            # 获取用户余额 - 使用API返回的余额
+            balance = result.get('carrot', 0)  # 从红包创建API返回的结果中获取余额
             
             message = (
                 f"# 红包凭证\n\n"
@@ -612,7 +610,7 @@ async def create_redpacket(update: Update, context: ContextTypes.DEFAULT_TYPE):
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
             keyboard = [
                 [InlineKeyboardButton("👥 跳转到 emospg 群", url="https://t.me/emospg")],
-                [InlineKeyboardButton("🔙 返回主菜单", callback_data="menu_main")]
+                [InlineKeyboardButton("🔙 返回主菜单", callback_data="back_to_main")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             

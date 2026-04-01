@@ -2113,13 +2113,14 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             if response.status_code == 200:
                                 result = response.json()
                                 remaining = result.get('carrot', 0)
-                                await loading.edit_text(f"?转赠成功！\n剩余萝卜：{remaining}")
+                                await loading.edit_text(f"✅ 转赠成功！\n剩余萝卜：{remaining}")
                             else:
-                                await loading.edit_text(f"?转赠失败，状态码：{response.status_code}")
+                                error_msg = response.text[:200] if response.text else "未知错误"
+                                logger.error(f"转赠失败: 状态码={response.status_code}, 错误={error_msg}")
+                                await loading.edit_text(f"❌ 转赠失败\n状态码：{response.status_code}\n错误：{error_msg}")
                         except Exception as e:
-                            # 直接记录固定的错误信息，避免尝试编码包含emoji的异常信?
-                            logger.error("转赠失败")
-                            await loading.edit_text("?转赠失败，请稍后重试")
+                            logger.error(f"转赠异常: {str(e)}")
+                            await loading.edit_text(f"❌ 转赠失败：{str(e)}")
                         
                         # 显示返回菜单
                         from telegram import InlineKeyboardButton, InlineKeyboardMarkup
