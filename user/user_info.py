@@ -166,8 +166,16 @@ async def get_user_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else:
                 message += f"• 📅 签到状态: ❌ 未签到\n\n"
             
+            # 显示空库状态
+            is_show_empty = user_data.get('is_show_empty', True)
+            if is_show_empty:
+                message += f"• 📁 显示空库: ✅ 显示\n\n"
+                context.user_data['is_show_empty'] = True
+            else:
+                message += f"• 📁 显示空库: ❌ 隐藏\n\n"
+                context.user_data['is_show_empty'] = False
+            
             message += (
-                f"• 📁 显示空库: ✅ 显示\n\n"
                 f"• 📎 上传总量: {size_display}\n\n"
                 f"• 🎫 剩余邀请: {invite_remaining}个\n\n"
                 f"• 📋 片单卡槽: {watch_slot_remaining}个\n\n"
@@ -207,11 +215,14 @@ async def get_user_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton("🎋 修仙境界", callback_data="menu_cultivation_level")
         ],
         [
-            InlineKeyboardButton("📨 邀请好友", callback_data="menu_user_invite"),
-            InlineKeyboardButton("✏️ 更改笔名", callback_data="menu_user_pseudonym")
+            InlineKeyboardButton("📁 空库开关", callback_data="menu_toggle_empty"),
+            InlineKeyboardButton("📨 邀请好友", callback_data="menu_user_invite")
         ],
         [
-            InlineKeyboardButton("❌ 撤销邀请", callback_data="menu_revoke_invite"),
+            InlineKeyboardButton("✏️ 更改笔名", callback_data="menu_user_pseudonym"),
+            InlineKeyboardButton("❌ 撤销邀请", callback_data="menu_revoke_invite")
+        ],
+        [
             InlineKeyboardButton("🔙 返回主菜单", callback_data="back_to_main")
         ]
     ]
@@ -253,7 +264,7 @@ async def user_sign(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # 检查是否是重复签到
             if 'message' in result and result['message'] == '重复签到':
                 await loading.edit_text(
-                    f"⏰ 您今天已经签到过了！\n" +
+                    f"⏰ 您今天已经签到过了！\n\n" +
                     f"🌈 明天再来吧～\n" +
                     f"✨ 每天签到都有惊喜哦！"
                 )
@@ -263,11 +274,14 @@ async def user_sign(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 earn_point = result.get('earn_point', 0)
                 continuous_days = result.get('continuous_days', 0)
                 await loading.edit_text(
-                    f"🎉 签到成功！\n" +
-                    f"💰 获得 {earn_point} 萝卜～\n" +
-                    f"📅 连续签到 {continuous_days} 天\n" +
-                    f"🏆 第 {sign_index} 次签到\n" +
-                    f"✨ 坚持签到，奖励更丰厚！"
+                    f"🎉 *签到成功！*\n\n" +
+                    f"━━━━━━━━━━━━━━━━━━\n\n" +
+                    f"💰 获得萝卜：`{earn_point}` 🥕\n\n" +
+                    f"📅 连续签到：`{continuous_days}` 天\n\n" +
+                    f"🏆 今日排名：第 `{sign_index}` 位\n\n" +
+                    f"✨ 坚持签到，奖励更丰厚！\n\n" +
+                    f"━━━━━━━━━━━━━━━━━━",
+                    parse_mode='Markdown'
                 )
         else:
             error_text = response.text[:200] if response.text else "无响应内容"
@@ -471,3 +485,68 @@ async def user_revoke_invite(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     # 返回一个状态码，用于后续处理用户输入
     return 109  # 自定义状态码，用于处理撤销邀请输入
+
+async def toggle_show_empty(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """切换是否显示空媒体库"""
+    user_id = update.effective_user.id
+    user_info = user_tokens.get(user_id)
+    
+    if not user_info:
+        await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
+        return
+    
+    # 检查user_info是字典还是字符串
+    if isinstance(user_info, dict):
+        token = user_info.get('token')
+    else:
+        token = user_info
+    
+    if not token:
+        await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
+        return
+    
+    loading = await update.callback_query.edit_message_text("🔄 正在切换...")
+    
+    try:
+        headers = {"Authorization": f"Bearer {token}"}
+        async with httpx.AsyncClient() as client:
+            response = await client.put(
+                f"{Config.API_BASE_URL}/user/showEmpty",
+                headers=headers,
+                timeout=10
+            )
+        
+        if response.status_code == 200:
+            result = response.json()
+            is_show_empty = result.get('is_show_empty', True)
+            
+            if is_show_empty:
+                await loading.edit_text(
+                    f"✅ 已开启显示空媒体库！\n\n"
+                    f"📁 现在会显示空的媒体库文件夹"
+                )
+            else:
+                await loading.edit_text(
+                    f"✅ 已隐藏空媒体库！\n\n"
+                    f"📁 现在会隐藏空的媒体库文件夹"
+                )
+        else:
+            error_text = response.text[:200] if response.text else "无响应内容"
+            logger.error(f"切换空媒体库API错误: 状态码={response.status_code}")
+            await loading.edit_text(f"❌ 切换失败，状态码：{response.status_code}\n{error_text}")
+    except httpx.HTTPStatusError as e:
+        logger.error(f"切换空媒体库HTTP错误: {e.response.status_code}")
+        await loading.edit_text(f"❌ 切换失败，HTTP错误：{e.response.status_code}")
+    except httpx.RequestError as e:
+        logger.error(f"切换空媒体库请求错误: {type(e).__name__}")
+        await loading.edit_text("❌ 切换失败，网络请求错误，请检查网络连接")
+    except Exception as e:
+        logger.error(f"切换空媒体库异常: {type(e).__name__}")
+        await loading.edit_text("❌ 切换失败，请稍后重试")
+    
+    # 显示返回菜单
+    keyboard = [
+        [InlineKeyboardButton("🔙 返回主菜单", callback_data="back_to_main")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.callback_query.message.reply_text("切换完成", reply_markup=reply_markup)

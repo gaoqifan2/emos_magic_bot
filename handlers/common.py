@@ -1007,6 +1007,12 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         from user.user_info import user_pseudonym
         return await user_pseudonym(update, context)
     
+    if data == "menu_toggle_empty":
+        logger.info(f"处理空库开关按钮")
+        from user.user_info import toggle_show_empty
+        await toggle_show_empty(update, context)
+        return
+    
     # 账号设置按钮
     if data == "menu_account_settings":
         logger.info(f"处理账号设置按钮")
