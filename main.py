@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 import logging
@@ -9,7 +9,7 @@ import asyncio
 import time
 from datetime import datetime, timedelta, timezone
 
-# 兼容 Python 3.12+，替换已被移除的 imghdr 模块
+# 兼容 Python 3.12+, 替换已被移除的 imghdr 模块
 sys.modules['imghdr'] = __import__('utils.imghdr_compat')
 
 # 设置环境变量
@@ -73,14 +73,14 @@ def ensure_single_instance():
                 process = kernel32.OpenProcess(0x100000, False, int(pid))
                 if process:
                     kernel32.CloseHandle(process)
-                    print("另一个机器人实例已在运行，请先关闭它")
+                    print("另一个机器人实例已在运行, 请先关闭它")
                     sys.exit(1)
             else:
                 # 其他平台
                 import subprocess
                 try:
                     subprocess.check_call(['kill', '-0', pid])
-                    print("另一个机器人实例已在运行，请先关闭它")
+                    print("另一个机器人实例已在运行, 请先关闭它")
                     sys.exit(1)
                 except subprocess.CalledProcessError:
                     pass
@@ -106,7 +106,7 @@ def cleanup():
 atexit.register(cleanup)
 
 def clear_operation_data(context):
-    """清理操作相关的用户数据，保留登录信息"""
+    """清理操作相关的用户数据, 保留登录信息"""
     # 保留的关键字段
     preserved_keys = ['token', 'user_id', 'local_user_id', 'emos_user_id', 'username']
     
@@ -142,13 +142,13 @@ def group_command_filter(func):
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # 检查是否是群聊
         if update.message and update.message.chat.type in ['group', 'supergroup']:
-            # 获取命令名称，处理带@机器人用户名的情�?
+            # 获取命令名称, 处理带@机器人用户名的情�?
             command_part = update.message.text.split(' ')[0].lstrip('/')
             # 移除@机器人用户名部分
             command = command_part.split('@')[0]
             # 检查命令是否在允许列表�?
             if command not in GROUP_ALLOWED_COMMANDS:
-                # 群聊中不允许的命令，不执�?
+                # 群聊中不允许的命令, 不执�?
                 logger.info(f"群聊中拒绝执行命�? /{command_part}")
                 return
         # 执行原函�?
@@ -233,7 +233,7 @@ logging.basicConfig(
     force=True
 )
 
-# 设置第三方库的日志级别为WARNING，减少不必要的日志输�?
+# 设置第三方库的日志级别为WARNING, 减少不必要的日志输�?
 logging.getLogger('telegram').setLevel(logging.WARNING)
 logging.getLogger('httpx').setLevel(logging.WARNING)
 logging.getLogger('httpcore').setLevel(logging.WARNING)
@@ -253,7 +253,7 @@ private_guess_games = {}  # 存储等待中的猜大小游戏（用于群聊�?
 
 # post_init 包装函数
 async def post_init_wrapper(application):
-    """包装post_init函数，在设置命令菜单后启动游戏检查任�?""
+    """包装post_init函数, 在设置命令菜单后启动游戏检查任�?""
     # 先调用原始的post_init函数
     await post_init(application)
     
@@ -344,7 +344,7 @@ async def end_guess_game(chat_id, application):
         
         # 处理单边投注情况
         if winning_total == 0:
-            # 所有人都押输了，退还本�?
+            # 所有人都押输了, 退还本�?
             # 处理庄家
             banker_user_info = user_tokens.get(game['banker'])
             if banker_user_info:
@@ -385,7 +385,7 @@ async def end_guess_game(chat_id, application):
                     'new_balance': new_balance
                 })
         elif losing_total == 0:
-            # 所有人都押赢了，退还本�?
+            # 所有人都押赢了, 退还本�?
             # 处理庄家
             banker_user_info = user_tokens.get(game['banker'])
             if banker_user_info:
@@ -548,18 +548,18 @@ async def end_guess_game(chat_id, application):
                 new_balance = get_balance(banker_user_id)
                 
                 # 构建空盘结果
-                result_message = f"🎲 开奖结果：{actual_result}（点数：{dice1}, {dice2}, {dice3}，总和：{total_value}）\n"
+                result_message = f"🎲 开奖结果：{actual_result}（点数：{dice1}, {dice2}, {dice3}, 总和：{total_value}）\n"
                 result_message += f"━━━━━━━━━━━━━━━━━━━━━━\n"
                 result_message += f"📊 本局结算明细：\n"
                 result_message += f"━━━━━━━━━━━━━━━━━━━━━━\n"
                 result_message += f"【空盘】\n"
-                result_message += f"庄家 {game['banker_name']}：押{game['banker_guess']} {game['banker_amount']}，退还本金，扣除空盘�?{empty_game_fee}，净收益 {-empty_game_fee:+}\n"
+                result_message += f"庄家 {game['banker_name']}：押{game['banker_guess']} {game['banker_amount']}, 退还本金, 扣除空盘�?{empty_game_fee}, 净收益 {-empty_game_fee:+}\n"
                 result_message += f"━━━━━━━━━━━━━━━━━━━━━━\n"
                 result_message += f"💰 平台空盘费：{empty_game_fee}（庄家下注的1%）\n"
                 result_message += f"━━━━━━━━━━━━━━━━━━━━━━\n"
         else:
             # 正常游戏结果
-            result_message = f"🎲 开奖结果：{actual_result}（点数：{dice1}, {dice2}, {dice3}，总和：{total_value}）\n"
+            result_message = f"🎲 开奖结果：{actual_result}（点数：{dice1}, {dice2}, {dice3}, 总和：{total_value}）\n"
             result_message += f"━━━━━━━━━━━━━━━━━━━━━━\n"
             result_message += f"📊 本局结算明细：\n"
             result_message += f"━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -568,14 +568,14 @@ async def end_guess_game(chat_id, application):
             if winners:
                 result_message += f"【赢家】\n"
                 for winner in winners:
-                    result_message += f"{winner['user_name']}：押{winner['guess']} {winner['amount']}，赢�?{winner['win_amount']}，净收益 {winner['net_profit']:+}\n"
+                    result_message += f"{winner['user_name']}：押{winner['guess']} {winner['amount']}, 赢�?{winner['win_amount']}, 净收益 {winner['net_profit']:+}\n"
                 result_message += f"━━━━━━━━━━━━━━━━━━━━━━\n"
             
             # 显示输家
             if losers:
                 result_message += f"【输家】\n"
                 for loser in losers:
-                    result_message += f"{loser['user_name']}：押{loser['guess']} {loser['amount']}，损�?{loser['loss_amount']}，净收益 {loser['net_profit']:+}\n"
+                    result_message += f"{loser['user_name']}：押{loser['guess']} {loser['amount']}, 损�?{loser['loss_amount']}, 净收益 {loser['net_profit']:+}\n"
                 result_message += f"━━━━━━━━━━━━━━━━━━━━━━\n"
             
             # 显示平台服务费和庄家奖励
@@ -595,7 +595,7 @@ async def end_guess_game(chat_id, application):
         logger.error(f"结束猜大小游戏失�? {e}")
         await bot.send_message(
             chat_id=game['chat_id'],
-            text=f"�?游戏结束失败，请联系管理�?
+            text=f"�?游戏结束失败, 请联系管理�?
         )
     
     # 标记游戏为结�?
@@ -620,7 +620,7 @@ async def guess_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if chat_id in guess_games:
             # 有正在进行的庄家游戏 - 参与庄家游戏
             if len(args) != 2:
-                await update.message.reply_text("请输入猜测的大小和金额，例如：`/guess �?10`\n\n直接复制：`/guess �?10`", parse_mode='Markdown')
+                await update.message.reply_text("请输入猜测的大小和金额, 例如：`/guess �?10`\n\n直接复制：`/guess �?10`", parse_mode='Markdown')
                 return
             
             # 尝试两种参数顺序
@@ -753,9 +753,9 @@ async def guess_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception as e:
                 logger.error(f"更新群聊消息失败: {e}")
         else:
-            # 没有正在进行的庄家游�?- 自己玩（像私聊一样，使用官方骰子�?
+            # 没有正在进行的庄家游�?- 自己玩（像私聊一样, 使用官方骰子�?
             if len(args) != 2:
-                await update.message.reply_text("请输入下注金额和猜测的大小，例如：`/guess 10 大`\n\n直接复制：`/guess 10 大`", parse_mode='Markdown')
+                await update.message.reply_text("请输入下注金额和猜测的大小, 例如：`/guess 10 大`\n\n直接复制：`/guess 10 大`", parse_mode='Markdown')
                 return
             
             try:
@@ -827,7 +827,7 @@ async def guess_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         # 私聊模式 - 与机器人猜大�?
         if len(args) != 2:
-            await update.message.reply_text("请输入下注金额和猜测的大小，例如：`/guess 10 大`\n\n直接复制：`/guess 10 大`", parse_mode='Markdown')
+            await update.message.reply_text("请输入下注金额和猜测的大小, 例如：`/guess 10 大`\n\n直接复制：`/guess 10 大`", parse_mode='Markdown')
             return
         
         try:
@@ -907,7 +907,7 @@ blackjack_games = {}
 GAME_STATE_TIMEOUT = 600  # 10分钟
 
 def cleanup_expired_game_states():
-    """清理过期的游戏状态，防止内存泄漏"""
+    """清理过期的游戏状态, 防止内存泄漏"""
     import time
     current_time = time.time()
     
@@ -958,7 +958,7 @@ async def handle_dice_result(update: Update, context: ContextTypes.DEFAULT_TYPE)
         
         # 只处理普通骰子（emoji为🎲）
         if dice_message.dice.emoji != '🎲':
-            print("6. 不是普通骰子，跳过处理")
+            print("6. 不是普通骰子, 跳过处理")
             return
         
         # 获取原始用户ID - 从reply_to_message中获�?
@@ -978,7 +978,7 @@ async def handle_dice_result(update: Update, context: ContextTypes.DEFAULT_TYPE)
             chat_games = private_guess_games[chat_id]
             print(f"11. 该chat_id下的游戏: {chat_games}")
             
-            # 如果有reply_to_message，优先使用其中的用户ID
+            # 如果有reply_to_message, 优先使用其中的用户ID
             if original_user_id and original_user_id in chat_games:
                 print(f"12. 找到匹配的游戏数�?- user_id={original_user_id}")
                 game_data = chat_games[original_user_id]
@@ -1001,7 +1001,7 @@ async def handle_dice_result(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 print("17. 游戏数据已清�?)
                 return
             else:
-                # 如果没有reply_to_message或找不到对应用户，尝试获取该聊天中的第一个游�?
+                # 如果没有reply_to_message或找不到对应用户, 尝试获取该聊天中的第一个游�?
                 if chat_games:
                     # 获取第一个等待中的游�?
                     first_user_id = list(chat_games.keys())[0]
@@ -1085,7 +1085,7 @@ async def process_guess_result(update: Update, dice_value: int, amount: int, gue
     
     # 构建结果消息
     if is_win:
-        # 赢了，获得相同金�?
+        # 赢了, 获得相同金�?
         win_amount = amount
         service_fee = int(win_amount * 0.1)
         net_win = win_amount - service_fee
@@ -1105,7 +1105,7 @@ async def process_guess_result(update: Update, dice_value: int, amount: int, gue
             f"━━━━━━━━━━━━━━━━━━"
         )
     else:
-        # 输了，失去下注金�?
+        # 输了, 失去下注金�?
         
         result_text = (
             f"🎲 *猜大小游戏结�?\n"
@@ -1120,7 +1120,7 @@ async def process_guess_result(update: Update, dice_value: int, amount: int, gue
             f"━━━━━━━━━━━━━━━━━━"
         )
     
-    # 尝试更新数据库（异步，不阻塞主流程）
+    # 尝试更新数据库（异步, 不阻塞主流程）
     async def update_database():
         try:
             from app.database import update_balance, add_game_record
@@ -1157,11 +1157,11 @@ async def process_guess_result(update: Update, dice_value: int, amount: int, gue
     
     # 发送结�?
     try:
-        # 使用context.bot.send_message发送消息，确保消息能够正确发�?
+        # 使用context.bot.send_message发送消息, 确保消息能够正确发�?
         if context:
             await context.bot.send_message(chat_id=chat_id, text=result_text, parse_mode='Markdown')
         else:
-            # 如果没有context，使用update.effective_message.reply_text
+            # 如果没有context, 使用update.effective_message.reply_text
             await update.effective_message.reply_text(result_text, parse_mode='Markdown')
     except Exception as e:
         print(f"发送结果消息失�? {e}")
@@ -1193,7 +1193,7 @@ async def guess_bet_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # 检查参�?
     if len(args) != 2:
-        await update.message.reply_text("请输入猜测的大小和金额，例如：`/guess_bet �?10`\n\n直接复制：`/guess_bet �?10`", parse_mode='Markdown')
+        await update.message.reply_text("请输入猜测的大小和金额, 例如：`/guess_bet �?10`\n\n直接复制：`/guess_bet �?10`", parse_mode='Markdown')
         return
     
     guess = args[0]
@@ -1212,7 +1212,7 @@ async def guess_bet_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # 检查是否有正在进行的游�?
     if chat_id not in guess_games:
-        await update.message.reply_text("�?当前没有正在进行的猜大小游戏，请先使�?`/createguess �?�?金额` 命令创建游戏")
+        await update.message.reply_text("�?当前没有正在进行的猜大小游戏, 请先使�?`/createguess �?�?金额` 命令创建游戏")
         return
     
     game = guess_games[chat_id]
@@ -1223,7 +1223,7 @@ async def guess_bet_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 检查是否已过截止下注时�?
     current_time = datetime.now()
     if current_time >= game.get('bet_end_time', game['end_time']):
-        await update.message.reply_text("�?下注时间已截止，无法再下�?)
+        await update.message.reply_text("�?下注时间已截止, 无法再下�?)
         return
     
     # 检查用户是否已登录
@@ -1234,7 +1234,7 @@ async def guess_bet_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # 检查是否是庄家自己
     if game['banker'] == user_id:
-        await update.message.reply_text("�?庄家已经下注，不能重复下注！")
+        await update.message.reply_text("�?庄家已经下注, 不能重复下注！")
         return
     
     # 检查用户是否已经下注过
@@ -1328,7 +1328,7 @@ async def guess_bet_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def createguess_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """群聊庄家模式猜大小游戏命令处理器
     
-    群聊�?createguess �?�?金额 - 创建群聊猜大小游戏（庄家参与版，三个骰子�?
+    群聊�?createguess �?�?金额 - 创建群聊猜大小游戏（庄家参与版, 三个骰子�?
     """
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
@@ -1341,7 +1341,7 @@ async def createguess_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     # 检查参�?
     if len(args) != 2:
-        await update.message.reply_text("请输入猜测的大小和金额，例如：`/createguess �?10`\n\n直接复制：`/createguess �?10`", parse_mode='Markdown')
+        await update.message.reply_text("请输入猜测的大小和金额, 例如：`/createguess �?10`\n\n直接复制：`/createguess �?10`", parse_mode='Markdown')
         return
     
     guess = args[0]
@@ -1378,21 +1378,21 @@ async def createguess_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     # 检查是否已经有游戏在进行中
     if chat_id in guess_games:
         game = guess_games[chat_id]
-        # 只要有游戏存在（不管状态如何），就不允许创建新游戏
-        await update.message.reply_text("�?群里已经有游戏在进行中，请等待当前游戏结�?)
+        # 只要有游戏存在（不管状态如何）, 就不允许创建新游戏
+        await update.message.reply_text("�?群里已经有游戏在进行中, 请等待当前游戏结�?)
         return
     
     # 创建群聊猜大小游�?
     await create_guess_game(update, context, user_id, guess, amount)
 
 async def create_guess_game(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int, guess: str, amount: int):
-    """创建群聊猜大小游戏（庄家参与版，群聊直接下注�?""
+    """创建群聊猜大小游戏（庄家参与版, 群聊直接下注�?""
     chat_id = update.effective_chat.id
     user = update.effective_user
     
     # 再次检查是否已经有游戏在进行中
     if chat_id in guess_games:
-        await update.message.reply_text("�?群里已经有游戏在进行中，请等待当前游戏结�?)
+        await update.message.reply_text("�?群里已经有游戏在进行中, 请等待当前游戏结�?)
         return
     
     # 计算结束时间�?分钟后）
@@ -1437,7 +1437,7 @@ async def create_guess_game(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         f"1. 发�?`/guess_bet �?金额` �?`/guess_bet �?金额` 参与下注\n"
         f"2. 三个骰子规则�?-10为小�?1-17为大\n"
         f"3. 猜对的一方按各自下注比例瓜分输方的全部下注（扣除10%服务费）\n"
-        f"4. 庄家与玩家同场竞技，按下注比例分配奖金\n\n"
+        f"4. 庄家与玩家同场竞技, 按下注比例分配奖金\n\n"
         f"💡 示例：`/guess_bet �?10` 下注10游戏币猜�?
     )
     
@@ -1559,7 +1559,7 @@ async def gameshoot_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """猜拳游戏命令处理�?
     
     私聊�?gameshoot 金额 - 与AI对战
-    群聊�?gameshoot 金额 - 创建群聊游戏，直接参�?
+    群聊�?gameshoot 金额 - 创建群聊游戏, 直接参�?
     群聊回复：回复某�?+ /gameshoot 金额 - 单挑模式
     """
     user_id = update.effective_user.id
@@ -1573,10 +1573,10 @@ async def gameshoot_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     if not args:
-        # 没有参数，提示完整指�?
+        # 没有参数, 提示完整指�?
         await update.message.reply_text(
             "�?猜拳游戏\n\n"
-            "请输入完整命令，例如：\n"
+            "请输入完整命令, 例如：\n"
             "`/gameshoot 10`\n\n"
             "直接复制：`/gameshoot 10`",
             parse_mode='Markdown'
@@ -1633,10 +1633,10 @@ async def gameshoot_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # 开始单�?
             await start_shoot_duel(update, context, user_id, target_user_id, amount)
         else:
-            # 直接创建一个新的群聊游戏，显示选择按钮
+            # 直接创建一个新的群聊游戏, 显示选择按钮
             await create_shoot_game_with_buttons(update, context, user_id, amount)
     else:
-        # 私聊模式，与AI对战
+        # 私聊模式, 与AI对战
         await start_shoot_ai(update, context, user_id, amount)
 
 async def start_shoot_ai(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int, amount: int):
@@ -1734,7 +1734,7 @@ async def create_shoot_game_with_buttons(update: Update, context: ContextTypes.D
         'end_time': datetime.now() + timedelta(minutes=1),
         'chat_id': chat_id,
         'message_id': None,
-        'status': 'playing'  # 直接设为playing，因为按钮是给所有人点击�?
+        'status': 'playing'  # 直接设为playing, 因为按钮是给所有人点击�?
     }
     
     # 创建选择按钮
@@ -1840,7 +1840,7 @@ async def join_shoot_game(update: Update, context: ContextTypes.DEFAULT_TYPE, us
     player_count = len(game['players'])
     player_count_text = f"{player_count}/{game['player_count']}" if game['player_count'] else f"{player_count}"
     
-    # 计算赔率（简化版，实际可以根据参与人数和下注金额计算�?
+    # 计算赔率（简化版, 实际可以根据参与人数和下注金额计算�?
     odds = 1.0
     if player_count > 1:
         odds = round(player_count * 0.9, 1)  # 简单的赔率计算
@@ -1890,7 +1890,7 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         state_data = step_input_states[user_id]['data']
         
         if len(parts) == 2:
-            # 输入了金额和猜测，例如：10 �?
+            # 输入了金额和猜测, 例如：10 �?
             amount, guess = parts
             await process_guess(update, context, amount, guess)
             # 清除状�?
@@ -1898,7 +1898,7 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif len(parts) == 1:
             # 只输入了一个�?
             if 'amount' in state_data:
-                # 已经有金额，这个值应该是猜测
+                # 已经有金额, 这个值应该是猜测
                 amount = state_data['amount']
                 guess = parts[0]
                 if guess in ['�?, '�?]:
@@ -1906,28 +1906,28 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     # 清除状�?
                     del step_input_states[user_id]
                 else:
-                    await update.message.reply_text("猜测必须是「大」或「小」，请重新输�?)
-                    # 不清除状态，让用户重新输�?
+                    await update.message.reply_text("猜测必须是「大」或「小」, 请重新输�?)
+                    # 不清除状态, 让用户重新输�?
             else:
-                # 没有金额，这个值应该是金额
+                # 没有金额, 这个值应该是金额
                 try:
                     amount = int(parts[0])
                     if amount <= 0:
-                        await update.message.reply_text("下注金额必须大于0，请重新输入")
-                        # 不清除状态，让用户重新输�?
+                        await update.message.reply_text("下注金额必须大于0, 请重新输入")
+                        # 不清除状态, 让用户重新输�?
                     else:
-                        # 存储金额，等待用户输入猜�?
+                        # 存储金额, 等待用户输入猜�?
                         import time
                         step_input_states[user_id]['data']['amount'] = str(amount)
                         step_input_states[user_id]['timestamp'] = time.time()
                         await update.message.reply_text(f"已收到下注金额：{amount} 🪙\n\n请输入猜测的大小：`大` �?`小`", parse_mode='Markdown')
-                        # 不清除状态，继续等待猜测
+                        # 不清除状态, 继续等待猜测
                 except ValueError:
-                    await update.message.reply_text("请输入有效的数字作为金额，请重新输入")
-                    # 不清除状态，让用户重新输�?
+                    await update.message.reply_text("请输入有效的数字作为金额, 请重新输入")
+                    # 不清除状态, 让用户重新输�?
         else:
-            await update.message.reply_text("请输入正确的格式，例如：`10 大` 或只输入 `10`")
-            # 不清除状态，让用户重新输�?
+            await update.message.reply_text("请输入正确的格式, 例如：`10 大` 或只输入 `10`")
+            # 不清除状态, 让用户重新输�?
         return
     
     # 检查是否在等待老虎机游戏的输入
@@ -1936,10 +1936,10 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             amount = int(input_text.strip())
             if amount <= 0:
-                await update.message.reply_text("�?下注金额必须大于0，请重新输入")
+                await update.message.reply_text("�?下注金额必须大于0, 请重新输入")
                 return
         except ValueError:
-            await update.message.reply_text("�?请输入有效的数字作为金额，请重新输入")
+            await update.message.reply_text("�?请输入有效的数字作为金额, 请重新输入")
             return
         
         from app.handlers.command_handlers import process_slot
@@ -1953,10 +1953,10 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             amount = int(input_text.strip())
             if amount <= 0:
-                await update.message.reply_text("�?下注金额必须大于0，请重新输入")
+                await update.message.reply_text("�?下注金额必须大于0, 请重新输入")
                 return
         except ValueError:
-            await update.message.reply_text("�?请输入有效的数字作为金额，请重新输入")
+            await update.message.reply_text("�?请输入有效的数字作为金额, 请重新输入")
             return
         
         from app.handlers.command_handlers import process_blackjack
@@ -1970,10 +1970,10 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             amount = int(input_text.strip())
             if amount <= 0:
-                await update.message.reply_text("�?下注金额必须大于0，请重新输入")
+                await update.message.reply_text("�?下注金额必须大于0, 请重新输入")
                 return
         except ValueError:
-            await update.message.reply_text("�?请输入有效的数字作为金额，请重新输入")
+            await update.message.reply_text("�?请输入有效的数字作为金额, 请重新输入")
             return
         
         # 设置参数并调用gameshoot_handler
@@ -2002,7 +2002,7 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if 'token' in context.user_data:
                 token = context.user_data.get('token')
                 print(f"DEBUG: token from context={token[:20]}..." if token else "DEBUG: token is None from context")
-            # 如果context中没有token，从user_tokens中获?
+            # 如果context中没有token, 从user_tokens中获?
             elif user_id in user_tokens:
                 user_info = user_tokens[user_id]
                 print(f"DEBUG: user_info type={type(user_info)}")
@@ -2037,11 +2037,11 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     else:
                         error_text = response.text[:200] if response.text else "无响应内�?
                         logger.error(f"更新笔名API错误: 状态码={response.status_code}, 内容={error_text}")
-                        await loading.edit_text(f"�?更新笔名失败，状态码：{response.status_code}\n{error_text}")
+                        await loading.edit_text(f"�?更新笔名失败, 状态码：{response.status_code}\n{error_text}")
                 except Exception as e:
                     # 记录详细的错误信�?
                     logger.error(f"更新笔名失败: {type(e).__name__}: {str(e)}")
-                    await loading.edit_text(f"�?更新笔名失败，请稍后重试\n错误: {type(e).__name__}")
+                    await loading.edit_text(f"�?更新笔名失败, 请稍后重试\n错误: {type(e).__name__}")
                 
                 # 显示返回菜单
                 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
@@ -2078,11 +2078,11 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     else:
                         error_text = response.text[:200] if response.text else "无响应内�?
                         logger.error(f"邀请用户API错误: 状态码={response.status_code}, 内容={error_text}")
-                        await loading.edit_text(f"�?邀请失败，状态码：{response.status_code}\n{error_text}")
+                        await loading.edit_text(f"�?邀请失败, 状态码：{response.status_code}\n{error_text}")
                 except Exception as e:
                     # 记录详细的错误信�?
                     logger.error(f"邀请用户失�? {type(e).__name__}: {str(e)}")
-                    await loading.edit_text(f"�?邀请用户失败，请稍后重试\n错误: {type(e).__name__}")
+                    await loading.edit_text(f"�?邀请用户失败, 请稍后重试\n错误: {type(e).__name__}")
                 
                 # 显示返回菜单
                 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
@@ -2147,10 +2147,10 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         reply_markup = InlineKeyboardMarkup(keyboard)
                         await update.message.reply_text("操作完成", reply_markup=reply_markup)
                     else:
-                        await update.message.reply_text("�?转赠金额必须�?-6000之间，请重新输入�?)
+                        await update.message.reply_text("�?转赠金额必须�?-6000之间, 请重新输入�?)
                         return 103  # 继续等待金额输入
                 except ValueError:
-                    await update.message.reply_text("�?请输入有效的数字，请重新输入�?)
+                    await update.message.reply_text("�?请输入有效的数字, 请重新输入�?)
                     return 103  # 继续等待金额输入
                 
                 # 清理用户数据
@@ -2170,7 +2170,7 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         
                         if total_recharge + amount > 100:
                             remaining = 100 - total_recharge
-                            await update.message.reply_text(f"充值限额为100萝卜，您已累计充值{total_recharge}萝卜，还可充值{remaining}萝卜")
+                            await update.message.reply_text(f"充值限额为100萝卜, 您已累计充值{total_recharge}萝卜, 还可充值{remaining}萝卜")
                             return
                         
                         # 从context中获取用户信?
@@ -2223,7 +2223,7 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                 expired = result.get('expired')
                                 
                                 if pay_url:
-                                    # 先获取用户信息，保存到本地数据库
+                                    # 先获取用户信息, 保存到本地数据库
                                     try:
                                         user_headers = {"Authorization": f"Bearer {token}"}
                                         async with httpx.AsyncClient() as client:
@@ -2300,16 +2300,16 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                                 reply_markup = InlineKeyboardMarkup(keyboard)
                                                 await loading.edit_text(message, reply_markup=reply_markup)
                                             else:
-                                                await loading.edit_text("�?创建订单失败，用户信息获取失�?)
+                                                await loading.edit_text("�?创建订单失败, 用户信息获取失�?)
                                         else:
-                                            await loading.edit_text(f"�?获取用户信息失败，状态码：{user_response.status_code}")
+                                            await loading.edit_text(f"�?获取用户信息失败, 状态码：{user_response.status_code}")
                                     except Exception as db_error:
                                         logger.error(f"保存订单到本地数据库失败: {db_error}")
-                                        await loading.edit_text("�?订单创建失败，请稍后重试")
+                                        await loading.edit_text("�?订单创建失败, 请稍后重试")
                                 else:
-                                    await loading.edit_text("�?创建订单失败，没有返回支付链�?)
+                                    await loading.edit_text("�?创建订单失败, 没有返回支付链�?)
                             else:
-                                await loading.edit_text(f"�?创建订单失败，状态码：{response.status_code}\n响应：{response.text}")
+                                await loading.edit_text(f"�?创建订单失败, 状态码：{response.status_code}\n响应：{response.text}")
                         except Exception as e:
                             # 记录详细的错误信�?
                             logger.error(f"创建支付订单失败: {type(e).__name__}: {e}")
@@ -2317,15 +2317,15 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             logger.error(f"错误堆栈: {traceback.format_exc()}")
                             await loading.edit_text(f"�?创建订单失败: {type(e).__name__}: {e}")
                     else:
-                        await update.message.reply_text("�?充值金额必须在1-50000之间，请重新输入�?)
+                        await update.message.reply_text("�?充值金额必须在1-50000之间, 请重新输入�?)
                         return 104  # 继续等待金额输入
                 except ValueError:
-                    await update.message.reply_text("�?请输入有效的数字，请重新输入�?)
+                    await update.message.reply_text("�?请输入有效的数字, 请重新输入�?)
                     return 104  # 继续等待金额输入
             else:
                 await update.message.reply_text("�?请先登录！发�?/start 登录")
             
-            # 注意：这里不应该有代码，因为前面�?if-elif 链已经结�?
+            # 注意：这里不应该有代码, 因为前面�?if-elif 链已经结�?
             # 提现处理应该在单独的 elif 分支�?
             
         elif operation == 'service_withdraw_amount':
@@ -2367,8 +2367,8 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             order_no = f"W{datetime.now(beijing_tz).strftime('%Y%m%d')}{str(uuid.uuid4())[:8].upper()}"
                             
                             # 1. 创建提现订单
-                            # 手续费已从游戏币中扣除，萝卜数量保持不变
-                            # 获取用户信息，包括username
+                            # 手续费已从游戏币中扣除, 萝卜数量保持不变
+                            # 获取用户信息, 包括username
                             from app.config import user_tokens
                             user_info = user_tokens.get(user_id, {})
                             username = user_info.get('username', '') if isinstance(user_info, dict) else ''
@@ -2422,7 +2422,7 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                             update_withdraw_order_status(
                                                 order_no=order_no,
                                                 status='success',
-                                                transfer_result=f"转账成功，金额：{after_tax_carrot}萝卜（税前{carrot_amount}萝卜，税费{tax_carrot}萝卜），手续费：{fee_game_coin}游戏�?
+                                                transfer_result=f"转账成功, 金额：{after_tax_carrot}萝卜（税前{carrot_amount}萝卜, 税费{tax_carrot}萝卜）, 手续费：{fee_game_coin}游戏�?
                                             )
                                             # 计算剩余游戏币余�?
                                             remaining_balance = game_balance - amount
@@ -2446,7 +2446,7 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                                 f"💰 扣除游戏币：{amount}\n"
                                                 f"🪙 剩余游戏币：{remaining_balance}\n\n"
                                                 f"📊 剩余可提现额度：{remaining_withdraw_limit} 🥕\n"
-                                                f"（累计充值{total_recharge} 🥕3倍，已提现{total_withdraw_after} 🥕�?,
+                                                f"（累计充值{total_recharge} 🥕3倍, 已提现{total_withdraw_after} 🥕�?,
                                                 parse_mode="Markdown"
                                             )
                                         
@@ -2464,9 +2464,9 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                         update_withdraw_order_status(
                                             order_no=order_no,
                                             status='failed',
-                                            transfer_result=f"转账失败，状态码：{transfer_response.status_code}"
+                                            transfer_result=f"转账失败, 状态码：{transfer_response.status_code}"
                                         )
-                                        await loading.edit_text(f"?转账失败，状态码：{transfer_response.status_code}\n订单号：\n```\n{order_no}\n```\n", parse_mode="Markdown")
+                                        await loading.edit_text(f"?转账失败, 状态码：{transfer_response.status_code}\n订单号：\n```\n{order_no}\n```\n", parse_mode="Markdown")
                                 else:
                                     # 更新提现订单状态为失败
                                     update_withdraw_order_status(
@@ -2480,21 +2480,21 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                 update_withdraw_order_status(
                                     order_no=order_no,
                                     status='failed',
-                                    transfer_result=f"获取用户信息失败，状态码：{user_response.status_code}"
+                                    transfer_result=f"获取用户信息失败, 状态码：{user_response.status_code}"
                                 )
-                                await loading.edit_text(f"?获取用户信息失败，状态码：{user_response.status_code}\n订单号：\n```\n{order_no}\n```\n", parse_mode="Markdown")
+                                await loading.edit_text(f"?获取用户信息失败, 状态码：{user_response.status_code}\n订单号：\n```\n{order_no}\n```\n", parse_mode="Markdown")
                         except Exception as e:
-                            # 直接记录固定的错误信息，避免尝试编码包含emoji的异常信�?
+                            # 直接记录固定的错误信息, 避免尝试编码包含emoji的异常信�?
                             logger.error("提现失败")
                             # 更新提现订单状态为失败
                             update_withdraw_order_status(
                                 order_no=order_no,
                                 status='failed',
-                                transfer_result="提现失败，请稍后重试"
+                                transfer_result="提现失败, 请稍后重试"
                             )
-                            await loading.edit_text(f"�?提现失败，请稍后重试\n订单号：\n```\n{order_no}\n```\n", parse_mode="Markdown")
+                            await loading.edit_text(f"�?提现失败, 请稍后重试\n订单号：\n```\n{order_no}\n```\n", parse_mode="Markdown")
                 except ValueError:
-                    await update.message.reply_text("�?请输入有效的数字，请重新输入�?)
+                    await update.message.reply_text("�?请输入有效的数字, 请重新输入�?)
                     return 105  # 继续等待金额输入
                 else:
                     await update.message.reply_text("�?请先登录！发�?/start 登录")
@@ -2525,11 +2525,11 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                     game_coin = result.get('game_coin', 0)
                                     await loading.edit_text(f"�?游戏充值成功！\n兑换游戏币：{game_coin}")
                                 else:
-                                    await loading.edit_text(f"�?游戏充值失败，状态码：{response.status_code}")
+                                    await loading.edit_text(f"�?游戏充值失败, 状态码：{response.status_code}")
                             except Exception as e:
-                                # 直接记录固定的错误信息，避免尝试编码包含emoji的异常信�?
+                                # 直接记录固定的错误信息, 避免尝试编码包含emoji的异常信�?
                                 logger.error("游戏充值失�?)
-                                await loading.edit_text("�?游戏充值失败，请稍后重�?)
+                                await loading.edit_text("�?游戏充值失败, 请稍后重�?)
                             
                             # 显示返回菜单
                             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
@@ -2537,10 +2537,10 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             reply_markup = InlineKeyboardMarkup(keyboard)
                             await update.message.reply_text("操作完成", reply_markup=reply_markup)
                         else:
-                            await update.message.reply_text("�?充值金额必须在1-50000之间，请重新输入�?)
+                            await update.message.reply_text("�?充值金额必须在1-50000之间, 请重新输入�?)
                             return 106  # 继续等待金额输入
                     except ValueError:
-                        await update.message.reply_text("�?请输入有效的数字，请重新输入�?)
+                        await update.message.reply_text("�?请输入有效的数字, 请重新输入�?)
                         return 106  # 继续等待金额输入
                     
                     # 清理用户数据
@@ -2593,36 +2593,36 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         print(f"DEBUG: Response content: {response.text}")
                         
                         if response.status_code == 200:
-                            await loading.edit_text("?申请成功，等待审�?)
+                            await loading.edit_text("?申请成功, 等待审�?)
                         else:
                             try:
                                 error_data = response.json()
                                 safe_error = error_data.get('msg', '未知错误')
                                 logger.error(f"申请服务商API返回错误: 状态码={response.status_code}, 错误信息={safe_error}")
-                                await loading.edit_text(f"?申请失败，状态码：{response.status_code}\n{safe_error}")
+                                await loading.edit_text(f"?申请失败, 状态码：{response.status_code}\n{safe_error}")
                             except Exception as e:
                                 print(f"DEBUG: Error processing error text: {type(e).__name__}: {e}")
                                 logger.error(f"申请服务商API返回错误: 状态码={response.status_code} [无法处理的响应]")
-                                await loading.edit_text(f"?申请失败，状态码：{response.status_code}\n[响应内容无法显示]")
+                                await loading.edit_text(f"?申请失败, 状态码：{response.status_code}\n[响应内容无法显示]")
                     except httpx.HTTPStatusError as e:
                         print(f"DEBUG: HTTPStatusError: {e}")
                         logger.error(f"申请服务商HTTP错误: {e.response.status_code}")
-                        await loading.edit_text(f"?申请失败，HTTP错误：{e.response.status_code}")
+                        await loading.edit_text(f"?申请失败, HTTP错误：{e.response.status_code}")
                     except httpx.RequestError as e:
                         print(f"DEBUG: RequestError: {e}")
                         logger.error(f"申请服务商请求错�?{type(e).__name__}")
-                        await loading.edit_text("�?申请失败，网络请求错误，请检查网络连�?)
+                        await loading.edit_text("�?申请失败, 网络请求错误, 请检查网络连�?)
                     except UnicodeEncodeError as e:
                         print(f"DEBUG: UnicodeEncodeError: {e}")
                         print(f"DEBUG: Error details: {e.encode}")
                         # 记录异常类型但不记录可能包含emoji的消�?
                         logger.error(f"申请服务商发生异�?UnicodeEncodeError")
-                        await loading.edit_text("�?申请失败，请稍后重试")
+                        await loading.edit_text("�?申请失败, 请稍后重试")
                     except Exception as e:
                         print(f"DEBUG: Other exception: {type(e).__name__}: {e}")
                         # 记录异常类型但不记录可能包含emoji的消�?
                         logger.error(f"申请服务商发生异�?{type(e).__name__}")
-                        await loading.edit_text("�?申请失败，请稍后重试")
+                        await loading.edit_text("�?申请失败, 请稍后重试")
                     
                     # 显示返回菜单
                     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
@@ -2690,10 +2690,10 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         if response.status_code == 200:
                             await loading.edit_text("�?更新成功!")
                         else:
-                            await loading.edit_text(f"�?更新失败，状态码：{response.status_code}")
+                            await loading.edit_text(f"�?更新失败, 状态码：{response.status_code}")
                     except Exception as e:
                         logger.error(f"更新服务商信息失�?{e}")
-                        await loading.edit_text("�?更新失败，请稍后重试")
+                        await loading.edit_text("�?更新失败, 请稍后重试")
                     
                     # 显示返回菜单
                     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
@@ -2780,7 +2780,7 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                 clear_operation_data(context)
                                 return
                             
-                            # 先发送加载消息，确保loading变量在try块之前定�?
+                            # 先发送加载消息, 确保loading变量在try块之前定�?
                             loading = await update.message.reply_text("🔄 正在转账...")
                             
                             try:
@@ -2813,7 +2813,7 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                         logger.error(f"转账失败: {msg}, 完整响应: {result}")
                                         await loading.edit_text(f"�?转账失败：{msg}")
                                 else:
-                                    await loading.edit_text(f"�?转账失败，状态码：{response.status_code}")
+                                    await loading.edit_text(f"�?转账失败, 状态码：{response.status_code}")
                             except Exception as e:
                                 logger.error(f"转账失败: {e}")
                                 import traceback
@@ -2825,10 +2825,10 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             reply_markup = InlineKeyboardMarkup(keyboard)
                             await update.message.reply_text("操作完成", reply_markup=reply_markup)
                         else:
-                            await update.message.reply_text("�?转账金额必须�?-50000之间，请重新输入�?)
+                            await update.message.reply_text("�?转账金额必须�?-50000之间, 请重新输入�?)
                             return 107  # 继续等待金额输入
                     except ValueError:
-                        await update.message.reply_text("�?请输入有效的数字，请重新输入�?)
+                        await update.message.reply_text("�?请输入有效的数字, 请重新输入�?)
                         return 107  # 继续等待金额输入
                     
                     # 清理用户数据
@@ -2848,10 +2848,10 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             context.user_data['current_operation'] = 'service_pay_create_name'
                             context.user_data['amount'] = amount
                         else:
-                            await update.message.reply_text("�?订单金额必须�?-50000之间，请重新输入�?)
+                            await update.message.reply_text("�?订单金额必须�?-50000之间, 请重新输入�?)
                             return 108  # 继续等待金额输入
                     except ValueError:
-                        await update.message.reply_text("�?请输入有效的数字，请重新输入�?)
+                        await update.message.reply_text("�?请输入有效的数字, 请重新输入�?)
                         return 108  # 继续等待金额输入
                 else:
                     await update.message.reply_text("�?请先登录！发�?/start 登录")
@@ -2903,10 +2903,10 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             message += f"回调状态：{result.get('notify_status', '未知')}"
                             await loading.edit_text(message, parse_mode="Markdown")
                         else:
-                            await loading.edit_text(f"?查询失败，状态码：{response.status_code}")
+                            await loading.edit_text(f"?查询失败, 状态码：{response.status_code}")
                     except Exception as e:
                         logger.error(f"查询订单失败: {e}")
-                        await loading.edit_text("?查询失败，请稍后重试")
+                        await loading.edit_text("?查询失败, 请稍后重试")
                     
                     # 清理用户数据
                     clear_operation_data(context)
@@ -2932,10 +2932,10 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         if response.status_code == 200:
                             await loading.edit_text("�?订单关闭成功!")
                         else:
-                            await loading.edit_text(f"�?关闭失败，状态码：{response.status_code}")
+                            await loading.edit_text(f"�?关闭失败, 状态码：{response.status_code}")
                     except Exception as e:
                         logger.error(f"关闭订单失败: {e}")
-                        await loading.edit_text("�?关闭失败，请稍后重试")
+                        await loading.edit_text("�?关闭失败, 请稍后重试")
                     
                     # 清理用户数据
                     clear_operation_data(context)
@@ -2981,10 +2981,10 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             
                             await loading.edit_text(message, parse_mode="Markdown")
                         else:
-                            await loading.edit_text(f"?查询失败，状态码：{response.status_code}", parse_mode="Markdown")
+                            await loading.edit_text(f"?查询失败, 状态码：{response.status_code}", parse_mode="Markdown")
                     except Exception as e:
                         logger.error(f"查询中奖列表失败: {e}")
-                        await loading.edit_text("?查询失败，请稍后重试", parse_mode="Markdown")
+                        await loading.edit_text("?查询失败, 请稍后重试", parse_mode="Markdown")
                     
                     # 清理用户数据
                     clear_operation_data(context)
@@ -3014,10 +3014,10 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             remaining = result.get('invite_remaining', 0)
                             await loading.edit_text(f"?撤销成功！剩余邀请次数：{remaining}")
                         else:
-                            await loading.edit_text(f"?撤销失败，状态码：{response.status_code}")
+                            await loading.edit_text(f"?撤销失败, 状态码：{response.status_code}")
                     except Exception as e:
                         logger.error(f"撤销邀请失�? {e}")
-                        await loading.edit_text("?撤销失败，请稍后重试")
+                        await loading.edit_text("?撤销失败, 请稍后重试")
                     
                     # 清理用户数据
                     clear_operation_data(context)
@@ -3163,7 +3163,7 @@ async def shoot_callback_handler(update: Update, context: ContextTypes.DEFAULT_T
         game = shoot_games[chat_id]
         
         if user_id not in game['players']:
-            # 如果用户还没参与，添加到游戏�?
+            # 如果用户还没参与, 添加到游戏�?
             from app.config import user_tokens
             if user_id not in user_tokens:
                 await query.answer("请先使用 /start 命令登录�?)
@@ -3191,7 +3191,7 @@ async def shoot_callback_handler(update: Update, context: ContextTypes.DEFAULT_T
             
             await query.answer(f"�?您选择了{user_choice}！已参与游戏")
         else:
-            # 用户已经在游戏中，更新选择
+            # 用户已经在游戏中, 更新选择
             if game['players'][user_id]['choice'] is not None:
                 await query.answer(f"�?您已出拳�?)
             else:
@@ -3230,12 +3230,12 @@ async def shoot_callback_handler(update: Update, context: ContextTypes.DEFAULT_T
         player2_choice = game['players'][player2_id]['choice']
         
         if player1_choice and player2_choice:
-            # 双方都出拳了，判定结�?
+            # 双方都出拳了, 判定结�?
             await process_duel_result(game_id, context)
         else:
             # 等待对方出拳
-            await query.answer(f"�?您选择了{user_choice}，等待对方出�?..")
-            # 更新消息显示已出拳状态，但保留按�?
+            await query.answer(f"�?您选择了{user_choice}, 等待对方出�?..")
+            # 更新消息显示已出拳状态, 但保留按�?
             player1_name = game['players'][player1_id]['name']
             player2_name = game['players'][player2_id]['name']
             
@@ -3250,7 +3250,7 @@ async def shoot_callback_handler(update: Update, context: ContextTypes.DEFAULT_T
             else:
                 status_text += f"�?{player2_name} 等待�?..\n"
             
-            # 保留按钮，让另一方可以继续选择
+            # 保留按钮, 让另一方可以继续选择
             keyboard = [
                 [
                     InlineKeyboardButton("�?石头", callback_data=f"shoot_duel_rock_{game_id}"),
@@ -3328,7 +3328,7 @@ async def shoot_callback_handler(update: Update, context: ContextTypes.DEFAULT_T
             await start_shoot_group_game(game_id, context)
         return
     
-    # 加入群聊游戏（旧方式，保留兼容）
+    # 加入群聊游戏（旧方式, 保留兼容）
     if data.startswith("shoot_join_"):
         game_id = data.replace("shoot_join_", "")
         
@@ -3572,7 +3572,7 @@ async def start_shoot_group_game(chat_id: str, context: ContextTypes.DEFAULT_TYP
         if i + 1 < player_count:
             groups.append((players[i], players[i+1]))
         else:
-            # 单数，最后一名和AI（天道）对战
+            # 单数, 最后一名和AI（天道）对战
             await process_ai_match(game, players[i], context)
     
     # 处理每组对战
@@ -3787,17 +3787,17 @@ async def end_shoot_game(chat_id: str, application):
     
     game = shoot_games[chat_id]
     
-    # 如果是等待中的游戏，且人数不�?
+    # 如果是等待中的游戏, 且人数不�?
     if game['status'] == 'waiting':
         player_count = len(game['players'])
         
         if player_count < 2:
             await application.bot.send_message(
                 chat_id=game['chat_id'],
-                text=f"🎮 猜拳游戏结束\n\n�?分钟内无人参与，游戏自动结束"
+                text=f"🎮 猜拳游戏结束\n\n�?分钟内无人参与, 游戏自动结束"
             )
         else:
-            # 有人参与但时间到了，开始游�?
+            # 有人参与但时间到了, 开始游�?
             await application.bot.send_message(
                 chat_id=game['chat_id'],
                 text=f"🎮 猜拳游戏时间到！\n\n参与人数：{player_count} 人\n游戏开始！"
@@ -3805,19 +3805,19 @@ async def end_shoot_game(chat_id: str, application):
             await start_shoot_group_game(chat_id, application)
             return
     elif game['status'] == 'playing':
-        # 带按钮的游戏，时间到了直接开始结�?
+        # 带按钮的游戏, 时间到了直接开始结�?
         player_count = len(game['players'])
         # 检查是否有玩家选择了出拳（至少有创建者）
         players_with_choice = sum(1 for p in game['players'].values() if p['choice'] is not None)
         
         if players_with_choice == 0:
-            # 没有人选择，结束游�?
+            # 没有人选择, 结束游�?
             await application.bot.send_message(
                 chat_id=game['chat_id'],
-                text=f"🎮 猜拳游戏结束\n\n无人参与，游戏自动结�?
+                text=f"🎮 猜拳游戏结束\n\n无人参与, 游戏自动结�?
             )
         else:
-            # 有人选择了，开始结�?
+            # 有人选择了, 开始结�?
             await application.bot.send_message(
                 chat_id=game['chat_id'],
                 text=f"🎮 猜拳游戏时间到！\n\n参与人数：{players_with_choice} 人\n游戏开始！"
@@ -3859,7 +3859,7 @@ def main() -> None:
     from telegram.ext import Defaults
     import os
     
-    # 从环境变量读取并发配置，默认使用较高值以充分利用VPS资源
+    # 从环境变量读取并发配置, 默认使用较高值以充分利用VPS资源
     concurrent_workers = int(os.getenv('BOT_CONCURRENT_WORKERS', '32'))
     connection_pool_size = int(os.getenv('BOT_CONNECTION_POOL_SIZE', '16'))
     
