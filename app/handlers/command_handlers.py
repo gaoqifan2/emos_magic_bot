@@ -1100,8 +1100,12 @@ async def stand_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             from app.database.user_streaks import update_user_streak
             update_user_streak(user_id, local_user_id, 'blackjack', True)
             
+            # 计算税收（10%）
+            service_fee = int(win_amount * 0.1)
+            net_win = win_amount - service_fee
+            
             # 更新余额
-            update_balance(user_id, win_amount)
+            update_balance(user_id, net_win)
             
             new_balance = get_balance(user_id)
             
@@ -1118,11 +1122,13 @@ async def stand_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 result_message += "🎉 您赢了！\n"
             
             result_message += f"获得：{win_amount} 🪙\n"
+            result_message += f"服务费：{service_fee} 🪙\n"
+            result_message += f"实际到账：{net_win} 🪙\n"
             result_message += f"当前余额：{new_balance} 🪙"
             
             # 记录游戏结果
             from app.database import add_game_record
-            add_game_record(user_id, 'blackjack', amount, 'win', win_amount, username)
+            add_game_record(user_id, 'blackjack', amount, 'win', net_win, username)
             # 添加积分
             from app.database.user_score import add_user_score
             add_user_score(user_id, 3)
