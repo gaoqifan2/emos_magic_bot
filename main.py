@@ -763,6 +763,10 @@ async def guess_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 'emos_user_id': emos_user_id
             }
             
+            # 调试信息
+            print(f"DEBUG: 保存游戏状态 - chat_id={chat_id}, user_id={user_id}, amount={amount}, guess={guess}")
+            print(f"DEBUG: private_guess_games 状态: {private_guess_games}")
+            
             # 发送Telegram官方骰子（使用reply_to回复用户消息）
             await update.message.reply_dice(reply_to_message_id=update.message.message_id)
             return
@@ -853,8 +857,18 @@ async def handle_dice_result(update: Update, context: ContextTypes.DEFAULT_TYPE)
     chat_id = update.effective_chat.id
     dice_message = update.effective_message
     
+    # 调试信息
+    print(f"DEBUG: handle_dice_result 被调用 - chat_id={chat_id}")
+    print(f"DEBUG: dice_message.reply_to_message 存在: {bool(dice_message.reply_to_message)}")
+    
+    if dice_message.reply_to_message:
+        original_user = dice_message.reply_to_message.from_user
+        original_user_id = original_user.id
+        print(f"DEBUG: 原始用户ID: {original_user_id}")
+    
     # 获取骰子点数
     dice_value = dice_message.dice.value
+    print(f"DEBUG: 骰子点数: {dice_value}")
     
     # 检查是否是私聊模式（通过reply_to_message判断）
     if dice_message.reply_to_message:
@@ -863,11 +877,16 @@ async def handle_dice_result(update: Update, context: ContextTypes.DEFAULT_TYPE)
         original_user_id = original_user.id
         
         # 从全局字典中查找该用户的游戏
+        print(f"DEBUG: 查找游戏 - chat_id={chat_id}, original_user_id={original_user_id}")
+        print(f"DEBUG: private_guess_games 状态: {private_guess_games}")
+        
         if chat_id in private_guess_games and original_user_id in private_guess_games[chat_id]:
             game_data = private_guess_games[chat_id][original_user_id]
             amount = game_data['amount']
             guess = game_data['guess']
             emos_user_id = game_data['emos_user_id']
+            
+            print(f"DEBUG: 找到游戏数据 - amount={amount}, guess={guess}, emos_user_id={emos_user_id}")
             
             # 处理结果
             await process_guess_result(update, dice_value, amount, guess, emos_user_id, original_user_id, chat_id)
@@ -876,6 +895,7 @@ async def handle_dice_result(update: Update, context: ContextTypes.DEFAULT_TYPE)
             del private_guess_games[chat_id][original_user_id]
             if not private_guess_games[chat_id]:
                 del private_guess_games[chat_id]
+            print(f"DEBUG: 游戏数据已清除")
             return
     
     # 检查当前用户是否有等待中的游戏（私聊模式）
@@ -893,11 +913,16 @@ async def handle_dice_result(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def process_guess_result(update: Update, dice_value: int, amount: int, guess: str, 
                                emos_user_id: str, user_id: int, chat_id: int, context=None):
     """处理猜大小游戏结果"""
+    # 调试信息
+    print(f"DEBUG: process_guess_result 被调用 - amount={amount}, guess={guess}, emos_user_id={emos_user_id}")
+    
     # 判断大小（一个骰子规则：4-6为大，1-3为小）
     if dice_value in [4, 5, 6]:
         actual_result = "大"
     else:
         actual_result = "小"
+    
+    print(f"DEBUG: 实际结果: {actual_result}, 猜测: {guess}")
     
     # 处理结果
     from app.database import update_balance, get_balance
@@ -918,6 +943,7 @@ async def process_guess_result(update: Update, dice_value: int, amount: int, gue
             f"实际到账：{net_win} 🪙\n"
             f"当前余额：{new_balance} 🪙"
         )
+        print(f"DEBUG: 用户赢了 - win_amount={win_amount}, service_fee={service_fee}, net_win={net_win}")
     else:
         # 输了，失去下注金额
         update_balance(emos_user_id, -amount)
@@ -930,8 +956,10 @@ async def process_guess_result(update: Update, dice_value: int, amount: int, gue
             f"扣除：{amount} 🪙\n"
             f"当前余额：{new_balance} 🪙"
         )
+        print(f"DEBUG: 用户输了 - 扣除金额={amount}")
     
     # 发送结果
+    print(f"DEBUG: 发送结果消息")
     await update.effective_message.reply_text(result_text)
     
     # 清除context中的数据（如果是私聊模式）
@@ -941,6 +969,7 @@ async def process_guess_result(update: Update, dice_value: int, amount: int, gue
         for key in keys_to_clear:
             if key in context.user_data:
                 del context.user_data[key]
+        print(f"DEBUG: 清除context数据")
 
 # 群聊下注命令处理器
 async def guess_bet_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
