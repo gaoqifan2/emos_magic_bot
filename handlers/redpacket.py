@@ -507,6 +507,7 @@ async def create_redpacket(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """创建红包API调用"""
     user_id = update.effective_user.id
     token = get_user_token(user_id)
+    user_info = user_tokens.get(user_id)
     
     if 'redpacket' not in context.user_data:
         await update.message.reply_text("❌ 数据不完整，请重新开始")
@@ -583,6 +584,11 @@ async def create_redpacket(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else:
                 redpacket_type_display = "🧧 红包"
             
+            # 获取用户余额
+            from app.database import get_balance
+            user_id_str = user_info.get('user_id', user_id)
+            balance = get_balance(user_id_str)
+            
             message = (
                 f"# 红包凭证\n\n"
                 f"✅ 红包创建成功！\n\n"
@@ -590,6 +596,7 @@ async def create_redpacket(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"💰 金额: {data['carrot']} 萝卜\n"
                 f"👥 人数: {data['number']}\n"
                 f"💬 祝福语: `{data['blessing']}`\n"
+                f"💎 当前余额: {balance} 萝卜\n"
             )
             if redpacket_text:
                 message += f"🔑 口令: `{redpacket_text}`\n"
@@ -601,7 +608,15 @@ async def create_redpacket(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if result.get('red_packet_id'):
                 message += f"🆔 红包ID: `{result['red_packet_id']}`\n"
             
-            await loading.edit_text(message, parse_mode="Markdown")
+            # 添加跳转到群链接的按钮
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            keyboard = [
+                [InlineKeyboardButton("👥 跳转到 emospg 群", url="https://t.me/emospg")],
+                [InlineKeyboardButton("🔙 返回主菜单", callback_data="menu_main")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await loading.edit_text(message, parse_mode="Markdown", reply_markup=reply_markup)
         else:
             await loading.edit_text(f"❌ 创建失败，状态码：{response.status_code}")
             if response.text:

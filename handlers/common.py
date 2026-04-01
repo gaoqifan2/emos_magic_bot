@@ -871,17 +871,17 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             if response.status_code == 200:
                 service_info = response.json()
-                status = service_info.get('status')
-                if status == 'pass':
-                    is_service = True
+                is_service = service_info.get('status') == 'pass'
+                if is_service:
                     logger.info(f"用户是服务商")
                 else:
-                    logger.info(f"用户不是服务商，状态: {status}")
+                    logger.info(f"用户不是服务商")
             else:
                 logger.info(f"用户不是服务商，状态码: {response.status_code}")
         except Exception as e:
             # 直接记录固定的错误信息，避免尝试编码包含emoji的异常信息
             logger.error("检查服务商状态失败")
+            is_service = False
         
         if is_service:
             # 提示用户输入对方用户ID
@@ -1045,7 +1045,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 InlineKeyboardButton("🔄 重置永久密码", callback_data="menu_reset_permanent_password")
             ],
             [
-                InlineKeyboardButton("✏️ 自定义密码", callback_data="menu_custom_password")
+                InlineKeyboardButton("🏠 跳转到官网", url="https://emos.best/#/home")
             ],
             [InlineKeyboardButton("🔙 返回", callback_data="menu_user_main")]
         ]

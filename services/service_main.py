@@ -37,9 +37,7 @@ async def show_service_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         if response.status_code == 200:
             service_info = response.json()
-            status = service_info.get('status')
-            if status == 'pass':
-                is_service = True
+            is_service = service_info.get('status') == 'pass'
         elif response.status_code == 404:
             # API不存在，暂时将用户视为普通用户
             logger.warning("服务商检查API不存在，暂时将用户视为普通用户")
@@ -334,11 +332,7 @@ async def service_fund_transfer(update: Update, context: ContextTypes.DEFAULT_TY
         
         if response.status_code == 200:
             service_info = response.json()
-            status = service_info.get('status')
-            if status == 'pass':
-                is_service = True
-            else:
-                is_service = False
+            is_service = service_info.get('status') == 'pass'
         else:
             is_service = False
     except Exception as e:

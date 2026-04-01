@@ -1,14 +1,14 @@
 # 配置文件 - 使用魔盒的配置
 
-# 从魔盒导入配置
-from config import Config, user_tokens, SERVICE_PROVIDER_TOKEN, DEFAULT_GROUP_CHAT_ID
-
 # 机器人配置
-BOT_USERNAME = Config.BOT_USERNAME
+BOT_USERNAME = "emosCheShiBox_bot"
 
 # API 配置
-API_BASE_URL = Config.API_BASE_URL
-API_USER_ENDPOINT = Config.API_USER_ENDPOINT
+API_BASE_URL = "https://emos.best/api"
+API_USER_ENDPOINT = "https://emos.best/api/user"
+
+# 从魔盒导入配置
+from config import user_tokens, SERVICE_PROVIDER_TOKEN, DEFAULT_GROUP_CHAT_ID
 
 # 从数据库加载 token
 def load_tokens_from_db():

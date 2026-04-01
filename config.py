@@ -56,6 +56,9 @@ BOT_COMMANDS = [
     ("guess", "猜大小游戏"),
     ("createguess", "创建群聊猜大小游戏"),
     ("guess_bet", "群聊猜大小下注"),
+    ("rob", "打劫游戏"),
+    ("robstatus", "打劫状态"),
+    ("rules", "游戏规则"),
     ("withdraw", "提现"),
     ("help", "帮助"),
 ]
@@ -70,6 +73,9 @@ GROUP_ALLOWED_COMMANDS = [
     "createguess",   # 创建猜大小游戏
     "guess_bet",         # 群聊下注
     "gameshoot",   # 猜拳游戏
+    "rob",         # 打劫游戏
+    "robstatus",   # 打劫状态
+    "rules",       # 游戏规则
 ]
 
 # 全局变量 - 存储用户token

@@ -250,7 +250,25 @@ async def user_sign(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         if response.status_code == 200:
             result = response.json()
-            await loading.edit_text(f"✅ 签到成功！获得 {result.get('earn_point', 0)} 萝卜")
+            # 检查是否是重复签到
+            if 'message' in result and result['message'] == '重复签到':
+                await loading.edit_text(
+                    f"⏰ 您今天已经签到过了！\n" +
+                    f"🌈 明天再来吧～\n" +
+                    f"✨ 每天签到都有惊喜哦！"
+                )
+            else:
+                # 签到成功
+                sign_index = result.get('sign_index', 0)
+                earn_point = result.get('earn_point', 0)
+                continuous_days = result.get('continuous_days', 0)
+                await loading.edit_text(
+                    f"🎉 签到成功！\n" +
+                    f"💰 获得 {earn_point} 萝卜～\n" +
+                    f"📅 连续签到 {continuous_days} 天\n" +
+                    f"🏆 第 {sign_index} 次签到\n" +
+                    f"✨ 坚持签到，奖励更丰厚！"
+                )
         else:
             error_text = response.text[:200] if response.text else "无响应内容"
             logger.error(f"签到API错误: 状态码={response.status_code}")

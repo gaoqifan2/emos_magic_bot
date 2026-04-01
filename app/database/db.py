@@ -77,6 +77,8 @@ class DatabaseConnectionPool:
     
     def _is_connection_valid(self, connection):
         """检查连接是否有效"""
+        if not connection:
+            return False
         try:
             with connection.cursor() as cursor:
                 cursor.execute('SELECT 1')
@@ -122,15 +124,20 @@ def init_connection_pool():
     return connection_pool
 
 # 延迟初始化
-init_connection_pool()
+# init_connection_pool()  # 注释掉这行代码，避免在模块导入时执行
 
 def get_db_connection():
     """从连接池获取数据库连接"""
+    global connection_pool
+    if connection_pool is None:
+        init_connection_pool()
     return connection_pool.get_connection()
 
 def return_db_connection(connection):
     """将连接返回池"""
-    connection_pool.return_connection(connection)
+    global connection_pool
+    if connection_pool is not None:
+        connection_pool.return_connection(connection)
 
 
 def init_db():
@@ -458,6 +465,64 @@ def add_game_record(user_id, game_type, bet_amount, result, win_amount=0, userna
         print(f"添加游戏记录失败: {e}")
         connection.rollback()
         return False
+    finally:
+        connection.close()
+
+
+def get_user_streak(user_id, game_type):
+    """获取用户连胜/连败记录
+    
+    返回: {
+        'streak': 连胜/连败次数（正数为连胜，负数为连败）,
+        'total_games': 总游戏次数,
+        'total_wins': 总胜场,
+        'total_losses': 总败场
+    }
+    """
+    connection = get_db_connection()
+    if not connection:
+        return {'streak': 0, 'total_games': 0, 'total_wins': 0, 'total_losses': 0}
+    
+    try:
+        with connection.cursor() as cursor:
+            # 获取该游戏类型的所有记录（按时间倒序）
+            cursor.execute('''
+                SELECT result FROM game_records 
+                WHERE user_id = %s AND game_type = %s
+                ORDER BY created_at DESC
+            ''', (user_id, game_type))
+            
+            records = cursor.fetchall()
+            
+            if not records:
+                return {'streak': 0, 'total_games': 0, 'total_wins': 0, 'total_losses': 0}
+            
+            total_games = len(records)
+            total_wins = sum(1 for r in records if r['result'] == 'win')
+            total_losses = sum(1 for r in records if r['result'] == 'lose')
+            
+            # 计算连胜/连败
+            streak = 0
+            if records:
+                first_result = records[0]['result']
+                for record in records:
+                    if record['result'] == first_result and record['result'] in ['win', 'lose']:
+                        if first_result == 'win':
+                            streak += 1
+                        else:
+                            streak -= 1
+                    else:
+                        break
+            
+            return {
+                'streak': streak,
+                'total_games': total_games,
+                'total_wins': total_wins,
+                'total_losses': total_losses
+            }
+    except Exception as e:
+        print(f"获取连胜记录失败: {e}")
+        return {'streak': 0, 'total_games': 0, 'total_wins': 0, 'total_losses': 0}
     finally:
         connection.close()
 

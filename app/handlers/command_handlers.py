@@ -5,7 +5,8 @@ from app.database.jackpot import get_jackpot_pool, add_to_jackpot_pool, reset_ja
 from app.database.user_score import get_user_score, add_user_score, reset_user_score, get_user_level
 from app.database.user_streaks import get_user_streak, update_user_streak, add_user_tag
 from app.utils.helpers import check_balance, process_daily_checkin
-from app.config import BOT_USERNAME, user_tokens, save_token_to_db, get_user_info, Config, API_BASE_URL, DEFAULT_GROUP_CHAT_ID
+from app.config import BOT_USERNAME, save_token_to_db, get_user_info, API_BASE_URL
+from config import user_tokens, DEFAULT_GROUP_CHAT_ID, Config, SERVICE_PROVIDER_TOKEN
 import logging
 import httpx
 import random
@@ -1542,6 +1543,99 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if operation == 'withdraw_amount':
             await process_withdraw(update, context, text)
             return
+        
+        elif operation == 'service_fund_transfer_user_id':
+            # 处理服务商转账的用户ID输入
+            user_id = update.effective_user.id
+            token = context.user_data.get('token')
+            
+            if not token:
+                await update.message.reply_text("❌ 请先登录！发送 /start 登录")
+                return
+            
+            # 验证用户ID格式（10位字符串，以e开头s结尾）
+            if not (len(text) == 10 and text.startswith('e') and text.endswith('s')):
+                await update.message.reply_text("❌ 用户ID格式错误！请输入10位字符串，以e开头s结尾的用户ID：")
+                return
+            
+            # 保存用户ID，提示输入转账金额
+            context.user_data['target_user_id'] = text
+            context.user_data['current_operation'] = 'service_fund_transfer_amount'
+            await update.message.reply_text("💸 请输入转账金额：")
+            return
+        
+        elif operation == 'service_fund_transfer_amount':
+            # 处理服务商转账的金额输入
+            user_id = update.effective_user.id
+            token = context.user_data.get('token')
+            target_user_id = context.user_data.get('target_user_id')
+            
+            if not token or not target_user_id:
+                await update.message.reply_text("❌ 请先登录！发送 /start 登录")
+                return
+            
+            # 验证金额格式
+            try:
+                amount = float(text)
+                if amount <= 0:
+                    await update.message.reply_text("❌ 转账金额必须大于0，请重新输入：")
+                    return
+            except ValueError:
+                await update.message.reply_text("❌ 请输入有效的数字，请重新输入：")
+                return
+            
+            # 处理转账
+            try:
+                import httpx
+                from config import Config
+                
+                # 服务商转账应该使用服务商的token，而不是用户的token
+                headers = {"Authorization": f"Bearer {SERVICE_PROVIDER_TOKEN}"}
+                data = {"user_id": target_user_id, "carrot": amount}
+                
+                loading = await update.message.reply_text("🔄 正在处理转账...")
+                
+                async with httpx.AsyncClient() as client:
+                    response = await client.post(
+                        f"{Config.API_BASE_URL}/pay/transfer",
+                        headers=headers,
+                        json=data,
+                        timeout=10
+                    )
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    logger.info(f"转账API响应: {result}")
+                    # 检查响应是否包含deduct字段，这表示转账成功
+                    if 'deduct' in result:
+                        deduct = result.get('deduct', 0)
+                        carrot = result.get('carrot', 0)
+                        await loading.edit_text(
+                            f"🎉 转账成功！\n" +
+                            f"💰 转账金额：{amount} 萝卜\n" +
+                            f"🎁 转账用户：{target_user_id}\n" +
+                            f"📊 扣除萝卜：{deduct}\n" +
+                            f"💎 剩余萝卜：{carrot}"
+                        )
+                    elif result.get('status') == 'pass':
+                        await loading.edit_text(f"✅ 转账成功！\n转账金额：{amount} 萝卜\n转账用户：{target_user_id}")
+                    else:
+                        msg = result.get('msg', '未知错误')
+                        logger.error(f"转账失败: {msg}, 完整响应: {result}")
+                        await loading.edit_text(f"❌ 转账失败：{msg}")
+                else:
+                    await loading.edit_text(f"❌ 转账失败，状态码：{response.status_code}")
+            except Exception as e:
+                logger.error(f"转账异常: {e}")
+                import traceback
+                logger.error(f"转账异常堆栈: {traceback.format_exc()}")
+                await loading.edit_text(f"❌ 转账失败：{str(e)}")
+            
+            # 清理用户数据
+            context.user_data.pop('current_operation', None)
+            context.user_data.pop('target_user_id', None)
+            context.user_data.pop('token', None)
+            return
 
 
 async def process_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE, amount: str):
@@ -1629,7 +1723,7 @@ async def process_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE, a
                             
                             if user_emos_id:
                                 # 使用服务商token转账（税后金额）
-                                service_headers = {"Authorization": f"Bearer {Config.SERVICE_PROVIDER_TOKEN}"}
+                                service_headers = {"Authorization": f"Bearer {SERVICE_PROVIDER_TOKEN}"}
                                 transfer_data = {"user_id": user_emos_id, "carrot": after_tax_carrot}
                                 async with httpx.AsyncClient() as client:
                                     transfer_response = await client.post(
