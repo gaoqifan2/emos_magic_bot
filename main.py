@@ -232,6 +232,7 @@ shoot_games = {}
 
 # 猜大小游戏全局变量
 guess_games = {}  # 存储每个群的猜大小游戏
+private_guess_games = {}  # 存储等待中的猜大小游戏（用于群聊）
 
 # post_init 包装函数
 async def post_init_wrapper(application):
@@ -763,7 +764,7 @@ async def guess_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             }
             
             # 发送Telegram官方骰子（使用reply_to回复用户消息）
-            await update.message.reply_dice(reply_to_message=update.message)
+            await update.message.reply_dice(reply_to_message_id=update.message.message_id)
             return
     else:
         # 私聊模式 - 与机器人猜大小
@@ -810,10 +811,6 @@ async def guess_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # 发送Telegram官方骰子
         await update.message.reply_dice()
-
-# 全局字典存储等待中的猜大小游戏（用于群聊）
-# 格式: {chat_id: {user_id: {'amount': int, 'guess': str, 'emos_user_id': str, 'message_id': int}}}
-private_guess_games = {}
 
 # 全局字典存储分步输入状态（用于群聊和私聊）
 # 格式: {user_id: {'game': str, 'data': dict, 'timestamp': float}}
