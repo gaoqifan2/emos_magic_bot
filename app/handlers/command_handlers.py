@@ -1584,20 +1584,18 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text("❌ 请输入有效的数字，请重新输入：")
                 return
             
+            # 先发送加载消息，确保loading变量在try块之前定义
+            loading = await update.message.reply_text("🔄 正在处理转账...")
+            
             # 处理转账
             try:
-                import httpx
-                from config import Config
-                
                 # 服务商转账应该使用服务商的token，而不是用户的token
                 headers = {"Authorization": f"Bearer {SERVICE_PROVIDER_TOKEN}"}
                 data = {"user_id": target_user_id, "carrot": amount}
                 
-                loading = await update.message.reply_text("🔄 正在处理转账...")
-                
                 async with httpx.AsyncClient() as client:
                     response = await client.post(
-                        f"{Config.API_BASE_URL}/pay/transfer",
+                        f"{API_BASE_URL}/pay/transfer",
                         headers=headers,
                         json=data,
                         timeout=10
@@ -1674,7 +1672,6 @@ async def process_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE, a
                 loading = await update.message.reply_text("🔄 正在处理提现...")
                 
                 try:
-                    import httpx
                     import uuid
                     from datetime import datetime
                     from utils.db_helper import create_withdraw_order, update_withdraw_order_status

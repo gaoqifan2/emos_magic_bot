@@ -2100,6 +2100,7 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         loading = await update.message.reply_text("🔄 正在转赠...")
                         
                         try:
+                            import httpx
                             headers = {"Authorization": f"Bearer {token}"}
                             data = {"user_id": target_user_id, "carrot": amount}
                             async with httpx.AsyncClient() as client:
@@ -2186,7 +2187,6 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             
                             json_data = json.dumps(data, ensure_ascii=False).encode('utf-8')
                             
-                            import httpx
                             async with httpx.AsyncClient() as client:
                                 response = await client.post(
                                     f"{Config.API_BASE_URL}/pay/create",
@@ -2302,179 +2302,182 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         await update.message.reply_text("❌ 充值金额必须在1-50000之间，请重新输入：")
                         return 104  # 继续等待金额输入
                 except ValueError:
-                        await update.message.reply_text("❌ 请输入有效的数字，请重新输入：")
-                        return 104  # 继续等待金额输入
-                else:
-                    await update.message.reply_text("❌ 请先登录！发送 /start 登录")
+                    await update.message.reply_text("❌ 请输入有效的数字，请重新输入：")
+                    return 104  # 继续等待金额输入
+            else:
+                await update.message.reply_text("❌ 请先登录！发送 /start 登录")
             
-            elif operation == 'service_withdraw_amount':
-                # 处理提现萝卜数量输入
-                if token:
-                    try:
-                        carrot_amount = int(input_text)
-                        game_balance = context.user_data.get('game_balance', 0)
-                        local_user_id = context.user_data.get('local_user_id')
-                        emos_user_id = context.user_data.get('emos_user_id')
-                        user_id = update.effective_user.id
+            # 注意：这里不应该有代码，因为前面的 if-elif 链已经结束
+            # 提现处理应该在单独的 elif 分支中
+            
+        elif operation == 'service_withdraw_amount':
+            # 处理提现萝卜数量输入
+            if token:
+                try:
+                    carrot_amount = int(input_text)
+                    game_balance = context.user_data.get('game_balance', 0)
+                    local_user_id = context.user_data.get('local_user_id')
+                    emos_user_id = context.user_data.get('emos_user_id')
+                    user_id = update.effective_user.id
+                    
+                    # 计算需要的游戏币数量（10游戏币=1萝卜，1游戏币/萝卜手续费）
+                    base_game_coin = carrot_amount * 10
+                    fee_game_coin = carrot_amount * 1  # 1游戏币/萝卜手续费
+                    amount = base_game_coin + fee_game_coin
+                    # 计算税后萝卜数量（1%税率）
+                    tax_rate = 0.01
+                    tax_carrot = int(carrot_amount * tax_rate)
+                    after_tax_carrot = carrot_amount - tax_carrot
+                    
+                    # 检查提现限额
+                    from utils.db_helper import check_withdraw_limits
+                    limit_check = check_withdraw_limits(emos_user_id, carrot_amount)
+                    if not limit_check['success']:
+                        await update.message.reply_text(f"❌ {limit_check['error']}")
+                        return
+                    
+                    if 1 <= carrot_amount <= 5000 and amount <= game_balance:
+                        loading = await update.message.reply_text("🔄 正在处理提现...")
                         
-                        # 计算需要的游戏币数量（10游戏币=1萝卜，1游戏币/萝卜手续费）
-                        base_game_coin = carrot_amount * 10
-                        fee_game_coin = carrot_amount * 1  # 1游戏币/萝卜手续费
-                        amount = base_game_coin + fee_game_coin
-                        # 计算税后萝卜数量（1%税率）
-                        tax_rate = 0.01
-                        tax_carrot = int(carrot_amount * tax_rate)
-                        after_tax_carrot = carrot_amount - tax_carrot
-                        
-                        # 检查提现限额
-                        from utils.db_helper import check_withdraw_limits
-                        limit_check = check_withdraw_limits(emos_user_id, carrot_amount)
-                        if not limit_check['success']:
-                            await update.message.reply_text(f"❌ {limit_check['error']}")
-                            return
-                        
-                        if 1 <= carrot_amount <= 5000 and amount <= game_balance:
-                            loading = await update.message.reply_text("🔄 正在处理提现...")
+                        try:
+                            import httpx
+                            import uuid
+                            from datetime import datetime
+                            from utils.db_helper import create_withdraw_order, update_withdraw_order_status
                             
-                            try:
-                                import httpx
-                                import uuid
-                                from datetime import datetime
-                                from utils.db_helper import create_withdraw_order, update_withdraw_order_status
+                            # 生成提现订单?
+                            order_no = f"W{datetime.now(beijing_tz).strftime('%Y%m%d')}{str(uuid.uuid4())[:8].upper()}"
+                            
+                            # 1. 创建提现订单
+                            # 手续费已从游戏币中扣除，萝卜数量保持不变
+                            # 获取用户信息，包括username
+                            from app.config import user_tokens
+                            user_info = user_tokens.get(user_id, {})
+                            username = user_info.get('username', '') if isinstance(user_info, dict) else ''
+                            
+                            create_withdraw_order(
+                                order_no=order_no,
+                                emos_user_id=emos_user_id,
+                                telegram_user_id=user_id,
+                                game_coin_amount=amount,
+                                carrot_amount=carrot_amount,
+                                username=username
+                            )
+                            
+                            # 直接使用本地数据库扣除游戏币（使用emos_user_id）
+                            from app.database import update_balance
+                            game_success = update_balance(emos_user_id, -amount)
+                            if game_success:
+                                logger.info(f"使用本地数据库扣除游戏币：{amount}")
+                            else:
+                                logger.error(f"扣除游戏币失败：{amount}")
+                            
+                            if game_success:
+                                # 3. 使用服务商token给用户转账萝?
+                                # 获取用户的emos ID
+                                user_headers = {"Authorization": f"Bearer {token}"}
+                                async with httpx.AsyncClient() as client:
+                                    user_response = await client.get(
+                                        f"{Config.API_BASE_URL}/user",
+                                        headers=user_headers,
+                                        timeout=10
+                                    )
                                 
-                                # 生成提现订单?
-                                order_no = f"W{datetime.now(beijing_tz).strftime('%Y%m%d')}{str(uuid.uuid4())[:8].upper()}"
-                                
-                                # 1. 创建提现订单
-                                # 手续费已从游戏币中扣除，萝卜数量保持不变
-                                # 获取用户信息，包括username
-                                from app.config import user_tokens
-                                user_info = user_tokens.get(user_id, {})
-                                username = user_info.get('username', '') if isinstance(user_info, dict) else ''
-                                
-                                create_withdraw_order(
-                                    order_no=order_no,
-                                    emos_user_id=emos_user_id,
-                                    telegram_user_id=user_id,
-                                    game_coin_amount=amount,
-                                    carrot_amount=carrot_amount,
-                                    username=username
-                                )
-                                
-                                # 直接使用本地数据库扣除游戏币（使用emos_user_id）
-                                from app.database import update_balance
-                                game_success = update_balance(emos_user_id, -amount)
-                                if game_success:
-                                    logger.info(f"使用本地数据库扣除游戏币：{amount}")
-                                else:
-                                    logger.error(f"扣除游戏币失败：{amount}")
-                                
-                                if game_success:
-                                    # 3. 使用服务商token给用户转账萝?
-                                    # 获取用户的emos ID
-                                    user_headers = {"Authorization": f"Bearer {token}"}
-                                    async with httpx.AsyncClient() as client:
-                                        user_response = await client.get(
-                                            f"{Config.API_BASE_URL}/user",
-                                            headers=user_headers,
-                                            timeout=10
-                                        )
+                                if user_response.status_code == 200:
+                                    user_info = user_response.json()
+                                    user_emos_id = user_info.get('user_id')
                                     
-                                    if user_response.status_code == 200:
-                                        user_info = user_response.json()
-                                        user_emos_id = user_info.get('user_id')
+                                    if user_emos_id:
+                                        # 使用服务商token转账（税后金额）
+                                        service_headers = {"Authorization": f"Bearer {SERVICE_PROVIDER_TOKEN}"}
+                                        transfer_data = {"user_id": user_emos_id, "carrot": after_tax_carrot}
+                                        async with httpx.AsyncClient() as client:
+                                            transfer_response = await client.post(
+                                                f"{Config.API_BASE_URL}/pay/transfer",
+                                                headers=service_headers,
+                                                json=transfer_data,
+                                                timeout=10
+                                            )
                                         
-                                        if user_emos_id:
-                                            # 使用服务商token转账（税后金额）
-                                            service_headers = {"Authorization": f"Bearer {SERVICE_PROVIDER_TOKEN}"}
-                                            transfer_data = {"user_id": user_emos_id, "carrot": after_tax_carrot}
-                                            async with httpx.AsyncClient() as client:
-                                                transfer_response = await client.post(
-                                                    f"{Config.API_BASE_URL}/pay/transfer",
-                                                    headers=service_headers,
-                                                    json=transfer_data,
-                                                    timeout=10
-                                                )
-                                            
-                                            if transfer_response.status_code == 200:
-                                                # 更新提现订单状态为成功
-                                                update_withdraw_order_status(
-                                                    order_no=order_no,
-                                                    status='success',
-                                                    transfer_result=f"转账成功，金额：{after_tax_carrot}萝卜（税前{carrot_amount}萝卜，税费{tax_carrot}萝卜），手续费：{fee_game_coin}游戏币"
-                                                )
-                                                # 计算剩余游戏币余额
-                                                remaining_balance = game_balance - amount
-                                                
-                                                # 计算剩余可提现额度
-                                                from app.database import get_user_total_recharge, get_user_total_withdraw
-                                                total_recharge = get_user_total_recharge(local_user_id)
-                                                total_withdraw_after = get_user_total_withdraw(local_user_id)
-                                                max_withdraw_limit = int(total_recharge * 3)
-                                                remaining_withdraw_limit = max_withdraw_limit - total_withdraw_after
-                                                
-                                                # 按照游戏厅格式显示
-                                                await loading.edit_text(
-                                                    f"✅ 提现申请成功！\n\n"
-                                                    f"📋 订单号：`{order_no}`\n"
-                                                    f"🥕 提现萝卜：{carrot_amount}\n"
-                                                    f"💼 税费：{tax_carrot} 萝卜（1%）\n"
-                                                    f"🎁 实际到账：{after_tax_carrot} 萝卜\n"
-                                                    f"🪙 基础游戏币：{base_game_coin}\n"
-                                                    f"💸 手续费：{fee_game_coin}\n"
-                                                    f"💰 扣除游戏币：{amount}\n"
-                                                    f"🪙 剩余游戏币：{remaining_balance}\n\n"
-                                                    f"📊 剩余可提现额度：{remaining_withdraw_limit} 🥕\n"
-                                                    f"（累计充值{total_recharge} 🥕3倍，已提现{total_withdraw_after} 🥕）",
-                                                    parse_mode="Markdown"
-                                                )
-                                            
-                                            # 显示返回菜单
-                                            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-                                            keyboard = [
-                                                [InlineKeyboardButton("🎮 前往游戏厅", callback_data="games"),
-                                                 InlineKeyboardButton("💎 继续提现", callback_data="service_withdraw")],
-                                                [InlineKeyboardButton("🔙 返回", callback_data="back")]
-                                            ]
-                                            reply_markup = InlineKeyboardMarkup(keyboard)
-                                            await update.message.reply_text("操作完成", reply_markup=reply_markup)
-                                        else:
-                                            # 更新提现订单状态为失败
+                                        if transfer_response.status_code == 200:
+                                            # 更新提现订单状态为成功
                                             update_withdraw_order_status(
                                                 order_no=order_no,
-                                                status='failed',
-                                                transfer_result=f"转账失败，状态码：{transfer_response.status_code}"
+                                                status='success',
+                                                transfer_result=f"转账成功，金额：{after_tax_carrot}萝卜（税前{carrot_amount}萝卜，税费{tax_carrot}萝卜），手续费：{fee_game_coin}游戏币"
                                             )
-                                            await loading.edit_text(f"?转账失败，状态码：{transfer_response.status_code}\n订单号：\n```\n{order_no}\n```\n", parse_mode="Markdown")
+                                            # 计算剩余游戏币余额
+                                            remaining_balance = game_balance - amount
+                                            
+                                            # 计算剩余可提现额度
+                                            from app.database import get_user_total_recharge, get_user_total_withdraw
+                                            total_recharge = get_user_total_recharge(local_user_id)
+                                            total_withdraw_after = get_user_total_withdraw(local_user_id)
+                                            max_withdraw_limit = int(total_recharge * 3)
+                                            remaining_withdraw_limit = max_withdraw_limit - total_withdraw_after
+                                            
+                                            # 按照游戏厅格式显示
+                                            await loading.edit_text(
+                                                f"✅ 提现申请成功！\n\n"
+                                                f"📋 订单号：`{order_no}`\n"
+                                                f"🥕 提现萝卜：{carrot_amount}\n"
+                                                f"💼 税费：{tax_carrot} 萝卜（1%）\n"
+                                                f"🎁 实际到账：{after_tax_carrot} 萝卜\n"
+                                                f"🪙 基础游戏币：{base_game_coin}\n"
+                                                f"💸 手续费：{fee_game_coin}\n"
+                                                f"💰 扣除游戏币：{amount}\n"
+                                                f"🪙 剩余游戏币：{remaining_balance}\n\n"
+                                                f"📊 剩余可提现额度：{remaining_withdraw_limit} 🥕\n"
+                                                f"（累计充值{total_recharge} 🥕3倍，已提现{total_withdraw_after} 🥕）",
+                                                parse_mode="Markdown"
+                                            )
+                                        
+                                        # 显示返回菜单
+                                        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                                        keyboard = [
+                                            [InlineKeyboardButton("🎮 前往游戏厅", callback_data="games"),
+                                             InlineKeyboardButton("💎 继续提现", callback_data="service_withdraw")],
+                                            [InlineKeyboardButton("🔙 返回", callback_data="back")]
+                                        ]
+                                        reply_markup = InlineKeyboardMarkup(keyboard)
+                                        await update.message.reply_text("操作完成", reply_markup=reply_markup)
                                     else:
                                         # 更新提现订单状态为失败
                                         update_withdraw_order_status(
                                             order_no=order_no,
                                             status='failed',
-                                            transfer_result=f"获取用户信息失败"
+                                            transfer_result=f"转账失败，状态码：{transfer_response.status_code}"
                                         )
-                                        await loading.edit_text(f"?获取用户信息失败\n订单号：\n```\n{order_no}\n```\n", parse_mode="Markdown")
+                                        await loading.edit_text(f"?转账失败，状态码：{transfer_response.status_code}\n订单号：\n```\n{order_no}\n```\n", parse_mode="Markdown")
                                 else:
                                     # 更新提现订单状态为失败
                                     update_withdraw_order_status(
                                         order_no=order_no,
                                         status='failed',
-                                        transfer_result=f"获取用户信息失败，状态码：{user_response.status_code}"
+                                        transfer_result=f"获取用户信息失败"
                                     )
-                                    await loading.edit_text(f"?获取用户信息失败，状态码：{user_response.status_code}\n订单号：\n```\n{order_no}\n```\n", parse_mode="Markdown")
-                            except Exception as e:
-                                # 直接记录固定的错误信息，避免尝试编码包含emoji的异常信息
-                                logger.error("提现失败")
+                                    await loading.edit_text(f"?获取用户信息失败\n订单号：\n```\n{order_no}\n```\n", parse_mode="Markdown")
+                            else:
                                 # 更新提现订单状态为失败
                                 update_withdraw_order_status(
                                     order_no=order_no,
                                     status='failed',
-                                    transfer_result="提现失败，请稍后重试"
+                                    transfer_result=f"获取用户信息失败，状态码：{user_response.status_code}"
                                 )
-                                await loading.edit_text(f"❌ 提现失败，请稍后重试\n订单号：\n```\n{order_no}\n```\n", parse_mode="Markdown")
-                    except ValueError:
-                        await update.message.reply_text("❌ 请输入有效的数字，请重新输入：")
-                        return 105  # 继续等待金额输入
+                                await loading.edit_text(f"?获取用户信息失败，状态码：{user_response.status_code}\n订单号：\n```\n{order_no}\n```\n", parse_mode="Markdown")
+                        except Exception as e:
+                            # 直接记录固定的错误信息，避免尝试编码包含emoji的异常信息
+                            logger.error("提现失败")
+                            # 更新提现订单状态为失败
+                            update_withdraw_order_status(
+                                order_no=order_no,
+                                status='failed',
+                                transfer_result="提现失败，请稍后重试"
+                            )
+                            await loading.edit_text(f"❌ 提现失败，请稍后重试\n订单号：\n```\n{order_no}\n```\n", parse_mode="Markdown")
+                except ValueError:
+                    await update.message.reply_text("❌ 请输入有效的数字，请重新输入：")
+                    return 105  # 继续等待金额输入
                 else:
                     await update.message.reply_text("❌ 请先登录！发送 /start 登录")
             
@@ -2735,7 +2738,6 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             # 检查是否是服务商
                             is_service = False
                             try:
-                                import httpx
                                 headers = {"Authorization": f"Bearer {token}"}
                                 async with httpx.AsyncClient() as client:
                                     response = await client.get(
@@ -2751,7 +2753,7 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                     logger.error("检查服务商状态失败")
                                     is_service = False
                             except Exception as e:
-                                logger.error("检查服务商状态失败")
+                                logger.error(f"检查服务商状态失败: {e}")
                                 is_service = False
                             
                             if not is_service:
@@ -2760,12 +2762,11 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                 context.user_data.clear()
                                 return
                             
+                            # 先发送加载消息，确保loading变量在try块之前定义
                             loading = await update.message.reply_text("🔄 正在转账...")
                             
                             try:
-                                import httpx
                                 # 使用服务商token进行转账
-                                from config import SERVICE_PROVIDER_TOKEN
                                 headers = {"Authorization": f"Bearer {SERVICE_PROVIDER_TOKEN}"}
                                 data = {"user_id": target_user_id, "carrot": amount}
                                 async with httpx.AsyncClient() as client:
@@ -2802,7 +2803,6 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                 await loading.edit_text(f"❌ 转账失败：{str(e)}")
                             
                             # 显示返回菜单
-                            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
                             keyboard = [[InlineKeyboardButton("🔙 返回服务商菜单", callback_data="menu_service")]]
                             reply_markup = InlineKeyboardMarkup(keyboard)
                             await update.message.reply_text("操作完成", reply_markup=reply_markup)

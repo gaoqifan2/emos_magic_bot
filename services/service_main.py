@@ -321,7 +321,6 @@ async def service_fund_transfer(update: Update, context: ContextTypes.DEFAULT_TY
     # 检查用户是否为服务商
     is_service = False
     try:
-        import httpx
         headers = {"Authorization": f"Bearer {token}"}
         async with httpx.AsyncClient() as client:
             response = await client.get(
@@ -336,7 +335,7 @@ async def service_fund_transfer(update: Update, context: ContextTypes.DEFAULT_TY
         else:
             is_service = False
     except Exception as e:
-        logger.error("检查服务商状态失败")
+        logger.error(f"检查服务商状态失败: {e}")
         is_service = False
     
     if not is_service:

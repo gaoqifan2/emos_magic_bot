@@ -1463,7 +1463,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             loading = await update.callback_query.edit_message_text("🔄 正在创建订单...")
             
             try:
-                import httpx
                 headers = {"Authorization": f"Bearer {token}"}
                 data = {"pay_way": "telegram_bot", "price": amount, "name": name}
                 async with httpx.AsyncClient() as client:
@@ -1518,7 +1517,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             loading = await update.callback_query.edit_message_text("🔄 正在创建订单...")
             
             try:
-                import httpx
                 headers = {"Authorization": f"Bearer {token}"}
                 data = {"pay_way": "web", "price": amount, "name": name}
                 async with httpx.AsyncClient() as client:
