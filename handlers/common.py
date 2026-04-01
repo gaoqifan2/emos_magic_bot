@@ -275,7 +275,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         loading = await update.message.reply_text("🔄 正在核实订单...")
         
         try:
-            import httpx
             from utils.db_helper import get_order_by_platform_no
             
             # 首先从本地数据库查询订单信息
@@ -860,7 +859,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # 检查用户是否为服务商
         is_service = False
         try:
-            import httpx
             headers = {"Authorization": f"Bearer {token}"}
             async with httpx.AsyncClient() as client:
                 response = await client.get(
@@ -879,8 +877,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else:
                 logger.info(f"用户不是服务商，状态码: {response.status_code}")
         except Exception as e:
-            # 直接记录固定的错误信息，避免尝试编码包含emoji的异常信息
-            logger.error("检查服务商状态失败")
+            logger.error(f"检查服务商状态失败: {e}")
             is_service = False
         
         if is_service:
