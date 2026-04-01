@@ -854,61 +854,73 @@ def cleanup_expired_game_states():
 
 async def handle_dice_result(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """处理骰子结果"""
-    chat_id = update.effective_chat.id
-    dice_message = update.effective_message
-    
-    # 调试信息
-    print(f"DEBUG: handle_dice_result 被调用 - chat_id={chat_id}")
-    print(f"DEBUG: dice_message.reply_to_message 存在: {bool(dice_message.reply_to_message)}")
-    
-    if dice_message.reply_to_message:
-        original_user = dice_message.reply_to_message.from_user
-        original_user_id = original_user.id
-        print(f"DEBUG: 原始用户ID: {original_user_id}")
-    
-    # 获取骰子点数
-    dice_value = dice_message.dice.value
-    print(f"DEBUG: 骰子点数: {dice_value}")
-    
-    # 检查是否是私聊模式（通过reply_to_message判断）
-    if dice_message.reply_to_message:
-        # 找到原始用户
-        original_user = dice_message.reply_to_message.from_user
-        original_user_id = original_user.id
+    try:
+        chat_id = update.effective_chat.id
+        dice_message = update.effective_message
         
-        # 从全局字典中查找该用户的游戏
-        print(f"DEBUG: 查找游戏 - chat_id={chat_id}, original_user_id={original_user_id}")
-        print(f"DEBUG: private_guess_games 状态: {private_guess_games}")
+        # 调试信息
+        print(f"DEBUG: handle_dice_result 被调用 - chat_id={chat_id}")
+        print(f"DEBUG: dice_message.reply_to_message 存在: {bool(dice_message.reply_to_message)}")
         
-        if chat_id in private_guess_games and original_user_id in private_guess_games[chat_id]:
-            game_data = private_guess_games[chat_id][original_user_id]
-            amount = game_data['amount']
-            guess = game_data['guess']
-            emos_user_id = game_data['emos_user_id']
+        if dice_message.reply_to_message:
+            original_user = dice_message.reply_to_message.from_user
+            original_user_id = original_user.id
+            print(f"DEBUG: 原始用户ID: {original_user_id}")
+        
+        # 获取骰子点数
+        dice_value = dice_message.dice.value
+        print(f"DEBUG: 骰子点数: {dice_value}")
+        
+        # 检查是否是群聊模式（通过reply_to_message判断）
+        if dice_message.reply_to_message:
+            # 找到原始用户
+            original_user = dice_message.reply_to_message.from_user
+            original_user_id = original_user.id
             
-            print(f"DEBUG: 找到游戏数据 - amount={amount}, guess={guess}, emos_user_id={emos_user_id}")
+            # 从全局字典中查找该用户的游戏
+            print(f"DEBUG: 查找游戏 - chat_id={chat_id}, original_user_id={original_user_id}")
+            print(f"DEBUG: private_guess_games 状态: {private_guess_games}")
+            
+            if chat_id in private_guess_games and original_user_id in private_guess_games[chat_id]:
+                game_data = private_guess_games[chat_id][original_user_id]
+                amount = game_data['amount']
+                guess = game_data['guess']
+                emos_user_id = game_data['emos_user_id']
+                
+                print(f"DEBUG: 找到游戏数据 - amount={amount}, guess={guess}, emos_user_id={emos_user_id}")
+                
+                # 处理结果
+                await process_guess_result(update, dice_value, amount, guess, emos_user_id, original_user_id, chat_id)
+                
+                # 清除游戏数据
+                del private_guess_games[chat_id][original_user_id]
+                if not private_guess_games[chat_id]:
+                    del private_guess_games[chat_id]
+                print(f"DEBUG: 游戏数据已清除")
+                return
+        
+        # 检查当前用户是否有等待中的游戏（私聊模式）
+        user_id = update.effective_user.id
+        print(f"DEBUG: 检查私聊模式 - user_id={user_id}")
+        print(f"DEBUG: context.user_data: {context.user_data}")
+        
+        if 'guess_amount' in context.user_data:
+            # 私聊模式
+            amount = context.user_data['guess_amount']
+            guess = context.user_data['guess_choice']
+            emos_user_id = context.user_data['guess_emos_user_id']
+            
+            print(f"DEBUG: 找到私聊游戏数据 - amount={amount}, guess={guess}, emos_user_id={emos_user_id}")
             
             # 处理结果
-            await process_guess_result(update, dice_value, amount, guess, emos_user_id, original_user_id, chat_id)
-            
-            # 清除游戏数据
-            del private_guess_games[chat_id][original_user_id]
-            if not private_guess_games[chat_id]:
-                del private_guess_games[chat_id]
-            print(f"DEBUG: 游戏数据已清除")
+            await process_guess_result(update, dice_value, amount, guess, emos_user_id, user_id, chat_id, context)
             return
-    
-    # 检查当前用户是否有等待中的游戏（私聊模式）
-    user_id = update.effective_user.id
-    if 'guess_amount' in context.user_data:
-        # 私聊模式
-        amount = context.user_data['guess_amount']
-        guess = context.user_data['guess_choice']
-        emos_user_id = context.user_data['guess_emos_user_id']
         
-        # 处理结果
-        await process_guess_result(update, dice_value, amount, guess, emos_user_id, user_id, chat_id, context)
-        return
+        print(f"DEBUG: 没有找到游戏数据")
+    except Exception as e:
+        print(f"ERROR: handle_dice_result 出错: {e}")
+        import traceback
+        traceback.print_exc()
 
 async def process_guess_result(update: Update, dice_value: int, amount: int, guess: str, 
                                emos_user_id: str, user_id: int, chat_id: int, context=None):
