@@ -340,10 +340,10 @@ async def service_fund_transfer(update: Update, context: ContextTypes.DEFAULT_TY
     
     if not is_service:
         await update.callback_query.edit_message_text("❌ 只有服务商才能使用此功能！")
-        # 1分钟后自动消失
+        # 30秒后自动消失
         import asyncio
         from utils.message_utils import auto_delete_message
-        asyncio.create_task(auto_delete_message(update, context, None, 60))
+        asyncio.create_task(auto_delete_message(update, context, None, 30))
         return
     
     # 提示用户输入对方用户ID

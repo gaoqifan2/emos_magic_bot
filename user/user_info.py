@@ -30,7 +30,7 @@ async def get_user_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_info = user_tokens.get(user_id)
     
     if not user_info:
-        await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
+        await update.callback_query.edit_message_text("🔑 请先登录！发送 /start 登录")
         return
     
     # 检查user_info是字典还是字符串
@@ -40,7 +40,7 @@ async def get_user_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
         token = user_info
     
     if not token:
-        await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
+        await update.callback_query.edit_message_text("🔑 请先登录！发送 /start 登录")
         return
     
     loading = await update.callback_query.edit_message_text("🔄 正在获取个人信息...")
@@ -149,7 +149,7 @@ async def get_user_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             # 构建用户信息消息
             message = (
-                f"# 个人信息凭证\n\n"
+                f"👤 个人信息凭证\n\n"
                 f"🎬 用户名: `{username}`\n\n"
                 f"• 🆔 用户ID: `{user_id}`\n\n"
                 f"• 🔑 Token: `{token}`\n\n"
@@ -164,7 +164,7 @@ async def get_user_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if sign_info:
                 message += f"• 📅 签到状态: ✅ 已签到\n\n"
             else:
-                message += f"• 📅 签到状态: ❌ 未签到\n\n"
+                message += f"• 📅 签到状态: ⏰ 未签到\n\n"
             
             # 显示空库状态
             is_show_empty = user_data.get('is_show_empty', True)
@@ -172,7 +172,7 @@ async def get_user_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 message += f"• 📁 显示空库: ✅ 显示\n\n"
                 context.user_data['is_show_empty'] = True
             else:
-                message += f"• 📁 显示空库: ❌ 隐藏\n\n"
+                message += f"• 📁 显示空库: 🔒 隐藏\n\n"
                 context.user_data['is_show_empty'] = False
             
             message += (
@@ -185,24 +185,24 @@ async def get_user_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             
             message_obj = await loading.edit_text(message, parse_mode="Markdown")
-            # 30秒后自动消失
+            # 2分钟后自动消失
             import asyncio
             from utils.message_utils import auto_delete_message
             # 使用message_obj作为消息对象
-            asyncio.create_task(auto_delete_message(update, context, message_obj, 30))
+            asyncio.create_task(auto_delete_message(update, context, message_obj, 120))
         else:
             error_text = response.text[:200] if response.text else "无响应内容"
             logger.error(f"获取个人信息API错误: 状态码={response.status_code}")
-            await loading.edit_text(f"❌ 获取失败，状态码：{response.status_code}\n{error_text}")
+            await loading.edit_text(f"⚠️ 获取失败，状态码：{response.status_code}\n{error_text}")
     except httpx.HTTPStatusError as e:
         logger.error(f"获取个人信息HTTP错误: {e.response.status_code}")
-        await loading.edit_text(f"❌ 获取失败，HTTP错误：{e.response.status_code}")
+        await loading.edit_text(f"⚠️ 获取失败，HTTP错误：{e.response.status_code}")
     except httpx.RequestError as e:
         logger.error(f"获取个人信息请求错误: {type(e).__name__}")
-        await loading.edit_text("❌ 获取失败，网络请求错误，请检查网络连接")
+        await loading.edit_text("🌐 获取失败，网络请求错误，请检查网络连接")
     except Exception as e:
         logger.error(f"获取个人信息异常: {type(e).__name__}")
-        await loading.edit_text("❌ 获取失败，请稍后重试")
+        await loading.edit_text("⚠️ 获取失败，请稍后重试")
     
     # 显示操作菜单 - 四个按钮
     keyboard = [
@@ -220,14 +220,14 @@ async def get_user_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ],
         [
             InlineKeyboardButton("✏️ 更改笔名", callback_data="menu_user_pseudonym"),
-            InlineKeyboardButton("❌ 撤销邀请", callback_data="menu_revoke_invite")
+            InlineKeyboardButton("🔄 撤销邀请", callback_data="menu_revoke_invite")
         ],
         [
             InlineKeyboardButton("🔙 返回主菜单", callback_data="back_to_main")
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.callback_query.message.reply_text("个人信息查询完成", reply_markup=reply_markup)
+    await update.callback_query.message.reply_text("个人信息", reply_markup=reply_markup)
 
 async def user_sign(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """用户签到"""
@@ -235,7 +235,7 @@ async def user_sign(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_info = user_tokens.get(user_id)
     
     if not user_info:
-        await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
+        await update.callback_query.edit_message_text("🔑 请先登录！发送 /start 登录")
         return
     
     # 检查user_info是字典还是字符串
@@ -245,7 +245,7 @@ async def user_sign(update: Update, context: ContextTypes.DEFAULT_TYPE):
         token = user_info
     
     if not token:
-        await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
+        await update.callback_query.edit_message_text("🔑 请先登录！发送 /start 登录")
         return
     
     loading = await update.callback_query.edit_message_text("🔄 正在签到...")
@@ -268,6 +268,10 @@ async def user_sign(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"🌈 明天再来吧～\n" +
                     f"✨ 每天签到都有惊喜哦！"
                 )
+                # 30秒后自动消失
+                import asyncio
+                from utils.message_utils import auto_delete_message
+                asyncio.create_task(auto_delete_message(update, context, loading, 30))
             else:
                 # 签到成功
                 sign_index = result.get('sign_index', 0)
@@ -283,19 +287,80 @@ async def user_sign(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"━━━━━━━━━━━━━━━━━━",
                     parse_mode='Markdown'
                 )
+        elif response.status_code == 429:
+            # 处理重复签到或请求过于频繁
+            try:
+                result = response.json()
+                error_msg = result.get('message', '')
+                if '重复签到' in error_msg or '已经签到' in error_msg:
+                    await loading.edit_text(
+                        f"⏰ 您今天已经签到过了！\n\n" +
+                        f"🌈 明天再来吧～\n" +
+                        f"✨ 每天签到都有惊喜哦！"
+                    )
+                    # 30秒后自动消失
+                    import asyncio
+                    from utils.message_utils import auto_delete_message
+                    asyncio.create_task(auto_delete_message(update, context, loading, 30))
+                else:
+                    await loading.edit_text(
+                        f"⏰ 操作太频繁了，请稍后再试！\n\n" +
+                        f"🌈 休息一下再来吧～"
+                    )
+            except:
+                await loading.edit_text(
+                    f"⏰ 您今天已经签到过了！\n\n" +
+                    f"🌈 明天再来吧～\n" +
+                    f"✨ 每天签到都有惊喜哦！"
+                )
+                # 30秒后自动消失
+                import asyncio
+                from utils.message_utils import auto_delete_message
+                asyncio.create_task(auto_delete_message(update, context, loading, 30))
         else:
             error_text = response.text[:200] if response.text else "无响应内容"
             logger.error(f"签到API错误: 状态码={response.status_code}")
-            await loading.edit_text(f"❌ 签到失败，状态码：{response.status_code}\n{error_text}")
+            await loading.edit_text(f"⚠️ 签到失败，状态码：{response.status_code}\n{error_text}")
     except httpx.HTTPStatusError as e:
         logger.error(f"签到HTTP错误: {e.response.status_code}")
-        await loading.edit_text(f"❌ 签到失败，HTTP错误：{e.response.status_code}")
+        if e.response.status_code == 429:
+            # 429 错误：重复签到或请求过于频繁
+            try:
+                result = e.response.json()
+                error_msg = result.get('message', '')
+                if '重复签到' in error_msg or '已经签到' in error_msg:
+                    await loading.edit_text(
+                        f"⏰ 您今天已经签到过了！\n\n" +
+                        f"🌈 明天再来吧～\n" +
+                        f"✨ 每天签到都有惊喜哦！"
+                    )
+                    # 30秒后自动消失
+                    import asyncio
+                    from utils.message_utils import auto_delete_message
+                    asyncio.create_task(auto_delete_message(update, context, loading, 30))
+                else:
+                    await loading.edit_text(
+                        f"⏰ 操作太频繁了，请稍后再试！\n\n" +
+                        f"🌈 休息一下再来吧～"
+                    )
+            except:
+                await loading.edit_text(
+                    f"⏰ 您今天已经签到过了！\n\n" +
+                    f"🌈 明天再来吧～\n" +
+                    f"✨ 每天签到都有惊喜哦！"
+                )
+                # 30秒后自动消失
+                import asyncio
+                from utils.message_utils import auto_delete_message
+                asyncio.create_task(auto_delete_message(update, context, loading, 30))
+        else:
+            await loading.edit_text("⚠️ 签到失败，请稍后重试")
     except httpx.RequestError as e:
         logger.error(f"签到请求错误: {type(e).__name__}")
-        await loading.edit_text("❌ 签到失败，网络请求错误，请检查网络连接")
+        await loading.edit_text("🌐 签到失败，网络请求错误，请检查网络连接")
     except Exception as e:
         logger.error(f"签到异常: {type(e).__name__}")
-        await loading.edit_text("❌ 签到失败，请稍后重试")
+        await loading.edit_text("⚠️ 签到失败，请稍后重试")
     
     # 显示返回菜单
     keyboard = [
@@ -310,7 +375,7 @@ async def user_invite(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_info = user_tokens.get(user_id)
     
     if not user_info:
-        await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
+        await update.callback_query.edit_message_text("🔑 请先登录！发送 /start 登录")
         return
     
     # 检查user_info是字典还是字符串
@@ -320,7 +385,7 @@ async def user_invite(update: Update, context: ContextTypes.DEFAULT_TYPE):
         token = user_info
     
     if not token:
-        await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
+        await update.callback_query.edit_message_text("🔑 请先登录！发送 /start 登录")
         return
     
     loading = await update.callback_query.edit_message_text("🔄 正在获取邀请信息...")
@@ -424,7 +489,7 @@ async def user_pseudonym(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_info = user_tokens.get(user_id)
     
     if not user_info:
-        await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
+        await update.callback_query.edit_message_text("🔑 请先登录！发送 /start 登录")
         return
     
     # 检查user_info是字典还是字符串
@@ -434,7 +499,7 @@ async def user_pseudonym(update: Update, context: ContextTypes.DEFAULT_TYPE):
         token = user_info
     
     if not token:
-        await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
+        await update.callback_query.edit_message_text("🔑 请先登录！发送 /start 登录")
         return
     
     # 提示用户输入新笔名
@@ -463,7 +528,7 @@ async def user_revoke_invite(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user_info = user_tokens.get(user_id)
     
     if not user_info:
-        await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
+        await update.callback_query.edit_message_text("🔑 请先登录！发送 /start 登录")
         return
     
     # 检查user_info是字典还是字符串
@@ -473,7 +538,7 @@ async def user_revoke_invite(update: Update, context: ContextTypes.DEFAULT_TYPE)
         token = user_info
     
     if not token:
-        await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
+        await update.callback_query.edit_message_text("🔑 请先登录！发送 /start 登录")
         return
     
     # 提示用户输入被撤销邀请的用户ID
@@ -492,7 +557,7 @@ async def toggle_show_empty(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_info = user_tokens.get(user_id)
     
     if not user_info:
-        await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
+        await update.callback_query.edit_message_text("🔑 请先登录！发送 /start 登录")
         return
     
     # 检查user_info是字典还是字符串
@@ -502,7 +567,7 @@ async def toggle_show_empty(update: Update, context: ContextTypes.DEFAULT_TYPE):
         token = user_info
     
     if not token:
-        await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
+        await update.callback_query.edit_message_text("🔑 请先登录！发送 /start 登录")
         return
     
     loading = await update.callback_query.edit_message_text("🔄 正在切换...")

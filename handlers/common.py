@@ -1,5 +1,6 @@
 import logging
 import pymysql
+import httpx
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
 from telegram.ext import ContextTypes, ConversationHandler, Application
 
@@ -39,10 +40,10 @@ def add_cancel_button(keyboard=None, show_back=False):
     if show_back:
         keyboard.append([
             InlineKeyboardButton("⬅️ 返回上一步", callback_data="back_to_previous"),
-            InlineKeyboardButton("❌ 取消", callback_data="cancel_operation")
+            InlineKeyboardButton("🔄 取消", callback_data="cancel_operation")
         ])
     else:
-        keyboard.append([InlineKeyboardButton("❌ 取消", callback_data="cancel_operation")])
+        keyboard.append([InlineKeyboardButton("🔄 取消", callback_data="cancel_operation")])
     return keyboard
 
 async def cancel_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -108,7 +109,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             # Token完整性检查
             if len(token) < 10:
                 logger.error(f"Token不完整，长度: {len(token)}")
-                await update.message.reply_text(f"❌ Token不完整，请重新尝试登录。")
+                await update.message.reply_text(f"⚠️ Token不完整，请重新尝试登录。")
                 return
             # 确保token被完整存储
             # 存储为字典类型，以匹配游戏模块的期望格式
@@ -177,11 +178,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 # API调用失败，删除临时存储的user_tokens条目
                 if user_id in user_tokens:
                     del user_tokens[user_id]
-                await update.message.reply_text("❌ 登录失败，请重新尝试登录。")
+                await update.message.reply_text("⚠️ 登录失败，请重新尝试登录。")
                 return
         else:
             logger.error("OAuth回调中没有token参数")
-            await update.message.reply_text("❌ 授权失败，请重新尝试登录。")
+            await update.message.reply_text("⚠️ 授权失败，请重新尝试登录。")
         return
     # 处理用户同意授权的情况
     elif text.startswith('/start emosLinkAgree-'):
@@ -192,7 +193,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         # Token完整性检查
         if len(token) < 10:
             logger.error(f"Token不完整，长度: {len(token)}")
-            await update.message.reply_text(f"❌ Token不完整，请重新尝试登录。")
+            await update.message.reply_text(f"⚠️ Token不完整，请重新尝试登录。")
             return
         # 确保token被完整存储
         # 存储为字典类型，以匹配游戏模块的期望格式
@@ -260,7 +261,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         # 提取Telegram ID
         telegram_id = text.split('/start emosLinkRefuse-', 1)[1].strip()
         logger.info(f"用户 {user_id} 拒绝授权，Telegram ID: {telegram_id}")
-        await update.message.reply_text("❌ 授权已拒绝，您可以稍后重新尝试登录。")
+        await update.message.reply_text("⚠️ 授权已拒绝，您可以稍后重新尝试登录。")
         return
     # 处理支付成功回调
     elif text.startswith('/start emosPayAgree-'):
@@ -308,7 +309,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                         )
                     
                     if response.status_code != 200:
-                        await loading.edit_text(f"❌ 查询订单失败：{order_no}")
+                        await loading.edit_text(f"⚠️ 查询订单失败：{order_no}")
                         return
                     
                     order_info = response.json()
@@ -334,7 +335,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                             conn.close()
                     
                     if not emos_user_id:
-                        await loading.edit_text(f"❌ 找不到用户信息，订单号：{order_no}")
+                        await loading.edit_text(f"⚠️ 找不到用户信息，订单号：{order_no}")
                         return
                     
                     # 生成本地订单号
@@ -364,7 +365,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     
                     if not save_result:
                         logger.error(f"重新保存订单失败: platform_order_no={order_no}")
-                        await loading.edit_text(f"❌ 保存订单失败：{order_no}")
+                        await loading.edit_text(f"⚠️ 保存订单失败：{order_no}")
                         return
                     
                     logger.info(f"订单重新保存成功，查询新保存的订单")
@@ -415,7 +416,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                         conn.close()
                     
                     if not user_token:
-                        await loading.edit_text("❌ 找不到用户token，请先登录")
+                        await loading.edit_text("⚠️ 找不到用户token，请先登录")
                         return
                     
                     price = order_info.get('price_order', 0)
@@ -461,12 +462,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     
                     await loading.edit_text(message, parse_mode="Markdown", reply_markup=reply_markup)
                 else:
-                    await loading.edit_text(f"❌ 订单状态：{status}，支付可能未完成")
+                    await loading.edit_text(f"⚠️ 订单状态：{status}，支付可能未完成")
             else:
-                await loading.edit_text(f"❌ 查询订单失败，状态码：{response.status_code}")
+                await loading.edit_text(f"⚠️ 查询订单失败，状态码：{response.status_code}")
         except Exception as e:
             logger.error(f"处理支付回调失败: {e}")
-            await loading.edit_text(f"❌ 处理支付回调失败，请稍后重试\n错误：{str(e)}")
+            await loading.edit_text(f"⚠️ 处理支付回调失败，请稍后重试\n错误：{str(e)}")
         return
     
     # 处理支付失败回调
@@ -477,7 +478,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         
         logger.info(f"收到支付失败回调 - 订单号: {order_no}")
         
-        await update.message.reply_text(f"❌ 支付已取消\n订单号：`{order_no}`\n", parse_mode="Markdown")
+        await update.message.reply_text(f"⚠️ 支付已取消\n订单号：`{order_no}`\n", parse_mode="Markdown")
         return
     
     # 处理直接的token链接（兼容旧格式）
@@ -489,7 +490,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         # Token完整性检查
         if len(token) < 10:
             logger.error(f"Token不完整，长度: {len(token)}")
-            await update.message.reply_text(f"❌ Token不完整，请重新尝试登录。")
+            await update.message.reply_text(f"⚠️ Token不完整，请重新尝试登录。")
             return
         # 确保token被完整存储
         # 存储为字典类型，以匹配游戏模块的期望格式
@@ -893,10 +894,10 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             logger.info(f"用户不是服务商，提示无权限")
             await update.callback_query.edit_message_text("❌ 只有服务商才能使用此功能！")
-            # 1分钟后自动消失
+            # 30秒后自动消失
             import asyncio
             from utils.message_utils import auto_delete_message
-            asyncio.create_task(auto_delete_message(update, context, None, 60))
+            asyncio.create_task(auto_delete_message(update, context, None, 30))
             return
     
     # 服务商功能

@@ -27,9 +27,17 @@ async def lottery_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     
     if user_id not in user_tokens:
         if update.message:
-            await update.message.reply_text("❌ 请先登录！发送 /start 登录")
+            message = await update.message.reply_text("🔑 请先登录！发送 /start 登录")
+            # 5秒后自动消失
+            import asyncio
+            from utils.message_utils import auto_delete_message
+            asyncio.create_task(auto_delete_message(update, context, message, 5))
         else:
-            await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
+            await update.callback_query.edit_message_text("🔑 请先登录！发送 /start 登录")
+            # 5秒后自动消失
+            import asyncio
+            from utils.message_utils import auto_delete_message
+            asyncio.create_task(auto_delete_message(update, context, None, 5))
         return ConversationHandler.END
     
     # 初始化抽奖数据
@@ -48,10 +56,12 @@ async def lottery_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             reply_markup=reply_markup
         )
     else:
-        await update.message.reply_text(
+        message = await update.message.reply_text(
             "🎲 创建抽奖\n\n请输入抽奖名称（30字内）：",
             reply_markup=reply_markup
         )
+        # 存储提示消息对象，以便用户输入时删除
+        context.user_data['current_prompt_message'] = message
     
     return WAITING_LOTTERY_NAME
 
@@ -60,8 +70,25 @@ async def lottery_process(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     user_id = update.effective_user.id
     text = update.message.text.strip()
     
+    # 删除之前的提示消息
+    if 'current_prompt_message' in context.user_data:
+        try:
+            message = context.user_data['current_prompt_message']
+            await context.bot.delete_message(
+                chat_id=message.chat_id,
+                message_id=message.message_id
+            )
+            del context.user_data['current_prompt_message']
+        except Exception:
+            # 忽略删除失败的错误
+            pass
+    
     if 'lottery' not in context.user_data:
-        await update.message.reply_text("❌ 会话已过期，请重新开始")
+        message = await update.message.reply_text("⚠️ 会话已过期，请重新开始")
+        # 5秒后自动消失
+        import asyncio
+        from utils.message_utils import auto_delete_message
+        asyncio.create_task(auto_delete_message(update, context, message, 5))
         return ConversationHandler.END
     
     lottery_data = context.user_data['lottery']
@@ -72,7 +99,11 @@ async def lottery_process(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     
     if current_step == 'name':
         if len(text) > 50:
-            await update.message.reply_text("❌ 名称不能超过50字，请重新输入：", reply_markup=reply_markup)
+            message = await update.message.reply_text("⚠️ 名称不能超过50字，请重新输入：", reply_markup=reply_markup)
+            # 8秒后自动消失
+            import asyncio
+            from utils.message_utils import auto_delete_message
+            asyncio.create_task(auto_delete_message(update, context, message, 8))
             return WAITING_LOTTERY_NAME
         
         lottery_data['name'] = text
@@ -102,12 +133,14 @@ async def lottery_process(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         keyboard = add_cancel_button(keyboard, show_back=True)
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        await update.message.reply_text(
+        message = await update.message.reply_text(
             "⏰ 请选择开奖时间\n\n"  
             f"开始时间：`{lottery_data['time_start']}`",
             reply_markup=reply_markup,
             parse_mode="Markdown"
         )
+        # 存储提示消息对象，以便用户输入时删除
+        context.user_data['current_prompt_message'] = message
         return WAITING_LOTTERY_END
     
     elif current_step == 'end':
@@ -116,31 +149,49 @@ async def lottery_process(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             start_time = datetime.strptime(lottery_data['time_start'], "%Y-%m-%d %H:%M:%S")
             
             if end_time <= start_time:
-                await update.message.reply_text("❌ 结束时间必须晚于开始时间，请重新输入：", reply_markup=reply_markup)
+                message = await update.message.reply_text("⚠️ 结束时间必须晚于开始时间，请重新输入：", reply_markup=reply_markup)
+                # 8秒后自动消失
+                import asyncio
+                from utils.message_utils import auto_delete_message
+                asyncio.create_task(auto_delete_message(update, context, message, 8))
                 return WAITING_LOTTERY_END
             
             days_diff = (end_time - start_time).days
             if days_diff > 7:
-                await update.message.reply_text("❌ 结束时间必须在开始时间的一周内，请重新输入：", reply_markup=reply_markup)
+                message = await update.message.reply_text("⚠️ 结束时间必须在开始时间的一周内，请重新输入：", reply_markup=reply_markup)
+                # 8秒后自动消失
+                import asyncio
+                from utils.message_utils import auto_delete_message
+                asyncio.create_task(auto_delete_message(update, context, message, 8))
                 return WAITING_LOTTERY_END
             
             lottery_data['time_end'] = text
             lottery_data['step'] = 'amount'
             context.user_data['lottery'] = lottery_data
-            await update.message.reply_text(
+            message = await update.message.reply_text(
                 "💰 请输入每人参与所需萝卜数量（1-50000）：",
                 reply_markup=reply_markup
             )
+            # 存储提示消息对象，以便用户输入时删除
+            context.user_data['current_prompt_message'] = message
             return WAITING_LOTTERY_AMOUNT
         except ValueError:
-            await update.message.reply_text("❌ 时间格式错误，请重新输入：", reply_markup=reply_markup)
+            message = await update.message.reply_text("⚠️ 时间格式错误，请重新输入：", reply_markup=reply_markup)
+            # 8秒后自动消失
+            import asyncio
+            from utils.message_utils import auto_delete_message
+            asyncio.create_task(auto_delete_message(update, context, message, 8))
             return WAITING_LOTTERY_END
     
     elif current_step == 'amount':
         try:
             amount = int(text)
             if amount <= 0 or amount > 50000:
-                await update.message.reply_text("❌ 金额必须在1-50000之间，请重新输入：", reply_markup=reply_markup)
+                message = await update.message.reply_text("⚠️ 金额必须在1-50000之间，请重新输入：", reply_markup=reply_markup)
+                # 8秒后自动消失
+                import asyncio
+                from utils.message_utils import auto_delete_message
+                asyncio.create_task(auto_delete_message(update, context, message, 8))
                 return WAITING_LOTTERY_AMOUNT
             lottery_data['amount'] = amount
             lottery_data['step'] = 'number'
@@ -153,20 +204,30 @@ async def lottery_process(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 "• 输入 **数字**：人数开奖模式，达到指定人数或到结束时间开奖\n"
             )
             
-            await update.message.reply_text(
+            message = await update.message.reply_text(
                 help_text,
                 reply_markup=reply_markup
             )
+            # 存储提示消息对象，以便用户输入时删除
+            context.user_data['current_prompt_message'] = message
             return WAITING_LOTTERY_NUMBER
         except ValueError:
-            await update.message.reply_text("❌ 请输入有效的数字：", reply_markup=reply_markup)
+            message = await update.message.reply_text("⚠️ 请输入有效的数字：", reply_markup=reply_markup)
+            # 8秒后自动消失
+            import asyncio
+            from utils.message_utils import auto_delete_message
+            asyncio.create_task(auto_delete_message(update, context, message, 8))
             return WAITING_LOTTERY_AMOUNT
     
     elif current_step == 'number':
         try:
             number = int(text)
             if number < 0 or number > 5000:
-                await update.message.reply_text("❌ 人数必须在0-5000之间，请重新输入：", reply_markup=reply_markup)
+                message = await update.message.reply_text("⚠️ 人数必须在0-5000之间，请重新输入：", reply_markup=reply_markup)
+                # 8秒后自动消失
+                import asyncio
+                from utils.message_utils import auto_delete_message
+                asyncio.create_task(auto_delete_message(update, context, message, 8))
                 return WAITING_LOTTERY_NUMBER
             
             lottery_data['number'] = number
@@ -181,39 +242,59 @@ async def lottery_process(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             
             lottery_data['step'] = 'rule_carrot'
             context.user_data['lottery'] = lottery_data
-            await update.message.reply_text(
+            message = await update.message.reply_text(
                 "🥕 请输入参与条件（萝卜数量要求，没有则输0）：",
                 reply_markup=reply_markup
             )
+            # 15秒后自动消失（给用户足够的输入时间）
+            import asyncio
+            from utils.message_utils import auto_delete_message
+            asyncio.create_task(auto_delete_message(update, context, message, 15))
             return WAITING_LOTTERY_RULE_CARROT
                 
         except ValueError:
-            await update.message.reply_text("❌ 请输入有效的数字：", reply_markup=reply_markup)
+            message = await update.message.reply_text("⚠️ 请输入有效的数字：", reply_markup=reply_markup)
+            # 8秒后自动消失
+            import asyncio
+            from utils.message_utils import auto_delete_message
+            asyncio.create_task(auto_delete_message(update, context, message, 8))
             return WAITING_LOTTERY_NUMBER
     
     elif current_step == 'rule_carrot':
         try:
             rule_carrot = int(text)
             if rule_carrot < 0:
-                await update.message.reply_text("❌ 请输入非负数：", reply_markup=reply_markup)
+                message = await update.message.reply_text("⚠️ 请输入非负数：", reply_markup=reply_markup)
+                # 8秒后自动消失
+                import asyncio
+                from utils.message_utils import auto_delete_message
+                asyncio.create_task(auto_delete_message(update, context, message, 8))
                 return WAITING_LOTTERY_RULE_CARROT
             lottery_data['rule_carrot'] = rule_carrot
             lottery_data['step'] = 'rule_sign'
             context.user_data['lottery'] = lottery_data
-            await update.message.reply_text(
+            message = await update.message.reply_text(
                 "📅 请输入参与条件（签到天数要求，没有则输0）：",
                 reply_markup=reply_markup
             )
+            # 15秒后自动消失（给用户足够的输入时间）
+            import asyncio
+            from utils.message_utils import auto_delete_message
+            asyncio.create_task(auto_delete_message(update, context, message, 15))
             return WAITING_LOTTERY_RULE_SIGN
         except ValueError:
-            await update.message.reply_text("❌ 请输入有效的数字：", reply_markup=reply_markup)
+            await update.message.reply_text("⚠️ 请输入有效的数字：", reply_markup=reply_markup)
             return WAITING_LOTTERY_RULE_CARROT
     
     elif current_step == 'rule_sign':
         try:
             rule_sign = int(text)
             if rule_sign < 0:
-                await update.message.reply_text("❌ 请输入非负数：", reply_markup=reply_markup)
+                message = await update.message.reply_text("⚠️ 请输入非负数：", reply_markup=reply_markup)
+                # 8秒后自动消失
+                import asyncio
+                from utils.message_utils import auto_delete_message
+                asyncio.create_task(auto_delete_message(update, context, message, 8))
                 return WAITING_LOTTERY_RULE_SIGN
             lottery_data['rule_sign'] = rule_sign
             lottery_data['step'] = 'prizes'
@@ -227,7 +308,7 @@ async def lottery_process(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             )
             return WAITING_LOTTERY_PRIZES
         except ValueError:
-            await update.message.reply_text("❌ 请输入有效的数字：", reply_markup=reply_markup)
+            await update.message.reply_text("⚠️ 请输入有效的数字：", reply_markup=reply_markup)
             return WAITING_LOTTERY_RULE_SIGN
     
     elif current_step == 'prizes':
@@ -289,7 +370,7 @@ async def handle_prize_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
             )
             return WAITING_LOTTERY_PRIZES
         except ValueError:
-            await update.message.reply_text("❌ 请输入有效的数字：", reply_markup=reply_markup)
+            await update.message.reply_text("⚠️ 请输入有效的数字：", reply_markup=reply_markup)
             return WAITING_LOTTERY_PRIZES
     
     elif prize_step == 'bodys':
@@ -423,7 +504,11 @@ async def get_lottery_bodys(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     text = update.message.text.strip()
     
     if 'lottery' not in context.user_data:
-        await update.message.reply_text("❌ 会话已过期，请重新开始")
+        message = await update.message.reply_text("⚠️ 会话已过期，请重新开始")
+        # 5秒后自动消失
+        import asyncio
+        from utils.message_utils import auto_delete_message
+        asyncio.create_task(auto_delete_message(update, context, message, 5))
         return ConversationHandler.END
     
     lottery_data = context.user_data['lottery']
@@ -541,7 +626,7 @@ async def finish_prizes(update, context):
     
     lottery_data = context.user_data.get('lottery')
     if not lottery_data:
-        await message.reply_text("❌ 会话已过期，请重新开始")
+        await message.reply_text("⚠️ 会话已过期，请重新开始")
         return ConversationHandler.END
     
     if not lottery_data.get('prizes'):
