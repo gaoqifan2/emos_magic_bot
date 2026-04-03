@@ -1,117 +1,82 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""修复main.py中的编码问题"""
+"""
+修复文件编码问题脚本
+用于修复包含U+FFFD替换字符的文件
+"""
 
-with open('main.py', 'r', encoding='utf-8', errors='replace') as f:
-    content = f.read()
+import sys
+import os
 
-# 替换所有 U+FFFD 替换字符
-content = content.replace('\ufffd', '')
+def fix_file_encoding(filepath):
+    """修复文件中的编码问题"""
+    print(f"正在处理文件: {filepath}")
+    
+    if not os.path.exists(filepath):
+        print(f"错误: 文件不存在 {filepath}")
+        return False
+    
+    # 读取文件内容（二进制模式）
+    with open(filepath, 'rb') as f:
+        content = f.read()
+    
+    # 检查是否包含替换字符 U+FFFD (UTF-8: 0xEF 0xBF 0xBD)
+    replacement_char = b'\xef\xbf\xbd'
+    
+    if replacement_char not in content:
+        print("未发现编码问题字符 (U+FFFD)")
+        # 尝试用UTF-8解码验证
+        try:
+            text = content.decode('utf-8')
+            print("文件编码正常，可以用UTF-8解码")
+            return True
+        except UnicodeDecodeError as e:
+            print(f"警告: 文件存在其他编码问题: {e}")
+    else:
+        print(f"发现 {content.count(replacement_char)} 个替换字符 (U+FFFD)")
+    
+    # 尝试用不同编码读取并修复
+    encodings = ['utf-8', 'gbk', 'gb2312', 'gb18030', 'latin-1', 'cp936']
+    
+    for encoding in encodings:
+        try:
+            # 先用该编码解码
+            text = content.decode(encoding, errors='replace')
+            
+            # 替换损坏的字符
+            original_text = text
+            text = text.replace('\ufffd', '')  # 移除替换字符
+            
+            # 如果文本有变化，说明修复了问题
+            if text != original_text:
+                print(f"使用 {encoding} 编码修复了文件")
+                
+                # 备份原文件
+                backup_path = filepath + '.backup'
+                with open(backup_path, 'wb') as f:
+                    f.write(content)
+                print(f"已备份原文件到: {backup_path}")
+                
+                # 写入修复后的内容（使用UTF-8）
+                with open(filepath, 'w', encoding='utf-8') as f:
+                    f.write(text)
+                print(f"已修复文件: {filepath}")
+                return True
+            else:
+                print(f"使用 {encoding} 编码可以正常解码，无需修复")
+                return True
+                
+        except Exception as e:
+            continue
+    
+    print("无法修复文件编码问题")
+    return False
 
-# 修复常见的乱码模式
-replacements = [
-    ('编?', '编码'),
-    ('运?', '运行'),
-    ('行?', '行'),
-    ('存?', '存在'),
-    ('在?', '在'),
-    ('文?', '文件'),
-    ('件?', '件'),
-    ('数?', '数据'),
-    ('据?', '据'),
-    ('器?', '器'),
-    ('情?', '情况'),
-    ('况?', '况'),
-    ('列?', '列表'),
-    ('执?', '执行'),
-    ('命?', '命令'),
-    ('令?', '令'),
-    ('函?', '函数'),
-    ('处理?', '处理器'),
-    ('日?', '日志'),
-    ('输?', '输出'),
-    ('出?', '出'),
-    ('任?', '任务'),
-    ('务?', '务'),
-    ('状?', '状态'),
-    ('态?', '态'),
-    ('失?', '失败'),
-    ('败?', '败'),
-    ('一?', '一次'),
-    ('次?', '次'),
-    ('模?', '模式'),
-    ('式?', '式'),
-    ('大?', '大小'),
-    ('小?', '小'),
-    ('游?', '游戏'),
-    ('戏?', '戏'),
-    ('私聊?', '私聊：'),
-    ('群聊?', '群聊：'),
-    ('：?', '：'),
-    ('金?', '金额'),
-    ('额?', '额'),
-    ('结?', '结束'),
-    ('束?', '束'),
-    ('开?', '开奖'),
-    ('奖?', '奖'),
-    ('管?', '管理'),
-    ('理?', '理'),
-    ('员?', '员'),
-    ('始?', '开始'),
-    ('登?', '登录'),
-    ('录?', '录'),
-    ('家?', '庄家'),
-    ('自?', '自己'),
-    ('己?', '己'),
-    ('参?', '参与'),
-    ('与?', '与'),
-    ('下?', '下注'),
-    ('注?', '注'),
-    ('余?', '余额'),
-    ('总?', '总额'),
-    ('服?', '服务费'),
-    ('比?', '比例'),
-    ('例?', '例'),
-    ('闲?', '闲家'),
-    ('空?', '空盘'),
-    ('盘?', '盘'),
-    ('费?', '费'),
-    ('赢?', '赢得'),
-    ('损?', '损失'),
-    ('成?', '成功'),
-    ('功?', '功'),
-    ('钟?', '钟'),
-    ('送?', '发送'),
-    ('或?', '或者'),
-    ('使?', '使用'),
-    ('清?', '清理'),
-    ('点?', '点数'),
-    ('检?', '检查'),
-    ('查?', '查'),
-    ('调?', '调用'),
-    ('性?', '属性'),
-    ('属?', '属'),
-    ('分?', '分配'),
-    ('配?', '配'),
-    ('装饰?', '装饰器'),
-    ('列表?', '列表中'),
-    ('骰?', '骰子'),
-    ('本?', '本金'),
-    ('管理?', '管理员'),
-    ('开始?', '开始或已结束'),
-    ('?0秒', '每10秒'),
-    ('??', '大/小'),
-    ('?10', '大 10'),
-    ('?,', '大,'),
-    ('?]', '大]'),
-    ("?'", "大'"),
-    ('??金额', '大/小 金额'),
-]
-
-for old, new in replacements:
-    content = content.replace(old, new)
-
-with open('main.py', 'w', encoding='utf-8') as f:
-    f.write(content)
-
-print('修复完成')
+if __name__ == '__main__':
+    if len(sys.argv) < 2:
+        # 默认修复 main.py
+        target_file = 'main.py'
+    else:
+        target_file = sys.argv[1]
+    
+    success = fix_file_encoding(target_file)
+    sys.exit(0 if success else 1)
