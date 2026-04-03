@@ -154,7 +154,7 @@ def update_user_streak(user_id, telegram_id, game_type='blackjack', is_win=True)
                     "tag": "新手村"  # 使用正确的参数名 tag，而不是 tag_name
                 }
                 
-                response = httpx.post(api_url, json=payload)
+                response = httpx.post(api_url, json=payload, timeout=10)
                 if response.status_code == 200:
                     logger.info(f"成功为用户 {telegram_id} 在群 {DEFAULT_GROUP_CHAT_ID} 中设置标签 '新手村'")
                 else:

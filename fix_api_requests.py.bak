@@ -1,0 +1,116 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+批量替换代码中的API请求为使用全局HTTP客户端
+"""
+
+import os
+import re
+import fileinput
+
+# 要处理的文件扩展名
+FILE_EXTENSIONS = ['.py']
+
+# 要搜索的目录
+SEARCH_DIRS = [
+    r'd:\emos_magic_bot',
+    r'd:\emos_magic_bot\handlers',
+    r'd:\emos_magic_bot\user',
+    r'd:\emos_magic_bot\services',
+    r'd:\emos_magic_bot\app\handlers',
+    r'd:\emos_magic_bot\shop'
+]
+
+# 导入语句检查
+IMPORT_PATTERN = r'from utils\.http_client import http_client'
+
+# 替换模式
+REPLACE_PATTERNS = [
+    # 匹配 async with httpx.AsyncClient() as client: 模式
+    (r'\s*async\s+with\s+httpx\.AsyncClient\(\)\s+as\s+client:\s*', ''),
+    # 匹配 await client.get( 模式
+    (r'\s*await\s+client\.get\(', 'await http_client.get('),
+    # 匹配 await client.post( 模式
+    (r'\s*await\s+client\.post\(', 'await http_client.post('),
+    # 匹配 await client.put( 模式
+    (r'\s*await\s+client\.put\(', 'await http_client.put('),
+    # 匹配 await client.delete( 模式
+    (r'\s*await\s+client\.delete\(', 'await http_client.delete('),
+    # 移除 timeout 参数
+    (r',\s*timeout=\d+\.\d+', ''),
+    (r',\s*timeout=\d+', '')
+]
+
+def add_import_if_missing(file_path):
+    """如果文件中没有导入HTTP客户端，添加导入语句"""
+    with open(file_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+    
+    if IMPORT_PATTERN not in content:
+        # 找到合适的位置添加导入
+        lines = content.split('\n')
+        import_section_end = 0
+        
+        for i, line in enumerate(lines):
+            if line.startswith('from ') or line.startswith('import '):
+                import_section_end = i + 1
+        
+        # 在导入部分末尾添加
+        if import_section_end > 0:
+            lines.insert(import_section_end, 'from utils.http_client import http_client')
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write('\n'.join(lines))
+            return True
+    return False
+
+def process_file(file_path):
+    """处理单个文件"""
+    print(f"处理文件: {file_path}")
+    
+    # 添加导入语句
+    added_import = add_import_if_missing(file_path)
+    if added_import:
+        print(f"  添加了HTTP客户端导入")
+    
+    # 替换API请求
+    changed = False
+    with fileinput.FileInput(file_path, inplace=True, backup='.bak', encoding='utf-8') as file:
+        for line in file:
+            original_line = line
+            for pattern, replacement in REPLACE_PATTERNS:
+                line = re.sub(pattern, replacement, line)
+            if line != original_line:
+                changed = True
+            print(line, end='')
+    
+    if changed:
+        print(f"  已更新API请求")
+    else:
+        print(f"  无需更新")
+    
+    return changed
+
+def main():
+    """主函数"""
+    total_files = 0
+    changed_files = 0
+    
+    for search_dir in SEARCH_DIRS:
+        if not os.path.exists(search_dir):
+            print(f"目录不存在: {search_dir}")
+            continue
+        
+        for root, dirs, files in os.walk(search_dir):
+            for file in files:
+                if any(file.endswith(ext) for ext in FILE_EXTENSIONS):
+                    file_path = os.path.join(root, file)
+                    total_files += 1
+                    if process_file(file_path):
+                        changed_files += 1
+    
+    print(f"\n处理完成:")
+    print(f"总文件数: {total_files}")
+    print(f"更新文件数: {changed_files}")
+
+if __name__ == '__main__':
+    main()
