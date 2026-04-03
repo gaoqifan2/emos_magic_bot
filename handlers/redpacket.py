@@ -1006,13 +1006,23 @@ async def handle_scene(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ]
         else:
             # 当天不是节日，跳转到自定义祝福语
-            message = await update.callback_query.edit_message_text("💬 请输入自定义祝福语（最多50字）：")
-            context.user_data['current_prompt_message'] = message.message_id
+            try:
+                message = await update.callback_query.edit_message_text("💬 请输入自定义祝福语（最多50字）：")
+                context.user_data['current_prompt_message'] = message.message_id
+            except Exception as e:
+                # 消息不存在，发送新消息
+                message = await update.effective_message.reply_text("💬 请输入自定义祝福语（最多50字）：")
+                context.user_data['current_prompt_message'] = message.message_id
             return WAITING_CUSTOM_BLESSING
     elif data == 'scene_custom':
         # 自定义祝福语
-        message = await update.callback_query.edit_message_text("💬 请输入自定义祝福语（最多50字）：")
-        context.user_data['current_prompt_message'] = message.message_id
+        try:
+            message = await update.callback_query.edit_message_text("💬 请输入自定义祝福语（最多50字）：")
+            context.user_data['current_prompt_message'] = message.message_id
+        except Exception as e:
+            # 消息不存在，发送新消息
+            message = await update.effective_message.reply_text("💬 请输入自定义祝福语（最多50字）：")
+            context.user_data['current_prompt_message'] = message.message_id
         return WAITING_CUSTOM_BLESSING
 
 async def handle_custom_blessing(update: Update, context: ContextTypes.DEFAULT_TYPE):
