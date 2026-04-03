@@ -3,10 +3,10 @@ import pymysql
 import httpx
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
 from telegram.ext import ContextTypes, ConversationHandler, Application
+from telegram.error import BadRequest
 
 from config import Config, BOT_COMMANDS, user_tokens, SERVICE_PROVIDER_TOKEN
 from utils.db_helper import update_recharge_order_status
-from utils.http_client import http_client
 from utils.http_client import http_client
 
 logger = logging.getLogger(__name__)
@@ -743,8 +743,15 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     # 先 answer 回调
-    await query.answer()
-    logger.info(f"已响应回调: {data}")
+    try:
+        await query.answer()
+        logger.info(f"已响应回调: {data}")
+    except BadRequest as e:
+        # 如果请求过期，记录日志但不抛出异常
+        if "Query is too old" in str(e) or "query is too old" in str(e):
+            logger.warning(f"回调查询已过期，跳过回应: {data}")
+        else:
+            raise e  # 如果是其他错误则继续抛出
     
     # 处理游戏相关的按钮回调
     from app.handlers.command_handlers import callback_handler as game_callback_handler
