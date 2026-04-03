@@ -2208,11 +2208,10 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                     # 先获取用户信息, 保存到本地数据库
                                     try:
                                         user_headers = {"Authorization": f"Bearer {token}"}
-                                            user_response = await http_client.get(
-                                                f"{Config.API_BASE_URL}/user",
-                                                headers=user_headers,
-                                                timeout=10
-                                            )
+                                        user_response = await http_client.get(
+                                            f"{Config.API_BASE_URL}/user",
+                                            headers=user_headers
+                                        )
                                         
                                         if user_response.status_code == 200:
                                             user_data = user_response.json()
@@ -4147,11 +4146,6 @@ def main() -> None:
     # 启动机器
 
     application.run_polling(allowed_updates=Update.ALL_TYPES)
-
-if __name__ == "__main__":
-    main()
-
-lowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
     main()
