@@ -4149,7 +4149,14 @@ def main() -> None:
     logger.info(f"机器@{Config.BOT_USERNAME} 启动成功")
     
     # 启动机器
-
+    # Python 3.13+ 兼容性：确保有事件循环
+    if sys.version_info >= (3, 13):
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+    
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
