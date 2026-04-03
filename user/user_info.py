@@ -254,7 +254,7 @@ async def user_sign(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     try:
         headers = {"Authorization": f"Bearer {token}"}
-            response =await http_client.put(
+        response = await http_client.put(
                 f"{Config.API_BASE_URL}/user/sign?content=1",
                 headers=headers,
                 timeout=10
@@ -393,7 +393,7 @@ async def user_invite(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     try:
         headers = {"Authorization": f"Bearer {token}"}
-            response =await http_client.get(
+        response = await http_client.get(
                 f"{Config.API_BASE_URL}/invite/info",
                 headers=headers,
                 timeout=10
@@ -574,7 +574,7 @@ async def toggle_show_empty(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     try:
         headers = {"Authorization": f"Bearer {token}"}
-            response =await http_client.put(
+        response = await http_client.put(
                 f"{Config.API_BASE_URL}/user/showEmpty",
                 headers=headers,
                 timeout=10

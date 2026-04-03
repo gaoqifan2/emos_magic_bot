@@ -37,7 +37,7 @@ async def shop_manage(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     try:
         headers = {"Authorization": f"Bearer {token}"}
-            response =await http_client.get(
+        response = await http_client.get(
                 f"{Config.API_BASE_URL}/shop/seller/base",
                 headers=headers,
                 timeout=10
@@ -104,7 +104,7 @@ async def shop_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     try:
         headers = {"Authorization": f"Bearer {token}"}
-            response =await http_client.get(
+        response = await http_client.get(
                 f"{Config.API_BASE_URL}/shop/category/list",
                 headers=headers,
                 timeout=10
@@ -147,7 +147,7 @@ async def shop_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     try:
         headers = {"Authorization": f"Bearer {token}"}
-            response =await http_client.get(
+        response = await http_client.get(
                 f"{Config.API_BASE_URL}/shop/product/list",
                 headers=headers,
                 timeout=10
@@ -190,7 +190,7 @@ async def shop_order(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     try:
         headers = {"Authorization": f"Bearer {token}"}
-            response =await http_client.get(
+        response = await http_client.get(
                 f"{Config.API_BASE_URL}/shop/order/list",
                 headers=headers,
                 timeout=10

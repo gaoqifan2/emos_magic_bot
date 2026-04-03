@@ -1367,7 +1367,7 @@ async def withdraw_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not local_user_id:
             # 从用户信息中获取本地用户ID
             user_headers = {"Authorization": f"Bearer {token}"}
-                user_response =await http_client.get(
+            user_response = await http_client.get(
                     f"{Config.API_BASE_URL}/user",
                     headers=user_headers,
                     timeout=10
@@ -1594,7 +1594,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 headers = {"Authorization": f"Bearer {SERVICE_PROVIDER_TOKEN}"}
                 data = {"user_id": target_user_id, "carrot": amount}
                 
-                    response =await http_client.post(
+                    response = await http_client.post(
                         f"{API_BASE_URL}/pay/transfer",
                         headers=headers,
                         json=data,
@@ -1707,7 +1707,7 @@ async def process_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE, a
                         # 3. 使用服务商token给用户转账萝卜
                         # 获取用户的emos ID
                         user_headers = {"Authorization": f"Bearer {token}"}
-                            user_response =await http_client.get(
+                            user_response = await http_client.get(
                                 f"{Config.API_BASE_URL}/user",
                                 headers=user_headers,
                                 timeout=10
@@ -1721,7 +1721,7 @@ async def process_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE, a
                                 # 使用服务商token转账（税后金额）
                                 service_headers = {"Authorization": f"Bearer {SERVICE_PROVIDER_TOKEN}"}
                                 transfer_data = {"user_id": user_emos_id, "carrot": after_tax_carrot}
-                                    transfer_response =await http_client.post(
+                                    transfer_response = await http_client.post(
                                         f"{Config.API_BASE_URL}/pay/transfer",
                                         headers=service_headers,
                                         json=transfer_data,

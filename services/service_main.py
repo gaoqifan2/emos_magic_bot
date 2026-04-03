@@ -30,7 +30,7 @@ async def show_service_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     is_service = False
     try:
         headers = {"Authorization": f"Bearer {token}"}
-            response =await http_client.get(
+        response = await http_client.get(
                 f"{Config.API_BASE_URL}/pay/base",
                 headers=headers,
                 timeout=10
@@ -106,7 +106,7 @@ async def service_manage(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     try:
         headers = {"Authorization": f"Bearer {token}"}
-            response =await http_client.get(
+        response = await http_client.get(
                 f"{Config.API_BASE_URL}/pay/base",
                 headers=headers,
                 timeout=10
@@ -322,7 +322,7 @@ async def service_fund_transfer(update: Update, context: ContextTypes.DEFAULT_TY
     is_service = False
     try:
         headers = {"Authorization": f"Bearer {token}"}
-            response =await http_client.get(
+        response = await http_client.get(
                 f"{Config.API_BASE_URL}/pay/base",
                 headers=headers,
                 timeout=10
@@ -366,7 +366,7 @@ async def service_user_manage(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     try:
         headers = {"Authorization": f"Bearer {token}"}
-            response =await http_client.get(
+        response = await http_client.get(
                 f"{Config.API_BASE_URL}/user",
                 headers=headers,
                 timeout=10
@@ -443,7 +443,7 @@ async def service_recharge(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not local_user_id or not emos_user_id:
             # 从用户信息中获取本地用户ID
             user_headers = {"Authorization": f"Bearer {token}"}
-                user_response =await http_client.get(
+            user_response = await http_client.get(
                     f"{Config.API_BASE_URL}/user",
                     headers=user_headers,
                     timeout=10
@@ -573,7 +573,7 @@ async def service_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not local_user_id or not emos_user_id:
             # 从用户信息中获取本地用户ID
             user_headers = {"Authorization": f"Bearer {token}"}
-                user_response =await http_client.get(
+            user_response = await http_client.get(
                     f"{Config.API_BASE_URL}/user",
                     headers=user_headers,
                     timeout=10
@@ -770,7 +770,7 @@ async def service_game_center(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     try:
         headers = {"Authorization": f"Bearer {token}"}
-            response =await http_client.get(
+        response = await http_client.get(
                 f"{Config.API_BASE_URL}/game/list",
                 headers=headers,
                 timeout=10
@@ -819,7 +819,7 @@ async def create_recharge_order(user_id, carrot_amount, game_id="1"):
         headers = {"Authorization": f"Bearer {token}"}
         data = {"game_id": game_id, "carrot_amount": carrot_amount}
         
-            response =await http_client.post(
+        response = await http_client.post(
                 f"{Config.API_BASE_URL}/game/recharge",
                 headers=headers,
                 json=data,
@@ -870,7 +870,7 @@ async def process_withdraw_order(user_id, game_coin_amount):
         carrot_amount = game_coin_amount // 10
         data = {"user_id": user_id, "carrot": carrot_amount}
         
-            response =await http_client.put(
+        response = await http_client.put(
                 f"{Config.API_BASE_URL}/carrot/transfer",
                 headers=headers,
                 json=data,
