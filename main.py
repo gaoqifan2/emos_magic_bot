@@ -33,7 +33,12 @@ if sys.platform == 'win32':
 if sys.version_info >= (3, 13):
     try:
         import signal
-        loop = asyncio.get_event_loop()
+        # Python 3.13+ 需要使用 get_running_loop 或 new_event_loop
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
         # 禁用信号处理
         loop.add_signal_handler = lambda sig, handler: None
     except:
