@@ -5,7 +5,6 @@ from telegram.ext import ContextTypes
 
 from config import user_tokens, Config, get_user_token
 from utils.http_client import http_client
-from utils.http_client import http_client
 
 logger = logging.getLogger(__name__)
 

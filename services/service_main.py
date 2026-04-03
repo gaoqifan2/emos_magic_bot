@@ -8,7 +8,6 @@ from telegram.ext import ContextTypes
 from config import user_tokens, Config, WITHDRAW_LIMITS
 from utils.message_utils import auto_delete_message
 from utils.http_client import http_client
-from utils.http_client import http_client
 
 logger = logging.getLogger(__name__)
 
