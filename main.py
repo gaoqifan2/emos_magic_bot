@@ -2107,12 +2107,11 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             import httpx
                             headers = {"Authorization": f"Bearer {token}"}
                             data = {"user_id": target_user_id, "carrot": amount}
-                                response = await http_client.put(
-                                    f"{Config.API_BASE_URL}/carrot/transfer",
-                                    headers=headers,
-                                    json=data,
-                                    timeout=10
-                                )
+                            response = await http_client.put(
+                                f"{Config.API_BASE_URL}/carrot/transfer",
+                                headers=headers,
+                                json=data
+                            )
                             
                             if response.status_code == 200:
                                 result = response.json()
@@ -2190,12 +2189,11 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             
                             json_data = json.dumps(data, ensure_ascii=False).encode('utf-8')
                             
-                                response = await http_client.post(
-                                    f"{Config.API_BASE_URL}/pay/create",
-                                    headers=headers,
-                                    content=json_data,
-                                    timeout=10
-                                )
+                            response = await http_client.post(
+                                f"{Config.API_BASE_URL}/pay/create",
+                                headers=headers,
+                                content=json_data
+                            )
                             
                             logger.info(f"支付订单API响应状态码: {response.status_code}")
                             logger.info(f"支付订单API响应内容: {response.text}")
@@ -2377,11 +2375,10 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                 # 3. 使用服务商token给用户转账萝?
                                 # 获取用户的emos ID
                                 user_headers = {"Authorization": f"Bearer {token}"}
-                                    user_response = await http_client.get(
-                                        f"{Config.API_BASE_URL}/user",
-                                        headers=user_headers,
-                                        timeout=10
-                                    )
+                                user_response = await http_client.get(
+                                    f"{Config.API_BASE_URL}/user",
+                                    headers=user_headers
+                                )
                                 
                                 if user_response.status_code == 200:
                                     user_info = user_response.json()
@@ -2391,12 +2388,11 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                         # 使用服务商token转账(税后金额)
                                         service_headers = {"Authorization": f"Bearer {SERVICE_PROVIDER_TOKEN}"}
                                         transfer_data = {"user_id": user_emos_id, "carrot": after_tax_carrot}
-                                            transfer_response = await http_client.post(
-                                                f"{Config.API_BASE_URL}/pay/transfer",
-                                                headers=service_headers,
-                                                json=transfer_data,
-                                                timeout=10
-                                            )
+                                        transfer_response = await http_client.post(
+                                            f"{Config.API_BASE_URL}/pay/transfer",
+                                            headers=service_headers,
+                                            json=transfer_data
+                                        )
                                         
                                         if transfer_response.status_code == 200:
                                             # 更新提现订单状态为成功
@@ -2493,12 +2489,11 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                 import httpx
                                 headers = {"Authorization": f"Bearer {token}"}
                                 data = {"game_id": game_id, "carrot_amount": amount}
-                                    response = await http_client.post(
-                                        f"{Config.API_BASE_URL}/game/recharge",
-                                        headers=headers,
-                                        json=data,
-                                        timeout=10
-                                    )
+                                response = await http_client.post(
+                                    f"{Config.API_BASE_URL}/game/recharge",
+                                    headers=headers,
+                                    json=data
+                                )
                                 
                                 if response.status_code == 200:
                                     result = response.json()
@@ -2561,12 +2556,11 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         
                         print(f"DEBUG: Request data: {data}")
                         
-                            response = await http_client.post(
-                                f"{Config.API_BASE_URL}/pay/apply",
-                                headers=headers,
-                                content=json_data,
-                                timeout=10
-                            )
+                        response = await http_client.post(
+                            f"{Config.API_BASE_URL}/pay/apply",
+                            headers=headers,
+                            content=json_data
+                        )
                         
                         print(f"DEBUG: Response status code: {response.status_code}")
                         print(f"DEBUG: Response content: {response.text}")
@@ -2658,12 +2652,11 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         }
                         data = {"name": service_name, "description": service_description, "notify_url": service_notify_url}
                         json_data = json.dumps(data, ensure_ascii=False).encode('utf-8')
-                            response = await http_client.post(
-                                f"{Config.API_BASE_URL}/pay/update",
-                                headers=headers,
-                                content=json_data,
-                                timeout=10
-                            )
+                        response = await http_client.post(
+                            f"{Config.API_BASE_URL}/pay/update",
+                            headers=headers,
+                            content=json_data
+                        )
                         
                         if response.status_code == 200:
                             await loading.edit_text("?更新成功!")
@@ -2701,11 +2694,10 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     try:
                         import httpx
                         headers = {"Authorization": f"Bearer {token}"}
-                            response = await http_client.get(
-                                f"{Config.API_BASE_URL}/pay/base",
-                                headers=headers,
-                                timeout=10
-                            )
+                        response = await http_client.get(
+                            f"{Config.API_BASE_URL}/pay/base",
+                            headers=headers
+                        )
                         
                         if response.status_code == 200:
                             result = response.json()
@@ -2758,11 +2750,10 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             is_service = False
                             try:
                                 headers = {"Authorization": f"Bearer {token}"}
-                                    response = await http_client.get(
-                                        f"{Config.API_BASE_URL}/pay/base",
-                                        headers=headers,
-                                        timeout=10
-                                    )
+                                response = await http_client.get(
+                                    f"{Config.API_BASE_URL}/pay/base",
+                                    headers=headers
+                                )
                                 
                                 if response.status_code == 200:
                                     result = response.json()
@@ -2792,12 +2783,11 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                 # 使用服务商token进行转账
                                 headers = {"Authorization": f"Bearer {SERVICE_PROVIDER_TOKEN}"}
                                 data = {"user_id": target_user_id, "carrot": amount}
-                                    response = await http_client.post(
-                                        f"{Config.API_BASE_URL}/pay/transfer",
-                                        headers=headers,
-                                        json=data,
-                                        timeout=10
-                                    )
+                                response = await http_client.post(
+                                    f"{Config.API_BASE_URL}/pay/transfer",
+                                    headers=headers,
+                                    json=data
+                                )
                                 
                                 if response.status_code == 200:
                                     result = response.json()
@@ -2887,11 +2877,10 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     try:
                         import httpx
                         headers = {"Authorization": f"Bearer {token}"}
-                            response = await http_client.get(
-                                f"{Config.API_BASE_URL}/pay/query?no={order_no}",
-                                headers=headers,
-                                timeout=10
-                            )
+                        response = await http_client.get(
+                            f"{Config.API_BASE_URL}/pay/query?no={order_no}",
+                            headers=headers
+                        )
                         
                         if response.status_code == 200:
                             result = response.json()
@@ -2925,11 +2914,10 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     try:
                         import httpx
                         headers = {"Authorization": f"Bearer {token}"}
-                            response = await http_client.put(
-                                f"{Config.API_BASE_URL}/pay/close?no={order_no}",
-                                headers=headers,
-                                timeout=10
-                            )
+                        response = await http_client.put(
+                            f"{Config.API_BASE_URL}/pay/close?no={order_no}",
+                            headers=headers
+                        )
                         
                         if response.status_code == 200:
                             await loading.edit_text("?订单关闭成功!")
@@ -2953,11 +2941,10 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     try:
                         import httpx
                         headers = {"Authorization": f"Bearer {token}"}
-                            response = await http_client.get(
-                                f"{Config.API_BASE_URL}/lottery/win?lottery_id={lottery_id}",
-                                headers=headers,
-                                timeout=10
-                            )
+                        response = await http_client.get(
+                            f"{Config.API_BASE_URL}/lottery/win?lottery_id={lottery_id}",
+                            headers=headers
+                        )
                         
                         if response.status_code == 200:
                             win_data = response.json()
@@ -3002,12 +2989,11 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         import httpx
                         headers = {"Authorization": f"Bearer {token}"}
                         data = {"user_id": target_user_id}
-                            response = await http_client.post(
-                                f"{Config.API_BASE_URL}/invite/revoke",
-                                headers=headers,
-                                json=data,
-                                timeout=10
-                            )
+                        response = await http_client.post(
+                            f"{Config.API_BASE_URL}/invite/revoke",
+                            headers=headers,
+                            json=data
+                        )
                         
                         if response.status_code == 200:
                             result = response.json()
@@ -4161,6 +4147,11 @@ def main() -> None:
     # 启动机器
 
     application.run_polling(allowed_updates=Update.ALL_TYPES)
+
+if __name__ == "__main__":
+    main()
+
+lowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
     main()
