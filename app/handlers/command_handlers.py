@@ -1594,12 +1594,12 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 headers = {"Authorization": f"Bearer {SERVICE_PROVIDER_TOKEN}"}
                 data = {"user_id": target_user_id, "carrot": amount}
                 
-                    response = await http_client.post(
-                        f"{API_BASE_URL}/pay/transfer",
-                        headers=headers,
-                        json=data,
-                        timeout=10
-                    )
+                response = await http_client.post(
+                    f"{API_BASE_URL}/pay/transfer",
+                    headers=headers,
+                    json=data,
+                    timeout=10
+                )
                 
                 if response.status_code == 200:
                     result = response.json()
@@ -1707,11 +1707,11 @@ async def process_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE, a
                         # 3. 使用服务商token给用户转账萝卜
                         # 获取用户的emos ID
                         user_headers = {"Authorization": f"Bearer {token}"}
-                            user_response = await http_client.get(
-                                f"{Config.API_BASE_URL}/user",
-                                headers=user_headers,
-                                timeout=10
-                            )
+                        user_response = await http_client.get(
+                            f"{Config.API_BASE_URL}/user",
+                            headers=user_headers,
+                            timeout=10
+                        )
                         
                         if user_response.status_code == 200:
                             user_info = user_response.json()
@@ -1721,12 +1721,12 @@ async def process_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE, a
                                 # 使用服务商token转账（税后金额）
                                 service_headers = {"Authorization": f"Bearer {SERVICE_PROVIDER_TOKEN}"}
                                 transfer_data = {"user_id": user_emos_id, "carrot": after_tax_carrot}
-                                    transfer_response = await http_client.post(
-                                        f"{Config.API_BASE_URL}/pay/transfer",
-                                        headers=service_headers,
-                                        json=transfer_data,
-                                        timeout=10
-                                    )
+                                transfer_response = await http_client.post(
+                                    f"{Config.API_BASE_URL}/pay/transfer",
+                                    headers=service_headers,
+                                    json=transfer_data,
+                                    timeout=10
+                                )
                                 
                                 if transfer_response.status_code == 200:
                                     # 更新提现订单状态为成功

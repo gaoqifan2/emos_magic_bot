@@ -303,11 +303,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     
                     # 使用服务商token查询平台订单信息
                     service_headers = {"Authorization": f"Bearer {SERVICE_PROVIDER_TOKEN}"}
-                        response = await http_client.get(
-                            f"{Config.API_BASE_URL}/pay/query?no={order_no}",
-                            headers=service_headers,
-                            timeout=10
-                        )
+                    response = await http_client.get(
+                        f"{Config.API_BASE_URL}/pay/query?no={order_no}",
+                        headers=service_headers
+                    )
                     
                     if response.status_code != 200:
                         await loading.edit_text(f"⚠️ 查询订单失败：{order_no}")
@@ -381,10 +380,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             # 查询订单状态
             logger.info(f"查询订单状态: {order_no}")
             response = await http_client.get(
-                    f"{Config.API_BASE_URL}/pay/query?no={order_no}",
-                    headers=service_headers,
-                    timeout=10
-                )
+                f"{Config.API_BASE_URL}/pay/query?no={order_no}",
+                headers=service_headers,
+                timeout=10
+            )
             
             logger.info(f"订单查询响应状态码: {response.status_code}")
             logger.info(f"订单查询响应内容: {response.text}")
@@ -905,10 +904,10 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             headers = {"Authorization": f"Bearer {token}"}
             response = await http_client.get(
-                    f"{Config.API_BASE_URL}/pay/base",
-                    headers=headers,
-                    timeout=10
-                )
+                f"{Config.API_BASE_URL}/pay/base",
+                headers=headers,
+                timeout=10
+            )
             
             if response.status_code == 200:
                 service_info = response.json()
@@ -1541,12 +1540,12 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             try:
                 headers = {"Authorization": f"Bearer {token}"}
                 data = {"pay_way": "telegram_bot", "price": amount, "name": name}
-                    response = await http_client.post(
-                        f"{Config.API_BASE_URL}/pay/create",
-                        headers=headers,
-                        json=data,
-                        timeout=10
-                    )
+                response = await http_client.post(
+                    f"{Config.API_BASE_URL}/pay/create",
+                    headers=headers,
+                    json=data,
+                    timeout=10
+                )
                 
                 if response.status_code == 200:
                     result = response.json()
@@ -1594,12 +1593,12 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             try:
                 headers = {"Authorization": f"Bearer {token}"}
                 data = {"pay_way": "web", "price": amount, "name": name}
-                    response = await http_client.post(
-                        f"{Config.API_BASE_URL}/pay/create",
-                        headers=headers,
-                        json=data,
-                        timeout=10
-                    )
+                response = await http_client.post(
+                    f"{Config.API_BASE_URL}/pay/create",
+                    headers=headers,
+                    json=data,
+                    timeout=10
+                )
                 
                 if response.status_code == 200:
                     result = response.json()

@@ -7,7 +7,6 @@ HTTP客户端工具模块
 
 import httpx
 from typing import Optional, Dict, Any
-from utils.http_client import http_client
 
 class HTTPClient:
     """HTTP客户端管理类"""
@@ -31,7 +30,7 @@ class HTTPClient:
                     keepalive_expiry=30.0   # 保持连接过期时间
                 ),
                 follow_redirects=True,  # 跟随重定向
-                http2=True,  # 启用HTTP/2
+                http2=False,  # 禁用HTTP/2，避免需要h2包
                 headers={
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
                 }

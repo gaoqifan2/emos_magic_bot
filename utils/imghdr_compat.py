@@ -3,7 +3,6 @@
 
 import os
 import struct
-from utils.http_client import http_client
 
 
 def what(file, h=None):
