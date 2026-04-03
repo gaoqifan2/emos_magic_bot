@@ -609,9 +609,51 @@ async def toggle_show_empty(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"切换空媒体库异常: {type(e).__name__}")
         await loading.edit_text("❌ 切换失败，请稍后重试")
     
-    # 显示返回菜单
+    # 3秒后返回账号设置界面
+    import asyncio
+    await asyncio.sleep(3)
+    
+    # 重新显示账号设置菜单
+    user_id = update.effective_user.id
+    user_info = user_tokens.get(user_id)
+    
+    if isinstance(user_info, dict):
+        token = user_info.get('token')
+    else:
+        token = user_info
+    
+    is_show_empty = True  # 默认显示
+    if token:
+        try:
+            import requests
+            headers = {"Authorization": f"Bearer {token}"}
+            response = requests.get(
+                f"{Config.API_BASE_URL}/user",
+                headers=headers,
+                timeout=5
+            )
+            if response.status_code == 200:
+                user_data = response.json()
+                is_show_empty = user_data.get('is_show_empty', True)
+        except Exception as e:
+            logger.error(f"查询空库状态失败: {e}")
+    
+    # 根据状态显示对应的按钮文字
+    if is_show_empty:
+        empty_button_text = "❌ 隐藏空媒体库"
+    else:
+        empty_button_text = "✅ 显示空媒体库"
+    
+    # 显示账号设置菜单
     keyboard = [
-        [InlineKeyboardButton("🔙 返回主菜单", callback_data="back_to_main")]
+        [
+            InlineKeyboardButton(empty_button_text, callback_data="menu_toggle_empty"),
+            InlineKeyboardButton("✏️ 修改笔名", callback_data="menu_user_pseudonym")
+        ],
+        [InlineKeyboardButton("🔙 返回", callback_data="menu_user_main")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.callback_query.message.reply_text("切换完成", reply_markup=reply_markup)
+    await update.callback_query.edit_message_text(
+        "⚙️ 账号设置",
+        reply_markup=reply_markup
+    )

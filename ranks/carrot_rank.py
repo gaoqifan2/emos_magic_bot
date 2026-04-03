@@ -83,14 +83,13 @@ async def rank_carrot_command(update: Update, context: ContextTypes.DEFAULT_TYPE
             message += "`"
             
             keyboard = [
-                [InlineKeyboardButton("🔙 返回排行榜菜单", callback_data="menu_rank_main")],
-                [InlineKeyboardButton("❌ 取消", callback_data="cancel_operation")]
+                [InlineKeyboardButton("🔙 返回排行榜菜单", callback_data="menu_rank_main")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
             await loading.edit_text(message, parse_mode="Markdown", reply_markup=reply_markup)
-            # 30秒后自动消失
-            asyncio.create_task(auto_delete_message(update, context, None, 30))
+            # 2分钟后自动消失
+            asyncio.create_task(auto_delete_message(update, context, loading, 120))
         else:
             await loading.edit_text(f"❌ 获取失败，状态码：{response.status_code}")
             

@@ -1,6 +1,7 @@
 # handlers/redpacket_query.py
 import logging
 import requests
+from datetime import datetime, timezone, timedelta
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes, ConversationHandler
 
@@ -11,6 +12,19 @@ from utils.message_utils import auto_delete_message
 logger = logging.getLogger(__name__)
 
 WAITING_REDPACKET_ID, WAITING_QUERY_TYPE = range(20, 22)
+
+def utc_to_beijing(utc_time_str):
+    """将UTC时间字符串转换为北京时间"""
+    if not utc_time_str:
+        return "未知时间"
+    try:
+        # 解析UTC时间
+        utc_time = datetime.fromisoformat(utc_time_str.replace('Z', '+00:00'))
+        # 转换为北京时间（UTC+8）
+        beijing_time = utc_time + timedelta(hours=8)
+        return beijing_time.strftime('%Y-%m-%d %H:%M:%S')
+    except Exception:
+        return utc_time_str
 
 async def check_redpacket_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """查询红包记录"""
@@ -28,21 +42,19 @@ async def check_redpacket_command(update: Update, context: ContextTypes.DEFAULT_
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     if update.callback_query:
-        await update.callback_query.edit_message_text(
+        message = await update.callback_query.edit_message_text(
             "📊 查询红包领取记录\n\n请输入红包ID：",
             reply_markup=reply_markup
         )
-        # 5秒后自动消失
-        import asyncio
-        asyncio.create_task(auto_delete_message(update, context, None, 5))
+        # 存储提示消息对象，以便用户输入时删除
+        context.user_data['current_prompt_message'] = message
     else:
         message = await update.message.reply_text(
             "📊 查询红包领取记录\n\n请输入红包ID：",
             reply_markup=reply_markup
         )
-        # 5秒后自动消失
-        import asyncio
-        asyncio.create_task(auto_delete_message(update, context, message, 5))
+        # 存储提示消息对象，以便用户输入时删除
+        context.user_data['current_prompt_message'] = message
     return WAITING_REDPACKET_ID
 
 async def handle_query_type(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -86,7 +98,7 @@ async def handle_query_type(update: Update, context: ContextTypes.DEFAULT_TYPE) 
                     number = item.get('number', 0)
                     received = item.get('received', 0)
                     status = item.get('status', 'unknown')
-                    created_at = item.get('created_at', '未知时间')[:19].replace('T', ' ')
+                    created_at = utc_to_beijing(item.get('created_at', '未知时间'))
                     
                     status_display = "✅ 已领取" if status == "completed" else "🔄 进行中"
                     
@@ -97,26 +109,39 @@ async def handle_query_type(update: Update, context: ContextTypes.DEFAULT_TYPE) 
                     message += f"📊 状态: {status_display}\n\n"
                 
                 await loading.edit_text(message, parse_mode="Markdown")
+                # 100秒后自动消失
+                import asyncio
+                asyncio.create_task(auto_delete_message(update, context, loading, 100))
             else:
                 await loading.edit_text(f"❌ 查询失败，状态码：{response.status_code}")
                 if response.text:
                     logger.error(f"API返回: {response.text}")
-            
+                # 5秒后自动消失
+                import asyncio
+                asyncio.create_task(auto_delete_message(update, context, loading, 5))
+        
         except Exception as e:
             logger.error(f"查询我的红包失败: {e}")
             await loading.edit_text("❌ 查询失败，请稍后重试")
-        
-        return ConversationHandler.END
+            # 5秒后自动消失
+            import asyncio
+            asyncio.create_task(auto_delete_message(update, context, loading, 5))
+            
+            return ConversationHandler.END
     
     elif data == "input_id":
         # 输入红包ID查询
         keyboard = add_cancel_button([[]])
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(
+        message = await query.edit_message_text(
             "📊 查询红包领取记录\n\n请输入红包ID：",
             reply_markup=reply_markup
         )
+        # 存储提示消息对象，以便用户输入时删除
+        context.user_data['current_prompt_message'] = message
         return WAITING_REDPACKET_ID
+    # 处理返回主菜单由common.py统一处理
+    # 这里不需要处理back_to_main，因为它会被common.py的回调处理
     
     return ConversationHandler.END
 
@@ -125,6 +150,16 @@ async def get_redpacket_id(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     user_id = update.effective_user.id
     redpacket_id = update.message.text.strip()
     token = get_user_token(user_id)
+    
+    # 删除之前的提示消息
+    if 'current_prompt_message' in context.user_data:
+        try:
+            message = context.user_data['current_prompt_message']
+            await message.delete()
+            del context.user_data['current_prompt_message']
+        except Exception as e:
+            logger.error(f"删除提示消息失败: {e}")
+            del context.user_data['current_prompt_message']
     
     if not token:
         await update.message.reply_text("❌ 登录已过期，请重新发送 /start 登录")
@@ -147,23 +182,33 @@ async def get_redpacket_id(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                 await loading.edit_text(f"📊 红包查询结果\n\n红包ID: `{redpacket_id}`\n暂无领取记录", parse_mode="Markdown")
                 return ConversationHandler.END
             
-            message = f"📊 红包领取记录\n\n红包ID: `{redpacket_id}`\n"
-            message += f"总领取: {data.get('total', 0)} 人\n\n"
+            message = f"# 红包领取记录\n\n"
+            message += f"🆔 红包ID: {redpacket_id}\n"
+            message += f"📊 总领取: {data.get('total', 0)} 人\n\n"
             
             for item in data.get('items', []):
                 username = item.get('username', '未知用户')
                 carrot = item.get('carrot', 0)
-                receive_at = item.get('receive_at', '未知时间')[:19].replace('T', ' ')
-                message += f"👤 {username}\n"
-                message += f"   🥕 {carrot} 萝卜\n"
-                message += f"   ⏰ {receive_at}\n\n"
+                receive_at = utc_to_beijing(item.get('receive_at', '未知时间'))
+                message += f"🧑 {username}\n"
+                message += f"🥕 {carrot} 萝卜\n"
+                message += f"⏰ {receive_at}\n\n"
             
             await loading.edit_text(message, parse_mode="Markdown")
+            # 100秒后自动消失
+            import asyncio
+            asyncio.create_task(auto_delete_message(update, context, loading, 100))
         else:
-                await loading.edit_text(f"❌ 查询失败，状态码：{response.status_code}", parse_mode="Markdown")
+            await loading.edit_text(f"❌ 查询失败，状态码：{response.status_code}", parse_mode="Markdown")
+            # 5秒后自动消失
+            import asyncio
+            asyncio.create_task(auto_delete_message(update, context, loading, 5))
             
     except Exception as e:
         logger.error(f"查询红包失败: {e}")
         await loading.edit_text("❌ 查询失败，请稍后重试", parse_mode="Markdown")
+        # 5秒后自动消失
+        import asyncio
+        asyncio.create_task(auto_delete_message(update, context, loading, 5))
     
     return ConversationHandler.END

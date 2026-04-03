@@ -25,6 +25,18 @@ async def auto_delete_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                 chat_id=message.chat_id,
                 message_id=message.message_id
             )
+        elif update.callback_query:
+            # 对于回调查询，删除回调消息
+            await context.bot.delete_message(
+                chat_id=update.callback_query.message.chat_id,
+                message_id=update.callback_query.message.message_id
+            )
+        elif update.message:
+            # 对于普通消息，删除消息
+            await context.bot.delete_message(
+                chat_id=update.message.chat_id,
+                message_id=update.message.message_id
+            )
     except Exception as e:
         # 忽略删除失败的错误
         pass

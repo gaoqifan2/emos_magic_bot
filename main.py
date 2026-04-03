@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 import logging
@@ -157,8 +157,8 @@ def group_command_filter(func):
 
 from handlers.redpacket import (
     redpocket_command, handle_type, handle_carrot, handle_number, handle_blessing, 
-    handle_password, handle_media, create_redpacket, cancel_redpacket,
-    WAITING_TYPE, WAITING_CARROT, WAITING_NUMBER, WAITING_BLESSING, WAITING_PASSWORD, WAITING_MEDIA
+    handle_password, handle_media, create_redpacket, cancel_redpacket, handle_scene, handle_custom_blessing,
+    WAITING_TYPE, WAITING_CARROT, WAITING_NUMBER, WAITING_BLESSING, WAITING_PASSWORD, WAITING_MEDIA, WAITING_SCENE, WAITING_CUSTOM_BLESSING
 )
 from app.handlers.command_handlers import (
     start_handler, balance_handler, slot_handler, daily_handler, help_handler, 
@@ -2066,10 +2066,21 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif operation == 'transfer_user_id':
             # 处理转赠用户ID输入
             if token:
+                # 检查是否返回上一步
+                if input_text == '返回':
+                    # 返回到转账菜单
+                    from handlers.common import show_transfer_menu
+                    await show_transfer_menu(update, context)
+                    # 清理用户数据
+                    clear_operation_data(context)
+                    return
+                
                 # 存储对方用户ID
                 context.user_data['target_user_id'] = input_text
+                # 获取余额
+                balance = context.user_data.get('balance', '未知')
                 # 提示用户输入转赠金额
-                await update.message.reply_text("💸 请输入转赠萝卜数量(2-6000之间):")
+                await update.message.reply_text(f"💸 请输入转赠萝卜数量(2-6000之间):\n\n当前余额: {balance} 🥕\n\n输入'返回'可返回上一步")
                 # 更新操作状态
                 context.user_data['current_operation'] = 'transfer_amount'
                 return 103  # 继续等待金额输入
@@ -2079,6 +2090,14 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif operation == 'transfer_amount':
             # 处理转赠金额输入
             if token:
+                # 检查是否返回上一步
+                if input_text == '返回':
+                    # 返回到输入用户ID的步骤
+                    await update.message.reply_text("💸 请输入对方用户ID（10位字符串，以e开头s结尾）：\n\n输入'返回'可返回上一步")
+                    # 更新操作状态
+                    context.user_data['current_operation'] = 'transfer_user_id'
+                    return 102  # 继续等待用户ID输入
+                
                 target_user_id = context.user_data.get('target_user_id')
                 try:
                     amount = int(input_text)
@@ -2677,6 +2696,15 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
             elif operation == 'service_fund_transfer_user_id':
                 # 处理转账用户ID输入
                 if token:
+                    # 检查是否返回上一步
+                    if input_text == '返回':
+                        # 返回到转账菜单
+                        from handlers.common import show_transfer_menu
+                        await show_transfer_menu(update, context)
+                        # 清理用户数据
+                        clear_operation_data(context)
+                        return
+                    
                     # 检查是否是服务
                     is_service = False
                     try:
@@ -2712,8 +2740,10 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     
                     # 存储目标用户ID
                     context.user_data['target_user_id'] = input_text
+                    # 获取余额
+                    balance = context.user_data.get('balance', '未知')
                     # 提示用户输入转账金额
-                    await update.message.reply_text("💸 请输入转账萝卜数量(1-50000之间):")
+                    await update.message.reply_text(f"💸 请输入转账萝卜数量(1-50000之间):\n\n当前余额: {balance} 🥕\n\n输入'返回'可返回上一步")
                     # 更新操作状态
                     context.user_data['current_operation'] = 'service_fund_transfer_amount'
                 else:
@@ -2722,6 +2752,14 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
             elif operation == 'service_fund_transfer_amount':
                 # 处理转账金额输入
                 if token:
+                    # 检查是否返回上一步
+                    if input_text == '返回':
+                        # 返回到输入用户ID的步骤
+                        await update.message.reply_text("🏢 请输入对方用户ID（10位字符串，以e开头s结尾）：\n\n输入'返回'可返回上一步")
+                        # 更新操作状态
+                        context.user_data['current_operation'] = 'service_fund_transfer_user_id'
+                        return 107  # 继续等待用户ID输入
+                    
                     target_user_id = context.user_data.get('target_user_id')
                     try:
                         amount = int(input_text)
@@ -3909,6 +3947,14 @@ def main() -> None:
                 MessageHandler(filters.AUDIO, handle_media),
                 MessageHandler(filters.Document.ALL, handle_media),
                 CallbackQueryHandler(handle_type, pattern="^back_"),
+                CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
+            ],
+            WAITING_SCENE: [
+                CallbackQueryHandler(handle_scene, pattern="^scene_"),
+                CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
+            ],
+            WAITING_CUSTOM_BLESSING: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_blessing),
                 CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
             ],
         },

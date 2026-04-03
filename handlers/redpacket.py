@@ -15,7 +15,7 @@ from utils.message_utils import auto_delete_message
 logger = logging.getLogger(__name__)
 
 # 对话状态 (从1开始，避免与 ConversationHandler.END=0 冲突)
-WAITING_TYPE, WAITING_CARROT, WAITING_NUMBER, WAITING_BLESSING, WAITING_PASSWORD, WAITING_MEDIA = range(1, 7)
+WAITING_TYPE, WAITING_CARROT, WAITING_NUMBER, WAITING_BLESSING, WAITING_PASSWORD, WAITING_MEDIA, WAITING_SCENE, WAITING_CUSTOM_BLESSING = range(1, 9)
 
 # 步骤顺序，用于返回上一步
 STEP_ORDER = ['type', 'carrot', 'number', 'blessing', 'password', 'media']
@@ -78,9 +78,10 @@ async def redpocket_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton("🎲 普通红包　　　　　　", callback_data="type_random")],
         [InlineKeyboardButton("🔐 口令红包　　　　　　", callback_data="type_password")],
+        [InlineKeyboardButton("💝 私包　　　　　　　　", callback_data="type_private")],
         [InlineKeyboardButton("🖼️ 图片红包　　　　　　", callback_data="type_image")],
         [InlineKeyboardButton("🎵 语音红包　　　　　　", callback_data="type_audio")],
-        [InlineKeyboardButton("⬅️ 返回上一步", callback_data="back_to_main")]
+        [InlineKeyboardButton("⬅️ 返回上一步", callback_data="back_prev")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
@@ -151,6 +152,14 @@ async def handle_type(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text("🎵 语音红包\n\n请选择是否需要口令：", reply_markup=reply_markup)
         return WAITING_TYPE
+    elif data == 'type_private':
+        redpacket_data['type'] = 'password'
+        redpacket_data['has_password'] = True
+        redpacket_data['private'] = True
+        redpacket_data['current_step'] = 'carrot'
+        message = await query.edit_message_text("💝 私包\n\n💰 请输入红包金额（萝卜）：\n（1 - 60000 之间）", reply_markup=get_step_keyboard('carrot'))
+        context.user_data['current_prompt_message'] = message.message_id
+        return WAITING_CARROT
     elif data == 'image_no_password':
         redpacket_data['has_password'] = False
         redpacket_data['current_step'] = 'carrot'
@@ -194,7 +203,47 @@ async def handle_back(update: Update, context: ContextTypes.DEFAULT_TYPE, data: 
     
     logger.info(f"用户返回上一步到: {prev_step}")
     
-    if prev_step == 'type':
+    if prev_step == 'to_main':
+        # 返回主菜单
+        keyboard = [
+            [
+                InlineKeyboardButton("👤 个人信息", callback_data="menu_user_main"),
+                InlineKeyboardButton("🧧 红包", callback_data="menu_redpacket_main")
+            ],
+            [
+                InlineKeyboardButton("🎲 抽奖", callback_data="menu_lottery_main"),
+                InlineKeyboardButton("🏆 排行榜", callback_data="menu_rank_main")
+            ],
+            [
+                InlineKeyboardButton("💰 转账", callback_data="menu_transfer_main"),
+                InlineKeyboardButton("🛒 商城", callback_data="menu_shop_main")
+            ],
+            [
+                InlineKeyboardButton("🎵 点歌", callback_data="menu_music_main"),
+                InlineKeyboardButton("🎁 兑换", callback_data="menu_exchange_main")
+            ],
+            [
+                InlineKeyboardButton("📱 其他", callback_data="menu_other_main")
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text("📱 功能菜单\n\n请选择功能：", reply_markup=reply_markup)
+        return ConversationHandler.END
+    elif prev_step == 'prev':
+        # 返回到红包功能菜单
+        keyboard = [
+            [
+                InlineKeyboardButton("🧧 创建红包", callback_data="menu_redpocket"),
+                InlineKeyboardButton("📊 查询红包", callback_data="menu_check_redpacket")
+            ],
+            [
+                InlineKeyboardButton("🔙 返回主菜单", callback_data="back_to_main")
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text("🧧 红包功能\n\n请选择操作：", reply_markup=reply_markup)
+        return ConversationHandler.END
+    elif prev_step == 'type':
         redpacket_data['current_step'] = 'type'
         keyboard = [
             [InlineKeyboardButton("🎲 普通红包", callback_data="type_random")],
@@ -267,6 +316,24 @@ async def handle_carrot(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return WAITING_CARROT
         
         redpacket_data['carrot'] = carrot
+        
+        # 处理私包逻辑
+        if redpacket_data.get('private'):
+            # 自动设置为私包
+            redpacket_data['number'] = 1
+            
+            # 显示场景选择菜单
+            keyboard = [
+                [InlineKeyboardButton("🎂 生日红包", callback_data="scene_birthday")],
+                [InlineKeyboardButton("🎊 节日红包", callback_data="scene_festival")],
+                [InlineKeyboardButton("✨ 自定义", callback_data="scene_custom")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            message = await update.message.reply_text("💝 请选择私包场景：", reply_markup=reply_markup)
+            context.user_data['current_prompt_message'] = message.message_id
+            return WAITING_SCENE
+        
+        # 普通红包流程
         redpacket_data['current_step'] = 'number'
         
         # 图片/语音红包提示可以上传媒体
@@ -615,16 +682,28 @@ async def create_redpacket(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = context.user_data['redpacket']
     
     if not token:
-        await update.message.reply_text("❌ 登录已过期，请重新发送 /start 登录")
+        # 处理回调查询的情况
+        if update.message:
+            await update.message.reply_text("❌ 登录已过期，请重新发送 /start 登录")
+        else:
+            await update.callback_query.message.reply_text("❌ 登录已过期，请重新发送 /start 登录")
         return ConversationHandler.END
     
     required_fields = ['carrot', 'number', 'blessing']
     missing = [f for f in required_fields if f not in data]
     if missing:
-        await update.message.reply_text(f"❌ 数据不完整，缺少: {missing}，请重新开始")
+        # 处理回调查询的情况
+        if update.message:
+            await update.message.reply_text(f"❌ 数据不完整，缺少: {missing}，请重新开始")
+        else:
+            await update.callback_query.message.reply_text(f"❌ 数据不完整，缺少: {missing}，请重新开始")
         return ConversationHandler.END
     
-    loading = await update.message.reply_text("🔄 正在创建红包...")
+    # 处理回调查询的情况
+    if update.message:
+        loading = await update.message.reply_text("🔄 正在创建红包...")
+    else:
+        loading = await update.callback_query.message.reply_text("🔄 正在创建红包...")
     
     try:
         headers = {
@@ -716,28 +795,51 @@ async def create_redpacket(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if result.get('red_packet_id'):
                 message += f"🆔 红包ID: `{result['red_packet_id']}`\n"
             
-            # 添加跳转到群链接的按钮
+            # 添加操作按钮
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
             keyboard = [
-                [InlineKeyboardButton("👥 跳转到 emospg 群", url="https://t.me/emospg")]
+                [InlineKeyboardButton("👥 跳转到 emospg 群", url="https://t.me/emospg")],
+                [InlineKeyboardButton("🔄 再创建一个", callback_data="create_another_redpacket"),
+                 InlineKeyboardButton("🔙 返回主菜单", callback_data="back_to_main")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
-            await loading.edit_text(message, parse_mode="Markdown", reply_markup=reply_markup)
-            
-            # 发送单独的返回主菜单按钮
-            menu_keyboard = [[InlineKeyboardButton("🔙 返回主菜单", callback_data="back_to_main")]]
-            menu_reply_markup = InlineKeyboardMarkup(menu_keyboard)
-            await update.message.reply_text("红包创建成功", reply_markup=menu_reply_markup)
+            # 尝试编辑消息显示红包凭证
+            try:
+                await loading.edit_text(message, parse_mode="Markdown", reply_markup=reply_markup)
+            except Exception as edit_error:
+                logger.error(f"编辑消息失败: {edit_error}")
+                # 尝试发送新消息
+                if update.message:
+                    await update.message.reply_text(message, parse_mode="Markdown", reply_markup=reply_markup)
+                else:
+                    await update.callback_query.message.reply_text(message, parse_mode="Markdown", reply_markup=reply_markup)
         else:
-            await loading.edit_text(f"❌ 创建失败，状态码：{response.status_code}")
+            # 尝试编辑消息显示失败信息
+            try:
+                await loading.edit_text(f"❌ 创建失败，状态码：{response.status_code}")
+            except Exception as edit_error:
+                logger.error(f"编辑消息失败: {edit_error}")
+                # 尝试发送新消息
+                if update.message:
+                    await update.message.reply_text(f"❌ 创建失败，状态码：{response.status_code}")
+                else:
+                    await update.callback_query.message.reply_text(f"❌ 创建失败，状态码：{response.status_code}")
             if response.text:
                 logger.error(f"API返回: {response.text}")
     except Exception as e:
         logger.error(f"创建红包失败: {e}")
         import traceback
         logger.error(traceback.format_exc())
-        await loading.edit_text("❌ 创建失败，请稍后重试")
+        try:
+            await loading.edit_text("❌ 创建失败，请稍后重试")
+        except Exception as edit_error:
+            logger.error(f"编辑消息失败: {edit_error}")
+            # 尝试发送新消息
+            if update.message:
+                await update.message.reply_text("❌ 创建失败，请稍后重试")
+            else:
+                await update.callback_query.message.reply_text("❌ 创建失败，请稍后重试")
     
     if 'redpacket' in context.user_data:
         del context.user_data['redpacket']
@@ -752,3 +854,197 @@ async def cancel_redpacket(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         del context.user_data['current_operation']
     await update.message.reply_text("✅ 红包创建已取消")
     return ConversationHandler.END
+
+async def handle_create_another(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """处理再创建一个红包"""
+    query = update.callback_query
+    await query.answer()
+    
+    # 清理之前的红包数据
+    if 'redpacket' in context.user_data:
+        del context.user_data['redpacket']
+    
+    # 跳转到选择红包类型的界面
+    await redpocket_command(update, context)
+    return ConversationHandler.END
+
+async def handle_scene(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """处理私包场景选择"""
+    user_id = update.effective_user.id
+    query = update.callback_query
+    await query.answer()
+    data = query.data
+    
+    # 删除之前的提示消息
+    if 'current_prompt_message' in context.user_data:
+        try:
+            await context.bot.delete_message(
+                chat_id=update.effective_chat.id,
+                message_id=context.user_data['current_prompt_message']
+            )
+            del context.user_data['current_prompt_message']
+        except Exception as e:
+            logger.error(f"删除提示消息失败: {e}")
+    
+    if 'redpacket' not in context.user_data:
+        await update.callback_query.edit_message_text("⚠️ 会话已过期，请重新开始")
+        return ConversationHandler.END
+    
+    redpacket_data = context.user_data['redpacket']
+    
+    # 生成随机口令
+    import string
+    import random
+    password_length = 6
+    password = ''.join(random.choices(string.ascii_letters + string.digits, k=password_length))
+    redpacket_data['password'] = password
+    
+    # 根据场景生成祝福语
+    if data == 'scene_birthday':
+        # 生日祝福语
+        birthday_blessings = [
+            "🎂 生日快乐！愿你年年有今日，岁岁有今朝！",
+            "🎁 生日大快乐！愿你在新的一岁里心想事成！",
+            "🎉 生日快乐！愿你的每一天都充满阳光和快乐！",
+            "🎈 生日祝福送到，愿你永远年轻，永远快乐！",
+            "🎊 生日快乐！愿你在未来的日子里一切顺利！"
+        ]
+        redpacket_data['blessing'] = random.choice(birthday_blessings)
+        # 直接创建红包
+        return await create_redpacket(update, context)
+    elif data == 'scene_festival':
+        # 节日祝福语
+        # 获取当前日期
+        import datetime
+        today = datetime.datetime.now()
+        month = today.month
+        day = today.day
+        
+        # 根据日期判断节日
+        festival_blessings = []
+        
+        # 春节 (农历正月初一，这里简化为公历1月或2月)
+        if (month == 1 and day >= 20) or (month == 2 and day <= 20):
+            festival_blessings = [
+                "🧧 新年快乐！祝你在新的一年里万事如意！",
+                "🎊 春节快乐！愿你阖家幸福，财源广进！",
+                "🎉 新年大吉！愿你在新的一年里心想事成！",
+                "✨ 新春快乐！愿你在新的一年里事业有成！",
+                "🎈 过年好！愿你在新的一年里身体健康！"
+            ]
+        # 元宵节 (农历正月十五，公历2月或3月)
+        elif (month == 2 and day >= 10) or (month == 3 and day <= 10):
+            festival_blessings = [
+                "🏮 元宵节快乐！愿你团团圆圆，幸福美满！",
+                "🎊 元宵佳节，愿你阖家欢乐，万事顺意！",
+                "🎉 元宵节快乐！愿你在新的一年里事事如意！",
+                "✨ 元宵快乐！愿你在新的一年里心想事成！",
+                "🎈 元宵节到，愿你平安吉祥，幸福安康！"
+            ]
+        # 情人节 (2月14日)
+        elif month == 2 and day == 14:
+            festival_blessings = [
+                "💖 情人节快乐！愿你和爱人甜甜蜜蜜！",
+                "💕 情人节快乐！愿你爱情美满，幸福长久！",
+                "💝 情人节快乐！愿你和心爱的人永远在一起！",
+                "🌹 情人节快乐！愿你的爱情如玫瑰般美丽！",
+                "💌 情人节快乐！愿你收到心仪的人的表白！"
+            ]
+        # 清明节 (4月4日-6日)
+        elif month == 4 and 4 <= day <= 6:
+            festival_blessings = [
+                "🌿 清明节安康！愿逝者安息，生者珍惜！",
+                "🌸 清明时节，愿你缅怀先人，珍惜当下！",
+                "🌱 清明节到，愿你心怀感恩，珍惜生活！",
+                "🍃 清明安康！愿你在春天里收获希望！",
+                "🌾 清明节快乐！愿你珍惜眼前人，过好每一天！"
+            ]
+        # 劳动节 (5月1日)
+        elif month == 5 and day == 1:
+            festival_blessings = [
+                "🏃 劳动节快乐！愿你工作顺利，生活愉快！",
+                "💪 劳动节快乐！愿你在工作中收获成长！",
+                "🎉 劳动节快乐！愿你在假期里好好休息！",
+                "✨ 劳动节到，愿你劳逸结合，事半功倍！",
+                "🎊 劳动节快乐！愿你在劳动中创造价值！"
+            ]
+        # 端午节 (农历五月初五，公历6月)
+        elif month == 6:
+            festival_blessings = [
+                "🌿 端午节快乐！愿你端午安康，百病不侵！",
+                "🐲 端午节快乐！愿你如龙般矫健，如粽般香甜！",
+                "🏮 端午节到，愿你平安吉祥，幸福安康！",
+                "🎉 端午节快乐！愿你在节日里收获快乐！",
+                "✨ 端午安康！愿你在夏天里一切顺利！"
+            ]
+        # 中秋节 (农历八月十五，公历9月或10月)
+        elif (month == 9 and day >= 15) or (month == 10 and day <= 15):
+            festival_blessings = [
+                "🌙 中秋节快乐！愿你月圆人圆，事事圆满！",
+                "🥮 中秋节快乐！愿你和家人团团圆圆！",
+                "🎑 中秋节到，愿你阖家欢乐，幸福美满！",
+                "✨ 中秋快乐！愿你在节日里收获团圆和快乐！",
+                "🎊 中秋节快乐！愿你心想事成，万事如意！"
+            ]
+        # 国庆节 (10月1日)
+        elif month == 10 and day == 1:
+            festival_blessings = [
+                "🇨🇳 国庆节快乐！愿祖国繁荣昌盛！",
+                "🎉 国庆节快乐！愿你在假期里玩得开心！",
+                "✨ 国庆佳节，愿你和家人共度美好时光！",
+                "🎊 国庆节到，愿你在假期里收获快乐！",
+                "🏮 国庆节快乐！愿你生活美满，万事如意！"
+            ]
+        # 圣诞节 (12月25日)
+        elif month == 12 and day == 25:
+            festival_blessings = [
+                "🎅 圣诞节快乐！愿你收到心仪的礼物！",
+                "🎄 圣诞节快乐！愿你在节日里收获快乐！",
+                "🌟 圣诞节到，愿你和家人共度美好时光！",
+                "✨ 圣诞快乐！愿你在新的一年里心想事成！",
+                "🎊 圣诞节快乐！愿你生活美满，万事如意！"
+            ]
+        else:
+            # 当天不是节日，跳转到自定义祝福语
+            message = await update.callback_query.edit_message_text("💬 请输入自定义祝福语（最多50字）：")
+            context.user_data['current_prompt_message'] = message.message_id
+            return WAITING_CUSTOM_BLESSING
+    elif data == 'scene_custom':
+        # 自定义祝福语
+        message = await update.callback_query.edit_message_text("💬 请输入自定义祝福语（最多50字）：")
+        context.user_data['current_prompt_message'] = message.message_id
+        return WAITING_CUSTOM_BLESSING
+
+async def handle_custom_blessing(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """处理自定义祝福语输入"""
+    user_id = update.effective_user.id
+    text = update.message.text.strip()
+    
+    # 删除之前的提示消息
+    if 'current_prompt_message' in context.user_data:
+        try:
+            await context.bot.delete_message(
+                chat_id=update.effective_chat.id,
+                message_id=context.user_data['current_prompt_message']
+            )
+            del context.user_data['current_prompt_message']
+        except Exception as e:
+            logger.error(f"删除提示消息失败: {e}")
+    
+    if 'redpacket' not in context.user_data:
+        await update.message.reply_text("⚠️ 会话已过期，请重新开始")
+        return ConversationHandler.END
+    
+    redpacket_data = context.user_data['redpacket']
+    
+    # 检查祝福语长度
+    if len(text) > 50:
+        message = await update.message.reply_text("⚠️ 祝福语不能超过50字，请重新输入：")
+        context.user_data['current_prompt_message'] = message.message_id
+        return WAITING_CUSTOM_BLESSING
+    
+    # 存储祝福语
+    redpacket_data['blessing'] = text
+    
+    # 直接创建红包
+    return await create_redpacket(update, context)

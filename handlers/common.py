@@ -627,8 +627,8 @@ async def show_menu(update, message_text: str):
     keyboard = [
         [
             InlineKeyboardButton("👤 我的信息", callback_data="menu_user_main"),
-            InlineKeyboardButton("📝 签到", callback_data="menu_user_sign"),
-            InlineKeyboardButton("💸 转账", callback_data="menu_transfer_main")
+            InlineKeyboardButton("💸 转账", callback_data="menu_transfer_main"),
+            InlineKeyboardButton("📝 签到", callback_data="menu_user_sign")
         ],
         [
             InlineKeyboardButton("🧧 红包", callback_data="menu_redpacket_main"),
@@ -776,6 +776,13 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await show_menu(update, "📱 功能菜单\n\n请选择功能：")
         return
     
+    # 处理再创建一个红包
+    if data == "create_another_redpacket":
+        logger.info(f"处理再创建一个红包按钮")
+        from handlers.redpacket import handle_create_another
+        await handle_create_another(update, context)
+        return
+    
     # 红包二级菜单
     if data == "menu_redpacket_main":
         logger.info(f"处理红包二级菜单按钮")
@@ -830,13 +837,49 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.callback_query.edit_message_text("❌ 请先登录！发送 /start 登录")
             return
         
+        # 获取用户余额
+        balance = "未知"
+        try:
+            import requests
+            headers = {"Authorization": f"Bearer {token}"}
+            response = requests.get(
+                f"{Config.API_BASE_URL}/user",
+                headers=headers,
+                timeout=5
+            )
+            if response.status_code == 200:
+                user_data = response.json()
+                balance = user_data.get('carrot', 0)
+        except Exception as e:
+            logger.error(f"查询余额失败: {e}")
+        
+        # 生成随机有趣文本
+        fun_texts = [
+            "💸 准备给好友转萝卜啦！",
+            "🎁 分享萝卜，分享快乐！",
+            "💰 慷慨解囊，友谊长存！",
+            "🎉 萝卜传递，心意相连！",
+            "🌟 小小的萝卜，大大的情谊！"
+        ]
+        import random
+        fun_text = random.choice(fun_texts)
+        
         # 提示用户输入对方用户ID
         logger.info(f"提示用户输入对方用户ID")
-        await update.callback_query.edit_message_text("💸 请输入对方用户ID（10位字符串，以e开头s结尾）：")
+        keyboard = [[InlineKeyboardButton("🔙 返回转账菜单", callback_data="menu_transfer_main")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.callback_query.edit_message_text(
+            f"{fun_text}\n\n" +
+            f"💸 请输入对方用户ID（10位字符串，以e开头s结尾）：\n\n" +
+            f"当前余额:\n" +
+            f"{balance} 🥕",
+            reply_markup=reply_markup
+        )
         
         # 存储当前状态，等待用户输入
         context.user_data['current_operation'] = 'transfer_user_id'
         context.user_data['token'] = token
+        context.user_data['balance'] = balance
         logger.info(f"存储转赠操作状态")
         return 102  # 自定义状态码，用于处理转赠用户ID输入
     
@@ -882,13 +925,49 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             is_service = False
         
         if is_service:
+            # 获取用户余额
+            balance = "未知"
+            try:
+                import requests
+                headers = {"Authorization": f"Bearer {token}"}
+                response = requests.get(
+                    f"{Config.API_BASE_URL}/user",
+                    headers=headers,
+                    timeout=5
+                )
+                if response.status_code == 200:
+                    user_data = response.json()
+                    balance = user_data.get('carrot', 0)
+            except Exception as e:
+                logger.error(f"查询余额失败: {e}")
+            
+            # 生成随机有趣文本
+            fun_texts = [
+                "💼 服务商专属转账功能！",
+                "🌟 为用户提供优质服务！",
+                "💰 专业转账，快捷方便！",
+                "🎁 服务商的贴心服务！",
+                "🔧 高效转账，值得信赖！"
+            ]
+            import random
+            fun_text = random.choice(fun_texts)
+            
             # 提示用户输入对方用户ID
             logger.info(f"提示服务商输入对方用户ID")
-            await update.callback_query.edit_message_text("🏢 请输入对方用户ID（10位字符串，以e开头s结尾）：")
+            keyboard = [[InlineKeyboardButton("🔙 返回转账菜单", callback_data="menu_transfer_main")]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.callback_query.edit_message_text(
+                f"{fun_text}\n\n" +
+                f"🏢 请输入对方用户ID（10位字符串，以e开头s结尾）：\n\n" +
+                f"当前余额:\n" +
+                f"{balance} 🥕",
+                reply_markup=reply_markup
+            )
             
             # 存储当前状态，等待用户输入
             context.user_data['current_operation'] = 'service_fund_transfer_user_id'
             context.user_data['token'] = token
+            context.user_data['balance'] = balance
             logger.info(f"存储服务商转账操作状态")
             return 107  # 自定义状态码，用于处理服务商转账用户ID输入
         else:
@@ -1656,6 +1735,32 @@ async def show_rank_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def show_transfer_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """转账二级菜单"""
+    user_id = update.effective_user.id
+    user_info = user_tokens.get(user_id)
+    
+    # 检查user_info是字典还是字符串
+    if isinstance(user_info, dict):
+        token = user_info.get('token')
+    else:
+        token = user_info
+    
+    # 获取用户余额
+    balance = "未知"
+    if token:
+        try:
+            import requests
+            headers = {"Authorization": f"Bearer {token}"}
+            response = requests.get(
+                f"{Config.API_BASE_URL}/user",
+                headers=headers,
+                timeout=5
+            )
+            if response.status_code == 200:
+                user_data = response.json()
+                balance = user_data.get('carrot', 0)
+        except Exception as e:
+            logger.error(f"查询余额失败: {e}")
+    
     keyboard = [
         [
             InlineKeyboardButton("💸 普通转增", callback_data="menu_transfer"),
@@ -1667,7 +1772,7 @@ async def show_transfer_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.callback_query.edit_message_text(
-        "💸 转账\n\n请选择类型：",
+        f"💸 转账\n\n当前余额: {balance} 🥕\n\n请选择转账类型：",
         reply_markup=reply_markup
     )
 
