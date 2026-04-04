@@ -21,7 +21,7 @@ class R2Client:
     def _init_client(self):
         """初始化R2客户端"""
         try:
-            boto_config = BotoConfig(signature_version='s3v4')
+            boto_config = BotoConfig(signature_version='s3v4', connect_timeout=5, read_timeout=5)
             self.client = boto3.client(
                 's3',
                 endpoint_url=AppConfig.R2_ENDPOINT,
@@ -30,8 +30,8 @@ class R2Client:
                 config=boto_config,
                 region_name='auto'
             )
-            # 测试连接
-            self.client.list_objects_v2(Bucket=self.bucket, MaxKeys=1)
+            # 移除测试连接，避免超时问题
+            # self.client.list_objects_v2(Bucket=self.bucket, MaxKeys=1)
             logger.info("✅ R2客户端初始化成功")
         except Exception as e:
             logger.error(f"❌ R2客户端初始化失败: {e}")
