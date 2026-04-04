@@ -389,7 +389,7 @@ def create_withdraw_order(order_no: str, emos_user_id: str, telegram_user_id: in
                     username = ''
             
             cursor.execute(
-                """INSERT INTO withdraw_orders 
+                """INSERT INTO withdrawal_records 
                    (order_no, user_id, username, telegram_user_id, game_coin_amount, 
                     carrot_amount, status)
                    VALUES (%s, %s, %s, %s, %s, %s, %s)""",
@@ -417,21 +417,21 @@ def update_withdraw_order_status(order_no: str, status: str,
         with conn.cursor() as cursor:
             if transfer_result:
                 cursor.execute(
-                    """UPDATE withdraw_orders 
+                    """UPDATE withdrawal_records 
                        SET status = %s, transfer_result = %s 
                        WHERE order_no = %s""",
                     (status, transfer_result, order_no)
                 )
             else:
                 cursor.execute(
-                    "UPDATE withdraw_orders SET status = %s WHERE order_no = %s",
+                    "UPDATE withdrawal_records SET status = %s WHERE order_no = %s",
                     (status, order_no)
                 )
             
             # 如果订单成功，更新用户余额和累计提现金额
             if status == 'success':
                 cursor.execute(
-                    """SELECT user_id, game_coin_amount, carrot_amount FROM withdraw_orders 
+                    """SELECT user_id, game_coin_amount, carrot_amount FROM withdrawal_records 
                        WHERE order_no = %s""",
                     (order_no,)
                 )
@@ -487,39 +487,35 @@ def check_withdraw_limits(emos_user_id: str, carrot_amount: int) -> Dict[str, An
     
     try:
         with conn.cursor() as cursor:
-            # 查询终身提现总额
+            # 查询用户累计充值和提现金额
             cursor.execute(
-                """SELECT COALESCE(SUM(carrot_amount), 0) FROM withdraw_orders 
-                   WHERE user_id = %s AND status = 'success'""",
-                (emos_user_id,)
-            )
-            lifetime_total = cursor.fetchone()[0]
-            
-            # 查询用户累计充值金额
-            cursor.execute(
-                """SELECT total_recharge FROM users WHERE user_id = %s""",
+                """SELECT total_recharge, total_withdraw FROM users WHERE user_id = %s""",
                 (emos_user_id,)
             )
             user_result = cursor.fetchone()
-            total_recharge = user_result[0] if user_result else 0
+            if not user_result:
+                return {"success": False, "error": "用户不存在"}
+            
+            total_recharge = user_result[0]
+            total_withdraw = user_result[1]
             
             # 计算累计充值3倍的限额
             recharge_limit = total_recharge * 3
             
             # 检查限额
-            if lifetime_total + carrot_amount > recharge_limit:
-                remaining_withdraw = recharge_limit - lifetime_total
+            if total_withdraw + carrot_amount > recharge_limit:
+                remaining_withdraw = recharge_limit - total_withdraw
                 return {
                     "success": False, 
-                    "error": f"提现限额为累计充值的3倍，累计已充值{total_recharge}萝卜，已提现{lifetime_total}萝卜，剩余可提现{remaining_withdraw}萝卜，无法再提现{carrot_amount}萝卜"
+                    "error": f"提现限额为累计充值的3倍，累计已充值{total_recharge}萝卜，已提现{total_withdraw}萝卜，剩余可提现{remaining_withdraw}萝卜，无法再提现{carrot_amount}萝卜"
                 }
             
             return {
                 "success": True, 
-                "lifetime_total": lifetime_total,
+                "lifetime_total": total_withdraw,
                 "total_recharge": total_recharge,
                 "recharge_limit": recharge_limit,
-                "remaining_withdraw": recharge_limit - lifetime_total
+                "remaining_withdraw": recharge_limit - total_withdraw
             }
     except Exception as e:
         logger.error(f"检查提现限额失败: {e}")

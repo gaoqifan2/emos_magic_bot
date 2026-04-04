@@ -382,6 +382,16 @@ def update_balance(user_id, amount):
     
     try:
         with connection.cursor() as cursor:
+            # 如果是扣除余额，先检查余额是否足够
+            if amount < 0:
+                cursor.execute('SELECT balance FROM balances WHERE user_id = %s', (user_id,))
+                result = cursor.fetchone()
+                if result:
+                    current_balance = result['balance']
+                    if current_balance < abs(amount):
+                        # 余额不足，返回False
+                        return False
+            
             cursor.execute('''
                 UPDATE balances 
                 SET balance = balance + %s 

@@ -1868,8 +1868,8 @@ async def process_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE, a
                                     
                                     # 计算剩余可提现额度
                                     from app.database import get_user_total_recharge, get_user_total_withdraw
-                                    total_recharge = get_user_total_recharge(local_user_id)
-                                    total_withdraw_after = get_user_total_withdraw(local_user_id)
+                                    total_recharge = get_user_total_recharge(emos_user_id)
+                                    total_withdraw_after = get_user_total_withdraw(emos_user_id)
                                     max_withdraw_limit = int(total_recharge * 3)
                                     remaining_withdraw_limit = max_withdraw_limit - total_withdraw_after
                                     
@@ -1927,9 +1927,9 @@ async def process_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE, a
                         update_withdraw_order_status(
                             order_no=order_no,
                             status='failed',
-                            transfer_result=f"获取用户信息失败，状态码：{user_response.status_code}"
+                            transfer_result="余额不足，无法完成提现"
                         )
-                        await loading.edit_text(f"❌ 获取用户信息失败，状态码：{user_response.status_code}\n订单号：\n```\n{order_no}\n```\n", parse_mode="Markdown")
+                        await loading.edit_text(f"❌ 余额不足，无法完成提现\n订单号：\n```\n{order_no}\n```\n", parse_mode="Markdown")
                 except Exception as e:
                     # 直接记录固定的错误信息，避免尝试编码包含emoji的异常信息
                     logger.error("提现失败")
