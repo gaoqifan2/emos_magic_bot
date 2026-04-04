@@ -402,11 +402,12 @@ async def service_recharge(update: Update, context: ContextTypes.DEFAULT_TYPE):
     token = user_info.get('token') if isinstance(user_info, dict) else user_info
     
     if not token:
-        # 生成授权链接，添加操作状态参数
-        unique_id = "e0E446ZE6s"
+        # 生成唯一的、一次性的token
+        import uuid
+        unique_token = str(uuid.uuid4())[:8].upper()
         bot_username = BOT_USERNAME
         # 添加操作状态参数，以便绑定后恢复
-        auth_link = f"https://t.me/emospg_bot?start=link_{unique_id}-{bot_username}-recharge"
+        auth_link = f"https://t.me/emospg_bot?start=link_{unique_token}-{bot_username}-recharge"
         
         # 创建绑定提示按钮
         keyboard = [
@@ -417,12 +418,12 @@ async def service_recharge(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         if hasattr(update, 'callback_query') and update.callback_query:
             await update.callback_query.edit_message_text(
-                "❌ 请先登录！发送 /start 登录",
+                "❌ 请先登录！发送 /start 登录\n\n⚠️ 登录链接仅可使用一次，使用后自动失效",
                 reply_markup=reply_markup
             )
         else:
             await update.message.reply_text(
-                "❌ 请先登录！发送 /start 登录",
+                "❌ 请先登录！发送 /start 登录\n\n⚠️ 登录链接仅可使用一次，使用后自动失效",
                 reply_markup=reply_markup
             )
         return
@@ -532,11 +533,12 @@ async def service_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
     token = user_info.get('token') if isinstance(user_info, dict) else user_info
     
     if not token:
-        # 生成授权链接，添加操作状态参数
-        unique_id = "e0E446ZE6s"
+        # 生成唯一的、一次性的token
+        import uuid
+        unique_token = str(uuid.uuid4())[:8].upper()
         bot_username = BOT_USERNAME
         # 添加操作状态参数，以便绑定后恢复
-        auth_link = f"https://t.me/emospg_bot?start=link_{unique_id}-{bot_username}-withdraw"
+        auth_link = f"https://t.me/emospg_bot?start=link_{unique_token}-{bot_username}-withdraw"
         
         # 创建绑定提示按钮
         keyboard = [
@@ -547,12 +549,12 @@ async def service_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         if hasattr(update, 'callback_query') and update.callback_query:
             await update.callback_query.edit_message_text(
-                "❌ 请先登录！发送 /start 登录",
+                "❌ 请先登录！发送 /start 登录\n\n⚠️ 登录链接仅可使用一次，使用后自动失效",
                 reply_markup=reply_markup
             )
         else:
             await update.message.reply_text(
-                "❌ 请先登录！发送 /start 登录",
+                "❌ 请先登录！发送 /start 登录\n\n⚠️ 登录链接仅可使用一次，使用后自动失效",
                 reply_markup=reply_markup
             )
         return

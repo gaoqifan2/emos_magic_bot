@@ -589,16 +589,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def show_login_options(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """显示登录选项"""
-    # 使用开发者的emos user_id来生成登录链接
-    developer_emos_id = "e0E446ZE6s"
-    auth_link_bot = f"https://t.me/emospg_bot?start=link_{developer_emos_id}-{Config.BOT_USERNAME}"
+    # 生成唯一的、一次性的token
+    import uuid
+    unique_token = str(uuid.uuid4())[:8].upper()
+    auth_link_bot = f"https://t.me/emospg_bot?start=link_{unique_token}-{Config.BOT_USERNAME}"
     keyboard = [
         [InlineKeyboardButton("🤖 机器人授权登录", url=auth_link_bot)],
         [InlineKeyboardButton("❌ 取消", callback_data="cancel_operation")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     message = await update.message.reply_text(
-        "👋 欢迎使用综合机器人！\n\n使用前请先登录EMOS账号：",
+        "👋 欢迎使用综合机器人！\n\n使用前请先登录EMOS账号：\n\n⚠️ 登录链接仅可使用一次，使用后自动失效",
         reply_markup=reply_markup
     )
     # 存储登录面板消息ID，以便登录成功后删除

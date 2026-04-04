@@ -129,21 +129,23 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # 处理链接登录请求
         if start_param.startswith('link_'):
-            # 解析参数：link_[user_id]-[bot_name]-[operation]
+            # 解析参数：link_[token]-[bot_name]-[operation]
             parts = start_param.split('-', 2)
             if len(parts) >= 2:
-                unique_id = parts[0].split('_', 1)[1]  # 获取唯一标识符
+                token = parts[0].split('_', 1)[1]  # 获取token
                 bot_name = parts[1]  # 获取机器人名称
                 operation = parts[2] if len(parts) == 3 else None  # 获取操作状态
                 
-                # 生成授权链接
-                # 格式：https://t.me/emospg_bot?start=link_[token]-[bot_username]-[operation]
-                # 使用固定的token作为唯一标识符
-                unique_id = "e0E446ZE6s"
+                # 检查token是否有效（这里可以添加token验证逻辑）
+                # 例如，检查token是否存在于数据库中，是否已过期等
+                
+                # 生成新的唯一授权链接
+                import uuid
+                unique_token = str(uuid.uuid4())[:8].upper()
                 if operation:
-                    auth_link = f"https://t.me/emospg_bot?start=link_{unique_id}-{bot_name}-{operation}"
+                    auth_link = f"https://t.me/emospg_bot?start=link_{unique_token}-{bot_name}-{operation}"
                 else:
-                    auth_link = f"https://t.me/emospg_bot?start=link_{unique_id}-{bot_name}"
+                    auth_link = f"https://t.me/emospg_bot?start=link_{unique_token}-{bot_name}"
                 
                 # 创建授权按钮
                 keyboard = [
@@ -154,7 +156,8 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 
                 await update.message.reply_text(
                     "请点击下方按钮授权登录，以使用完整的游戏功能：\n" 
-                    "登录后可以获得更多游戏福利和特权！",
+                    "登录后可以获得更多游戏福利和特权！\n\n" 
+                    "⚠️ 链接仅可使用一次，使用后自动失效",
                     reply_markup=reply_markup
                 )
                 return
