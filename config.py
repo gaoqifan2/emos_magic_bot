@@ -126,8 +126,7 @@ DB_CONFIG = {
     "user": "root",
     "password": "H_fans200109~",
     "database": "game_db_test",
-    "charset": "utf8mb4"
-
+    "charset": "utf8mb4",
 
     # #正式数据库
     # "host": "66.235.105.125",
