@@ -1671,6 +1671,15 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         if operation == 'withdraw_amount':
             await process_withdraw(update, context, text)
+            # 清理用户操作状态
+            context.user_data.pop('current_operation', None)
+            context.user_data.pop('token', None)
+            context.user_data.pop('game_balance', None)
+            context.user_data.pop('local_user_id', None)
+            context.user_data.pop('emos_user_id', None)
+            context.user_data.pop('total_recharge', None)
+            context.user_data.pop('total_withdraw', None)
+            context.user_data.pop('remaining_withdraw', None)
             return
         
         elif operation == 'service_fund_transfer_user_id':
@@ -1761,6 +1770,80 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data.pop('current_operation', None)
             context.user_data.pop('target_user_id', None)
             context.user_data.pop('token', None)
+            return
+        
+        elif operation == 'service_recharge_amount':
+            # 处理充值金额输入
+            user_id = update.effective_user.id
+            token = context.user_data.get('token')
+            total_recharge = context.user_data.get('total_recharge', 0)
+            remaining_recharge = context.user_data.get('remaining_recharge', 1000)
+            
+            if not token:
+                await update.message.reply_text("❌ 请先登录！发送 /start 登录")
+                return
+            
+            # 验证金额格式
+            try:
+                carrot_amount = int(text)
+                if carrot_amount <= 0:
+                    await update.message.reply_text("❌ 充值金额必须大于0，请重新输入：")
+                    return
+                
+                # 检查充值限额
+                if carrot_amount > remaining_recharge:
+                    await update.message.reply_text(f"❌ 充值金额超过剩余可充值额度（{remaining_recharge}萝卜），请重新输入：")
+                    return
+            except ValueError:
+                await update.message.reply_text("❌ 请输入有效的数字，请重新输入：")
+                return
+            
+            # 处理充值
+            loading = await update.message.reply_text("🔄 正在处理充值...")
+            
+            try:
+                # 创建充值订单
+                from services.service_main import create_recharge_order
+                result = await create_recharge_order(user_id, carrot_amount)
+                
+                if result['success']:
+                    # 充值成功
+                    payment_url = result.get('payment_url')
+                    qr_code = result.get('qr_code')
+                    
+                    # 显示充值信息
+                    message = f"✅ 充值订单创建成功！\n\n"
+                    message += f"📋 订单号：`{result['order_no']}`\n"
+                    message += f"💰 充值金额：{carrot_amount} 萝卜\n"
+                    message += f"🪙 获得游戏币：{result['game_coin']} 🪙\n"
+                    
+                    if payment_url:
+                        # 创建充值按钮
+                        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+                        keyboard = [
+                            [InlineKeyboardButton("💳 前往支付", url=payment_url)],
+                            [InlineKeyboardButton("🔙 返回", callback_data="games")]
+                        ]
+                        reply_markup = InlineKeyboardMarkup(keyboard)
+                        await loading.edit_text(message, reply_markup=reply_markup, parse_mode="Markdown")
+                    else:
+                        await loading.edit_text(message, parse_mode="Markdown")
+                else:
+                    # 充值失败
+                    await loading.edit_text(f"❌ 充值失败：{result['error']}")
+            except Exception as e:
+                logger.error(f"充值异常: {e}")
+                import traceback
+                logger.error(f"充值异常堆栈: {traceback.format_exc()}")
+                await loading.edit_text(f"❌ 充值失败：{str(e)}")
+            
+            # 清理用户数据
+            context.user_data.pop('current_operation', None)
+            context.user_data.pop('token', None)
+            context.user_data.pop('local_user_id', None)
+            context.user_data.pop('emos_user_id', None)
+            context.user_data.pop('total_recharge', None)
+            context.user_data.pop('remaining_recharge', None)
             return
 
 
