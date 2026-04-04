@@ -143,7 +143,7 @@ def init_r2_client():
     try:
         from botocore.client import Config as BotoConfig
         
-        boto_config = BotoConfig(signature_version='s3v4')
+        boto_config = BotoConfig(signature_version='s3v4', connect_timeout=5, read_timeout=5)
         
         client = boto3.client(
             's3',
@@ -153,8 +153,8 @@ def init_r2_client():
             config=boto_config,
             region_name='auto'
         )
-        # 测试连接
-        client.list_objects_v2(Bucket=Config.R2_BUCKET_NAME, MaxKeys=1)
+        # 移除测试连接，避免超时问题
+        # client.list_objects_v2(Bucket=Config.R2_BUCKET_NAME, MaxKeys=1)
         print("✅ R2客户端初始化成功")
         return client
     except Exception as e:
