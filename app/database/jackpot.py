@@ -49,10 +49,10 @@ def add_to_jackpot_pool(amount):
     try:
         with connection.cursor() as cursor:
             # 获取当前奖池金额
-            cursor.execute('SELECT pool_amount, updated_at FROM jackpot_pool ORDER BY id LIMIT 1')
+            cursor.execute('SELECT pool_amount, last_update FROM jackpot_pool ORDER BY id LIMIT 1')
             current_pool = cursor.fetchone()
             current_amount = current_pool['pool_amount'] if current_pool else 0
-            updated_at = current_pool['updated_at'] if current_pool else None
+            updated_at = current_pool['last_update'] if current_pool else None
             
             # 检查是否需要每日衰减
             if updated_at:

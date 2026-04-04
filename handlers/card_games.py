@@ -316,6 +316,10 @@ async def niuniu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_cards = draw_niuniu_cards()
         opponent_cards = draw_niuniu_cards()
         
+        # 获取游戏编号
+        from app.database import increment_game_counter
+        game_no = f"{increment_game_counter()}"
+        
         # 计算牌型
         user_type, user_value, _ = calculate_niuniu(user_cards)
         opponent_type, opponent_value, _ = calculate_niuniu(opponent_cards)
@@ -349,6 +353,7 @@ async def niuniu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             opponent_balance = get_balance(opponent_emos_id)
             
             result_text = (
+                f"NO.{game_no}\n"
                 f"🐮 牛牛游戏结果\n"
                 f"━━━━━━━━━━━━━━━━━━\n\n"
                 f"👤 {user_name}：{format_hand(user_cards)} → {user_type}\n"
@@ -386,6 +391,7 @@ async def niuniu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             opponent_balance = get_balance(opponent_emos_id)
             
             result_text = (
+                f"NO.{game_no}\n"
                 f"🐮 牛牛游戏结果\n"
                 f"━━━━━━━━━━━━━━━━━━\n\n"
                 f"👤 {user_name}：{format_hand(user_cards)} → {user_type}\n"
@@ -414,6 +420,7 @@ async def niuniu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             opponent_balance = get_balance(opponent_emos_id)
             
             result_text = (
+                f"NO.{game_no}\n"
                 f"🐮 牛牛游戏结果\n"
                 f"━━━━━━━━━━━━━━━━━━\n\n"
                 f"👤 {user_name}：{format_hand(user_cards)} → {user_type}\n"

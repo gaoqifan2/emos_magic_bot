@@ -260,6 +260,20 @@ def init_db():
                 INSERT IGNORE INTO jackpot_pool (id, pool_amount) VALUES (1, 0)
             ''')
             
+            # 创建游戏编号表
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS game_counter (
+                    id INT PRIMARY KEY DEFAULT 1,
+                    counter INT DEFAULT 1,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # 初始化游戏编号
+            cursor.execute('''
+                INSERT IGNORE INTO game_counter (id, counter) VALUES (1, 1)
+            ''')
+            
             connection.commit()
             print("数据库表初始化成功")
             return True
@@ -316,7 +330,21 @@ def get_user_by_user_id(user_id):
 
 
 def add_user(user_id, telegram_id=None, username=None, first_name=None, last_name=None, token=None):
-    """添加新用户"""
+    """添加新用户
+    
+    支持两种调用方式：
+    1. add_user(user_id, telegram_id, username, first_name, last_name, token)
+    2. add_user(user_id, user_data_dict)  （兼容旧代码）
+    """
+    # 检查是否是第二种调用方式（第二个参数是字典）
+    if isinstance(telegram_id, dict):
+        user_data = telegram_id
+        telegram_id = user_data.get('telegram_id')
+        username = user_data.get('username')
+        first_name = user_data.get('first_name')
+        last_name = user_data.get('last_name')
+        token = user_data.get('token')
+    
     connection = get_db_connection()
     if not connection:
         return False
@@ -877,6 +905,49 @@ def update_daily_win(user_id, username, amount):
         print(f"更新每日赢取记录失败: {e}")
         connection.rollback()
         return False
+    finally:
+        connection.close()
+
+
+def get_game_counter():
+    """获取当前游戏编号"""
+    connection = get_db_connection()
+    if not connection:
+        return 1
+    
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute('SELECT counter FROM game_counter WHERE id = 1')
+            result = cursor.fetchone()
+            return result['counter'] if result else 1
+    except Exception as e:
+        print(f"获取游戏编号失败: {e}")
+        return 1
+    finally:
+        connection.close()
+
+
+def increment_game_counter():
+    """递增游戏编号并返回新编号"""
+    connection = get_db_connection()
+    if not connection:
+        return 1
+    
+    try:
+        with connection.cursor() as cursor:
+            # 获取当前编号
+            cursor.execute('SELECT counter FROM game_counter WHERE id = 1 FOR UPDATE')
+            result = cursor.fetchone()
+            current = result['counter'] if result else 1
+            
+            # 递增编号
+            new_counter = current + 1
+            cursor.execute('UPDATE game_counter SET counter = %s WHERE id = 1', (new_counter,))
+            connection.commit()
+            return current
+    except Exception as e:
+        print(f"递增游戏编号失败: {e}")
+        return 1
     finally:
         connection.close()
 

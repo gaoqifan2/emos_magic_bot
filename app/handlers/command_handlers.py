@@ -526,6 +526,10 @@ async def process_guess(update: Update, context: ContextTypes.DEFAULT_TYPE, amou
     import random
     dice = random.randint(1, 6)
     
+    # 获取游戏编号
+    from app.database import increment_game_counter
+    game_no = f"{increment_game_counter()}"
+    
     # 判断大小
     if dice in [1, 2, 3]:
         result = "小"
@@ -534,35 +538,88 @@ async def process_guess(update: Update, context: ContextTypes.DEFAULT_TYPE, amou
     
     # 计算结果
     if guess == result:
-        # 赢了，获得下注金额
+        # 赢了，获得下注金额，扣除10%税
         win_amount = amount
-        update_balance(user_id_str, win_amount)
-        new_balance = get_balance(user_id_str)
-        result_message = (
-            f"🎮 猜大小游戏结果\n\n"
-            f"您选择：{guess}\n"
-            f"🎲 骰子点数：{dice} ({result})\n\n"
-            f"🎉 恭喜您赢了！\n"
-            f"获得：{win_amount} 🪙\n"
-            f"当前余额：{new_balance} 🪙"
-        )
-        # 记录游戏结果
-        add_game_record(user_id_str, 'guess', amount, 'win', win_amount, username)
+        tax = int(win_amount * 0.1)
+        net_win = win_amount - tax
+        
+        # 检查每日净赢取上限
+        from main import DAILY_NET_WIN_LIMIT
+        from app.database import get_daily_win, update_daily_win, init_daily_win_record
+        daily_win_record = get_daily_win(user_id_str)
+        if daily_win_record is None:
+            init_daily_win_record(user_id_str, username)
+            daily_win_record = {'amount': 0}
+        
+        current_daily_net_win = daily_win_record['amount']
+        remaining_limit = DAILY_NET_WIN_LIMIT - current_daily_net_win
+        
+        if remaining_limit <= 0:
+            # 达到上限，不给予奖励
+            new_balance = get_balance(user_id_str)
+            result_message = (
+                f"NO.{game_no}\n"
+                f"🎮 猜大小游戏结果\n\n"
+                f"您选择：{guess}\n"
+                f"🎲 骰子点数：{dice} ({result})\n\n"
+                f"🎉 恭喜您赢了！\n"
+                f"⚠️ 今日净赢已达上限!\n"
+                f"每日上限:{DAILY_NET_WIN_LIMIT} 🪙\n"
+                f"今日净赢:{current_daily_net_win} 🪙\n"
+                f"无法获得更多奖励\n"
+                f"当前余额：{new_balance} 🪙"
+            )
+            # 记录游戏结果 - 没有实际收益
+            add_game_record(user_id_str, 'guess', amount, 'win', 0, username)
+        else:
+            actual_win = min(net_win, remaining_limit)
+            update_balance(user_id_str, actual_win)
+            update_daily_win(user_id_str, username, actual_win)
+            new_balance = get_balance(user_id_str)
+            new_daily_net_win = current_daily_net_win + actual_win
+            
+            result_message = (
+                f"NO.{game_no}\n"
+                f"🎮 猜大小游戏结果\n\n"
+                f"您选择：{guess}\n"
+                f"🎲 骰子点数：{dice} ({result})\n\n"
+                f"🎉 恭喜您赢了！\n"
+                f"获得：{win_amount} 🪙\n"
+                f"服务费：{tax} 🪙\n"
+                f"实际到账：{actual_win} 🪙\n"
+                f"当前余额：{new_balance} 🪙\n"
+                f"📊 今日净赢:{new_daily_net_win}/{DAILY_NET_WIN_LIMIT} 🪙"
+            )
+            # 记录游戏结果 - 使用税后实际到账金额
+            add_game_record(user_id_str, 'guess', amount, 'win', actual_win, username)
         # 添加积分
         add_user_score(user_id_str, 1)
     else:
         # 输了，扣除下注金额
         update_balance(user_id_str, -amount)
+        # 输了，更新净赢记录
+        from app.database import update_daily_win
+        update_daily_win(user_id_str, username, -amount)
+        
         new_balance = get_balance(user_id_str)
+        
+        # 获取最新的净赢记录
+        from app.database import get_daily_win
+        from main import DAILY_NET_WIN_LIMIT
+        daily_win_record = get_daily_win(user_id_str)
+        current_daily_net_win = daily_win_record['amount'] if daily_win_record else 0
+        
         result_message = (
+            f"NO.{game_no}\n"
             f"🎮 猜大小游戏结果\n\n"
             f"您选择：{guess}\n"
             f"🎲 骰子点数：{dice} ({result})\n\n"
             f"😢 很遗憾，您输了！\n"
             f"扣除：{amount} 🪙\n"
-            f"当前余额：{new_balance} 🪙"
+            f"当前余额：{new_balance} 🪙\n"
+            f"📊 今日净赢:{current_daily_net_win}/{DAILY_NET_WIN_LIMIT} 🪙"
         )
-        # 记录游戏结果
+        # 记录游戏结果 - 记录损失金额
         add_game_record(user_id_str, 'guess', amount, 'lose', -amount, username)
     
     # 发送结果
@@ -732,6 +789,10 @@ async def process_slot(update: Update, context: ContextTypes.DEFAULT_TYPE, amoun
     # 发送老虎机消息
     dice_message = await update.message.reply_dice(emoji="🎰")
     
+    # 获取游戏编号
+    from app.database import increment_game_counter
+    game_no = f"{increment_game_counter()}"
+    
     # 等待老虎机结果
     import asyncio
     await asyncio.sleep(3)  # 等待3秒让老虎机完全停止
@@ -854,6 +915,7 @@ async def process_slot(update: Update, context: ContextTypes.DEFAULT_TYPE, amoun
             jackpot_amount = get_jackpot_pool()
             
             result_message = (
+                f"NO.{game_no}\n"
                 f"🎰 老虎机游戏结果\n\n"
                 f"{reels[0]} {reels[1]} {reels[2]}\n\n"
                 f"{result}\n"
@@ -896,6 +958,7 @@ async def process_slot(update: Update, context: ContextTypes.DEFAULT_TYPE, amoun
             jackpot_amount = get_jackpot_pool()
             
             result_message = (
+                f"NO.{game_no}\n"
                 f"🎰 老虎机游戏结果\n\n"
                 f"{reels[0]} {reels[1]} {reels[2]}\n\n"
                 f"{result}\n"
@@ -928,6 +991,7 @@ async def process_slot(update: Update, context: ContextTypes.DEFAULT_TYPE, amoun
         jackpot_amount = get_jackpot_pool()
         
         result_message = (
+            f"NO.{game_no}\n"
             f"🎰 老虎机游戏结果\n\n"
             f"{reels[0]} {reels[1]} {reels[2]}\n\n"
             f"{result}\n"
@@ -1116,12 +1180,17 @@ async def process_blackjack(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     player_cards = [get_blackjack_card(), get_blackjack_card()]
     dealer_cards = [get_blackjack_card(), get_blackjack_card()]
     
+    # 获取游戏编号
+    from app.database import increment_game_counter
+    game_no = f"{increment_game_counter()}"
+    
     # 计算点数
     player_score = calculate_blackjack_score(player_cards)
     dealer_score = calculate_blackjack_score(dealer_cards)
     
     # 显示初始状态
     initial_message = (
+        f"NO.{game_no}\n"
         f"🎲 21点游戏\n\n"
         f"您的牌：{format_blackjack_cards(player_cards)} (点数：{player_score})\n"
         f"庄家的牌：{format_blackjack_card(dealer_cards[0])} 🂠\n\n"
@@ -1141,6 +1210,7 @@ async def process_blackjack(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     import time
     user_id_key = update.effective_user.id
     blackjack_games[user_id_key] = {
+        'game_no': game_no,
         'player_cards': player_cards,
         'dealer_cards': dealer_cards,
         'amount': amount,
@@ -1197,6 +1267,7 @@ async def hit_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             update_balance(user_id, -amount)
             new_balance = get_balance(user_id)
             result_message = (
+                f"NO.{game['game_no']}\n"
                 f"🎲 21点游戏结果\n\n"
                 f"您的牌：{format_blackjack_cards(player_cards)} (点数：{player_score})\n"
                 f"庄家的牌：{format_blackjack_cards(dealer_cards)} (点数：{dealer_score})\n\n"
@@ -1212,6 +1283,7 @@ async def hit_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             # 继续游戏
             message = (
+                f"NO.{game['game_no']}\n"
                 f"🎲 21点游戏\n\n"
                 f"您的牌：{format_blackjack_cards(player_cards)} (点数：{player_score})\n"
                 f"庄家的牌：{format_blackjack_card(dealer_cards[0])} 🂠\n\n"
@@ -1290,6 +1362,7 @@ async def stand_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 
                 # 构建结果消息
                 result_message = (
+                    f"NO.{game['game_no']}\n"
                     f"🎲 21点游戏结果\n\n"
                     f"您的牌：{format_blackjack_cards(player_cards)} (点数：{player_score})\n"
                     f"庄家的牌：{format_blackjack_cards(dealer_cards)} (点数：{dealer_score})\n\n"
@@ -1316,6 +1389,7 @@ async def stand_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 
                 # 构建结果消息
                 result_message = (
+                    f"NO.{game['game_no']}\n"
                     f"🎲 21点游戏结果\n\n"
                     f"您的牌：{format_blackjack_cards(player_cards)} (点数：{player_score})\n"
                     f"庄家的牌：{format_blackjack_cards(dealer_cards)} (点数：{dealer_score})\n\n"
@@ -1358,6 +1432,7 @@ async def stand_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             current_daily_net_win = daily_win_record['amount'] if daily_win_record else 0
             
             result_message = (
+                f"NO.{game['game_no']}\n"
                 f"🎲 21点游戏结果\n\n"
                 f"您的牌：{format_blackjack_cards(player_cards)} (点数：{player_score})\n"
                 f"庄家的牌：{format_blackjack_cards(dealer_cards)} (点数：{dealer_score})\n\n"
@@ -1373,6 +1448,7 @@ async def stand_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # 平局
             # 平局不影响连胜
             result_message = (
+                f"NO.{game['game_no']}\n"
                 f"🎲 21点游戏结果\n\n"
                 f"您的牌：{format_blackjack_cards(player_cards)} (点数：{player_score})\n"
                 f"庄家的牌：{format_blackjack_cards(dealer_cards)} (点数：{dealer_score})\n\n"
