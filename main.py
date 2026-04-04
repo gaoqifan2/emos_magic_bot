@@ -145,6 +145,7 @@ from handlers.common import (
     button_callback, post_init,
     WAITING_REDPACKET_ID, WAITING_LOTTERY_CANCEL_ID
 )
+from handlers.rules import rules_handler
 
 # 群聊命令过滤装饰器
 from functools import wraps
