@@ -9,6 +9,10 @@ import asyncio
 import time
 from datetime import datetime, timedelta, timezone
 
+# 解决事件循环问题
+import nest_asyncio
+nest_asyncio.apply()
+
 # 兼容 Python 3.12+, 替换已被移除的 imghdr 模块
 sys.modules['imghdr'] = __import__('utils.imghdr_compat')
 
@@ -4269,15 +4273,11 @@ def main() -> None:
     logger.info(f"机器@{Config.BOT_USERNAME} 启动成功")
     
     # 启动机器
-    # Python 3.13+ 兼容性：确保有事件循环
-    if sys.version_info >= (3, 13):
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+    # 使用asyncio.run确保事件循环正确运行
+    async def run_bot():
+        await application.run_polling(allowed_updates=Update.ALL_TYPES)
     
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    asyncio.run(run_bot())
 
 if __name__ == "__main__":
     main()
