@@ -477,7 +477,7 @@ async def service_recharge(update: Update, context: ContextTypes.DEFAULT_TYPE):
         total_recharge = get_user_total_recharge(emos_user_id)
         
         # 计算剩余可充值萝卜数
-        max_recharge = 1500  # 累计充值限额为1500萝卜
+        max_recharge = 1000  # 累计充值限额为1000萝卜
         remaining_recharge = max_recharge - total_recharge
         
         # 记录日志，方便调试

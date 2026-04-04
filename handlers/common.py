@@ -436,7 +436,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     # 计算剩余可充值额度
                     from app.database import get_user_total_recharge
                     total_recharge = get_user_total_recharge(local_user_id)
-                    max_recharge = 1500  # 充值上限1500萝卜
+                    max_recharge = 1000  # 充值上限1000萝卜
                     remaining_recharge = max_recharge - total_recharge
                     
                     message = f"✅ {update.effective_user.first_name}，充值成功！\n\n"
