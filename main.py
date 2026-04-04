@@ -3964,6 +3964,9 @@ def main() -> None:
     print("[DEBUG] Application创建完成")
     
     try:
+        # 确保导入 rules_handler
+        from handlers.rules import rules_handler
+        
         # ===== 基本命令 =====
         print("[DEBUG] 添加start handler...")
         application.add_handler(CommandHandler("start", group_command_filter(start)))
