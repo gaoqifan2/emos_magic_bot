@@ -79,6 +79,7 @@ GROUP_ALLOWED_COMMANDS = [
     "slot",  
     "blackjack",      # 21点游戏    
     "rules",       # 游戏规则
+    "menu",        # 游戏菜单
 ]
 
 # 全局变量 - 存储用户token

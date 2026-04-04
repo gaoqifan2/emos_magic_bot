@@ -735,7 +735,7 @@ async def guess_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"猜大:{big_odds:.1f}倍\n"
                 f"猜小:{small_odds:.1f}倍\n\n"
                 f"👥 参与人数:{player_count} 人\n"
-                f"?距离开奖:{remaining_text}"
+                f"⏳ 距离开奖:{remaining_text}"
             )
             
             # 更新群聊中的游戏信息
@@ -752,8 +752,8 @@ async def guess_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"猜大:{game['big_total']} 🪙\n"
                     f"猜小:{game['small_total']} 🪙\n\n"
                     f"👥 参与人数:{player_count} 人\n\n"
-                    f"?5分钟后自动开奖\n\n"
-                    f"💡 发?`/guess ?金额` ?`/guess ?金额` 参与下注"
+                    f"⏳ 5分钟后自动开奖\n\n"
+                    f"💡 发送 `/guess <金额> <大/小>` 参与下注"
                 )
                 
                 await application.bot.edit_message_text(
@@ -765,7 +765,7 @@ async def guess_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception as e:
                 logger.error(f"更新群聊消息失败: {e}")
         else:
-            # 没有正在进行的庄家游戏- 自己玩(像私聊一样, 使用官方骰子?
+            # 没有正在进行的庄家游戏- 自己玩(像私聊一样, 使用官方骰子)
             if len(args) != 2:
                 await update.message.reply_text("请输入下注金额和猜测的大小, 例如:`/guess 10 大`\n\n直接复制:`/guess 10 大`", parse_mode='Markdown')
                 return
@@ -971,7 +971,7 @@ async def handle_dice_result(update: Update, context: ContextTypes.DEFAULT_TYPE)
             print("6. 不是普通骰子, 跳过处理")
             return
         
-        # 获取原始用户ID - 从reply_to_message中获?
+        # 获取原始用户ID - 从reply_to_message中获取
         original_user_id = None
         if dice_message.reply_to_message:
             original_user = dice_message.reply_to_message.from_user
@@ -1042,7 +1042,7 @@ async def handle_dice_result(update: Update, context: ContextTypes.DEFAULT_TYPE)
         
         print("18. 没有找到游戏数据")
     except Exception as e:
-        print(f"?handle_dice_result 出错: {e}")
+        print(f"handle_dice_result 出错: {e}")
         import traceback
         traceback.print_exc()
     finally:
@@ -1088,7 +1088,7 @@ async def process_guess_result(update: Update, dice_value: int, amount: int, gue
             streak_text = f"🎉 开启连胜!"
     else:
         if streak_info['streak'] < 0:
-            streak_text = f"💔 连败 {abs(streak_info['streak']) + 1} ?.."
+            streak_text = f"💔 连败 {abs(streak_info['streak']) + 1} 场..."
         else:
             streak_text = f"😢 运气不佳..."
     
@@ -1218,7 +1218,7 @@ async def process_guess_result(update: Update, dice_value: int, amount: int, gue
     
     # 发送结束
     try:
-        # 使用context.bot.send_message发送消息, 确保消息能够正确发?
+        # 使用context.bot.send_message发送消息, 确保消息能够正确发送
         if context:
             await context.bot.send_message(chat_id=chat_id, text=result_text, parse_mode='Markdown')
         else:
@@ -1277,7 +1277,7 @@ async def guess_bet_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("游戏已经开始或已结束")
         return
     
-    # 检查是否已过截止下注时?
+    # 检查是否已过截止下注时间
     current_time = datetime.now()
     if current_time >= game.get('bet_end_time', game['end_time']):
         await update.message.reply_text("下注时间已截止, 无法再下注")
@@ -1341,7 +1341,7 @@ async def guess_bet_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # 回复用户
     await update.message.reply_text(
-        f"?下注成功!\n\n"
+        f"✅ 下注成功!\n\n"
         f"🎮 猜大小游戏(庄家参与版)\n"
         f"庄家:{game['banker_name']}(押{game['banker_guess']} {game['banker_amount']})\n"
         f"您的猜测:{guess}\n"
@@ -1352,7 +1352,7 @@ async def guess_bet_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🎲 小池:{game['small_total']} 游戏币\n"
         f"━━━━━━━━━━━━━━━━━━\n"
         f"👥 参与人数:{player_count} 人\n"
-        f"?距离开奖:{remaining_text}"
+        f"⏳ 距离开奖:{remaining_text}"
     )
     
     # 更新群聊中的游戏信息
@@ -1368,8 +1368,8 @@ async def guess_bet_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"🎲 小池:{game['small_total']} 游戏币\n"
             f"━━━━━━━━━━━━━━━━━━\n"
             f"👥 参与人数:{player_count} 人\n\n"
-            f"?5分钟后自动开奖\n\n"
-            f"💡 发?`/guess_bet ?金额` ?`/guess_bet ?金额` 参与下注"
+            f"⏳ 5分钟后自动开奖\n\n"
+            f"💡 发送 `/guess_bet <大/小> <金额>` 参与下注"
         )
         
         await application.bot.edit_message_text(
@@ -1447,7 +1447,7 @@ async def create_guess_game(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         await update.message.reply_text("群里已经有游戏在进行中, 请等待当前游戏结束")
         return
     
-    # 计算结束时间?分钟后)
+    # 计算结束时间(5分钟后)
     end_time = datetime.now() + timedelta(minutes=5)
     # 计算截止下注时间(结束前30秒)
     bet_end_time = end_time - timedelta(seconds=30)
@@ -1459,7 +1459,7 @@ async def create_guess_game(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     guess_games[chat_id] = {
         'banker': user_id,
         'banker_name': user.first_name,
-        'banker_guess': guess,  # 庄家的猜?
+        'banker_guess': guess,  # 庄家的猜测
         'banker_amount': amount,  # 庄家的下注金额
         'bets': {},  # 闲家下注记录
         'big_total': big_total,  # 猜大的总金额
@@ -1484,10 +1484,10 @@ async def create_guess_game(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         f"🎮 猜大小游戏(庄家参与版)\n\n"
         f"庄家:{user.first_name}\n"
         f"庄家下注:{guess} {amount} 🪙\n\n"
-        f"?5分钟后自动开奖\n\n"
+        f"⏳ 5分钟后自动开奖\n\n"
         f"🎯 游戏规则:\n"
-        f"1. 发?`/guess_bet ?金额` ?`/guess_bet ?金额` 参与下注\n"
-        f"2. 三个骰子规则?-10为小1-17为大\n"
+        f"1. 发送 `/guess_bet <大/小> <金额>` 参与下注\n"
+        f"2. 三个骰子规则:4-10为小,11-17为大\n"
         f"3. 猜对的一方按各自下注比例瓜分输方的全部下注(扣除10%服务费)\n"
         f"4. 庄家与玩家同场竞技, 按下注比例分配奖金\n\n"
         f"💡 示例:`/guess_bet 大 10` 下注10游戏币猜大"
@@ -1569,13 +1569,13 @@ async def handle_guess_bet(update: Update, context: ContextTypes.DEFAULT_TYPE, g
     
     # 实时赔率计算:Odds = 1 + (输方总下注× (1 - T)) / 胜方总下注
     if big_total > 0:
-        # 猜大开奖时的赔?
+        # 猜大开奖时的赔率
         big_odds = 1 + (small_total * (1 - TAX_RATE)) / big_total if small_total > 0 else 1.0
     else:
         big_odds = 1.0
     
     if small_total > 0:
-        # 猜小开奖时的赔?
+        # 猜小开奖时的赔率
         small_odds = 1 + (big_total * (1 - TAX_RATE)) / small_total if big_total > 0 else 1.0
     else:
         small_odds = 1.0
@@ -1593,7 +1593,7 @@ async def handle_guess_bet(update: Update, context: ContextTypes.DEFAULT_TYPE, g
         f"猜大:{game['big_total']} 🪙\n"
         f"猜小:{game['small_total']} 🪙\n\n"
         f"👥 参与人数:{player_count} 人\n\n"
-        f"?1分钟后自动开奖"
+        f"⏳ 1分钟后自动开奖"
     )
     
     keyboard = [
@@ -1674,7 +1674,7 @@ async def gameshoot_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text(f"对方游戏币不足!对方余额:{target_balance}")
                 return
             
-            # 开始单?
+            # 开始单挑
             await start_shoot_duel(update, context, user_id, target_user_id, amount)
         else:
             # 直接创建一个新的群聊游戏, 显示选择按钮
@@ -1710,7 +1710,7 @@ async def start_shoot_duel(update: Update, context: ContextTypes.DEFAULT_TYPE, u
     target_user = update.message.reply_to_message.from_user
     chat_id = update.effective_chat.id
     
-    # 获取emos用户?
+    # 获取emos用户信息
     user_info = user_tokens[user_id]
     target_info = user_tokens[target_user_id]
     user_emos_name = user_info.get('username', user.first_name)
@@ -1755,7 +1755,7 @@ async def create_shoot_game_with_buttons(update: Update, context: ContextTypes.D
     chat_id = update.effective_chat.id
     user = update.effective_user
     
-    # 获取emos用户?
+    # 获取emos用户信息
     user_info = user_tokens[user_id]
     emos_username = user_info.get('username', user.first_name)
     
@@ -1802,7 +1802,7 @@ async def create_shoot_game(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     chat_id = update.effective_chat.id
     user = update.effective_user
     
-    # 获取emos用户?
+    # 获取emos用户信息
     user_info = user_tokens[user_id]
     emos_username = user_info.get('username', user.first_name)
     
@@ -3223,7 +3223,7 @@ async def shoot_callback_handler(update: Update, context: ContextTypes.DEFAULT_T
             return
         
         # 提示用户
-        await query.answer("?开始新的挑战!")
+        await query.answer("✅ 开始新的挑战!")
         
         # 重新创建游戏
         keyboard = [
@@ -3329,21 +3329,21 @@ async def shoot_callback_handler(update: Update, context: ContextTypes.DEFAULT_T
             await process_duel_result(game_id, context)
         else:
             # 等待对方出拳
-            await query.answer(f"?您选择了{user_choice}, 等待对方出..")
-            # 更新消息显示已出拳状态, 但保留按?
+            await query.answer(f"✅ 您选择了{user_choice}, 等待对方出拳...")
+            # 更新消息显示已出拳状态, 但保留按钮
             player1_name = game['players'][player1_id]['name']
             player2_name = game['players'][player2_id]['name']
             
             status_text = f"🎮 猜拳单挑\n\n{player1_name} ⚔️ {player2_name}\n下注金额:{game['amount']} 🪙\n\n"
             if player1_choice:
-                status_text += f"?{player1_name} 已出拳\n"
+                status_text += f"✅ {player1_name} 已出拳\n"
             else:
-                status_text += f"?{player1_name} 等待?..\n"
+                status_text += f"⏳ {player1_name} 等待中...\n"
             
             if player2_choice:
-                status_text += f"?{player2_name} 已出拳\n"
+                status_text += f"✅ {player2_name} 已出拳\n"
             else:
-                status_text += f"?{player2_name} 等待?..\n"
+                status_text += f"⏳ {player2_name} 等待中...\n"
             
             # 保留按钮, 让另一方可以继续选择
             keyboard = [
@@ -3520,11 +3520,11 @@ async def process_duel_result(game_id: str, context: ContextTypes.DEFAULT_TYPE):
     TAX_RATE = 0.1  # 系统抽水比例 10%
     
     if result == 'win':
-        # player1?
-        # 计算服务费(从利润中抽取?
+        # player1赢
+        # 计算服务费(从利润中抽取)
         service_fee = int(amount * TAX_RATE)
         net_win = amount - service_fee
-        # 赢家获得:下注金额+ 输家的下注- 服务
+        # 赢家获得:下注金额+ 输家的下注- 服务费
         # 输家失去:下注金额
         update_balance(player1['emos_id'], net_win)
         update_balance(player2['emos_id'], -amount)
@@ -3548,11 +3548,11 @@ async def process_duel_result(game_id: str, context: ContextTypes.DEFAULT_TYPE):
         add_game_record(player1['emos_id'], 'shoot', amount, 'win', net_win, player1['name'])
         add_game_record(player2['emos_id'], 'shoot', amount, 'lose', -amount, player2['name'])
     elif result == 'lose':
-        # player2?
-        # 计算服务费(从利润中抽取?
+        # player2赢
+        # 计算服务费(从利润中抽取)
         service_fee = int(amount * TAX_RATE)
         net_win = amount - service_fee
-        # 赢家获得:下注金额+ 输家的下注- 服务
+        # 赢家获得:下注金额+ 输家的下注- 服务费
         # 输家失去:下注金额
         update_balance(player2['emos_id'], net_win)
         update_balance(player1['emos_id'], -amount)
@@ -3594,7 +3594,17 @@ async def process_duel_result(game_id: str, context: ContextTypes.DEFAULT_TYPE):
         add_game_record(player1['emos_id'], 'shoot', amount, 'draw', 0, player1['name'])
         add_game_record(player2['emos_id'], 'shoot', amount, 'draw', 0, player2['name'])
     
-    # 发送结果并设置3分钟后自动删?
+    # 删除之前的游戏消息
+    if game['message_id']:
+        try:
+            await context.bot.delete_message(
+                chat_id=game['chat_id'],
+                message_id=game['message_id']
+            )
+        except Exception as e:
+            logger.error(f"删除游戏消息失败: {e}")
+    
+    # 发送结果并设置3分钟后自动删除
     message = await context.bot.send_message(
         chat_id=game['chat_id'],
         text=result_text
@@ -3623,9 +3633,9 @@ def get_choice_emoji(choice: str) -> str:
     }
     return emoji_map.get(choice, '')
 
-# 加入猜拳游戏命令处理器(保留用于兼容?
+# 加入猜拳游戏命令处理器(保留用于兼容性)
 async def join_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("请使用游戏消息中的[?点击参与]按钮加入游戏!")
+    await update.message.reply_text("请使用游戏消息中的[点击参与]按钮加入游戏!")
 
 async def start_shoot_group_game(chat_id: str, context: ContextTypes.DEFAULT_TYPE):
     if chat_id not in shoot_games:
@@ -4044,6 +4054,16 @@ def main() -> None:
                 MessageHandler(filters.VOICE, handle_media),
                 MessageHandler(filters.AUDIO, handle_media),
                 MessageHandler(filters.Document.ALL, handle_media),
+                CallbackQueryHandler(handle_type, pattern="^back_"),
+                CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
+            ],
+            WAITING_SCENE: [
+                CallbackQueryHandler(handle_scene, pattern="^scene_"),
+                CallbackQueryHandler(handle_type, pattern="^back_"),
+                CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
+            ],
+            WAITING_CUSTOM_BLESSING: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_blessing),
                 CallbackQueryHandler(handle_type, pattern="^back_"),
                 CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
             ],

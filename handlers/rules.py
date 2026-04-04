@@ -58,10 +58,21 @@ game_rules = {
     'rob': """
 🎭 打劫游戏 /rob
 • 群聊：回复消息 + /rob <金额>
-• 规则：成功率50%
-• 成功：抢到金额（扣除10%税）
-• 失败：损失输入金额
-• 限制：每天最多3次，金额10-10000
+• 规则：动态成功率（30%-70%）
+• 成功：抢到金额（扣除10%基础税，黄金及以上等级额外5%税）
+• 失败：损失输入金额 + 10%税（损失金额给对方）
+• 限制：
+  - 每天最多3次
+  - 金额10-10000（充值越多，可打劫金额越高）
+  - 不能打劫自己
+  - 不能打劫机器人
+  - 被打劫者必须已登录
+• 动态成功率计算：
+  - 基础概率：50%
+  - 等级优势：每高1级+5%
+  - 余额优势：余额少于对方+5%
+  - 首次打劫：+5%
+  - 次数惩罚：每次-3%
 """,
     'createguess': """
 👥 群聊猜大小 /createguess
@@ -131,7 +142,24 @@ game_rules = {
 
 async def rules_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """显示游戏规则菜单"""
-    # 创建游戏规则菜单
+    # 检查是否是群聊
+    if update.message and update.message.chat.type in ['group', 'supergroup']:
+        # 群聊中不显示规则菜单，只发送提示消息
+        msg = await update.message.reply_text(
+            "📜 游戏规则\n\n"
+            "游戏规则功能仅在私聊中可用\n\n"
+            "请在私聊中使用 /rules 命令查看游戏规则"
+        )
+        # 1分钟后自动删除消息
+        import asyncio
+        await asyncio.sleep(60)
+        try:
+            await msg.delete()
+        except Exception:
+            pass
+        return
+    
+    # 私聊中显示规则菜单
     keyboard = [
         [InlineKeyboardButton("🎲 猜大小", callback_data='rules_guess'),
          InlineKeyboardButton("🎰 老虎机", callback_data='rules_slot')],
@@ -149,7 +177,24 @@ async def rules_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """显示游戏菜单"""
-    # 创建游戏菜单
+    # 检查是否是群聊
+    if update.message and update.message.chat.type in ['group', 'supergroup']:
+        # 群聊中不显示菜单，只发送提示消息
+        msg = await update.message.reply_text(
+            "🎮 游戏菜单\n\n"
+            "游戏菜单功能仅在私聊中可用\n\n"
+            "请在私聊中使用 /menu 命令查看游戏菜单"
+        )
+        # 1分钟后自动删除消息
+        import asyncio
+        await asyncio.sleep(60)
+        try:
+            await msg.delete()
+        except Exception:
+            pass
+        return
+    
+    # 私聊中显示菜单
     keyboard = [
         [InlineKeyboardButton("🎲 猜大小", callback_data='game_guess'),
          InlineKeyboardButton("🎰 老虎机", callback_data='game_slot')],
