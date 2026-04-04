@@ -138,19 +138,6 @@ DB_CONFIG = {
     # "charset": "utf8mb4"
 }
 
-# 提现限制配置
-WITHDRAW_LIMITS = {
-    "daily": 50,  # 每日提现上限（萝卜）
-    "monthly": 200,  # 每月提现上限（萝卜）
-    "lifetime": 1000  # 终身提现上限（萝卜）
-}
-
-# 充值限制配置
-RECHARGE_LIMITS = {
-    "daily": 100,  # 每日充值上限（萝卜）
-    "monthly": 500  # 每月充值上限（萝卜）
-}
-
 # 初始化R2客户端
 def init_r2_client():
     try:
