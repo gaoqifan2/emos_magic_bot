@@ -1,5 +1,6 @@
 import logging
 import requests
+import random
 from datetime import datetime, timedelta, timezone
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes, ConversationHandler
@@ -920,14 +921,52 @@ async def handle_scene(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # 获取当前日期（北京时间）
         import datetime
         today = datetime.datetime.now(beijing_tz)
+        year = today.year
         month = today.month
         day = today.day
+        
+        logger.info(f"节日红包检查 - 当前日期: {today}, 年份: {year}, 月份: {month}, 日期: {day}")
         
         # 根据日期判断节日
         festival_blessings = []
         
-        # 春节 (农历正月初一，这里简化为公历1月或2月)
-        if (month == 1 and day >= 20) or (month == 2 and day <= 20):
+        # 尝试联网获取节日信息
+        festival_name = None
+        try:
+            # 使用第三方API获取节日信息
+            import httpx
+            url = f"https://api.vvhan.com/api/holiday?type=1&date={year}-{month:02d}-{day:02d}"
+            response = httpx.get(url, timeout=5)
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('code') == 1:
+                    festival_name = data.get('data', {}).get('name')
+                    logger.info(f"联网获取节日信息成功: {festival_name}")
+        except Exception as e:
+            logger.error(f"联网获取节日信息失败: {e}")
+        
+        # 如果联网获取失败，使用本地判断
+        if not festival_name:
+            # 情人节 (2月14日)
+            if month == 2 and day == 14:
+                festival_name = "情人节"
+            # 清明节 (4月4日-6日)
+            elif month == 4 and 4 <= day <= 6:
+                festival_name = "清明节"
+            # 劳动节 (5月1日)
+            elif month == 5 and day == 1:
+                festival_name = "劳动节"
+            # 国庆节 (10月1日)
+            elif month == 10 and day == 1:
+                festival_name = "国庆节"
+            # 圣诞节 (12月25日)
+            elif month == 12 and day == 25:
+                festival_name = "圣诞节"
+        
+        logger.info(f"最终确定的节日: {festival_name}")
+        
+        # 根据节日名称生成祝福语
+        if festival_name == "春节":
             festival_blessings = [
                 "🧧 新年快乐！祝你在新的一年里万事如意！",
                 "🎊 春节快乐！愿你阖家幸福，财源广进！",
@@ -935,8 +974,7 @@ async def handle_scene(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "✨ 新春快乐！愿你在新的一年里事业有成！",
                 "🎈 过年好！愿你在新的一年里身体健康！"
             ]
-        # 元宵节 (农历正月十五，公历2月或3月)
-        elif (month == 2 and day >= 10) or (month == 3 and day <= 10):
+        elif festival_name == "元宵节":
             festival_blessings = [
                 "🏮 元宵节快乐！愿你团团圆圆，幸福美满！",
                 "🎊 元宵佳节，愿你阖家欢乐，万事顺意！",
@@ -944,8 +982,7 @@ async def handle_scene(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "✨ 元宵快乐！愿你在新的一年里心想事成！",
                 "🎈 元宵节到，愿你平安吉祥，幸福安康！"
             ]
-        # 情人节 (2月14日)
-        elif month == 2 and day == 14:
+        elif festival_name == "情人节":
             festival_blessings = [
                 "💖 情人节快乐！愿你和爱人甜甜蜜蜜！",
                 "💕 情人节快乐！愿你爱情美满，幸福长久！",
@@ -953,8 +990,7 @@ async def handle_scene(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "🌹 情人节快乐！愿你的爱情如玫瑰般美丽！",
                 "💌 情人节快乐！愿你收到心仪的人的表白！"
             ]
-        # 清明节 (4月4日-6日)
-        elif month == 4 and 4 <= day <= 6:
+        elif festival_name == "清明节":
             festival_blessings = [
                 "🌿 清明节安康！愿逝者安息，生者珍惜！",
                 "🌸 清明时节，愿你缅怀先人，珍惜当下！",
@@ -962,8 +998,7 @@ async def handle_scene(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "🍃 清明安康！愿你在春天里收获希望！",
                 "🌾 清明节快乐！愿你珍惜眼前人，过好每一天！"
             ]
-        # 劳动节 (5月1日)
-        elif month == 5 and day == 1:
+        elif festival_name == "劳动节":
             festival_blessings = [
                 "🏃 劳动节快乐！愿你工作顺利，生活愉快！",
                 "💪 劳动节快乐！愿你在工作中收获成长！",
@@ -971,8 +1006,7 @@ async def handle_scene(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "✨ 劳动节到，愿你劳逸结合，事半功倍！",
                 "🎊 劳动节快乐！愿你在劳动中创造价值！"
             ]
-        # 端午节 (农历五月初五，公历6月)
-        elif month == 6:
+        elif festival_name == "端午节":
             festival_blessings = [
                 "🌿 端午节快乐！愿你端午安康，百病不侵！",
                 "🐲 端午节快乐！愿你如龙般矫健，如粽般香甜！",
@@ -980,8 +1014,7 @@ async def handle_scene(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "🎉 端午节快乐！愿你在节日里收获快乐！",
                 "✨ 端午安康！愿你在夏天里一切顺利！"
             ]
-        # 中秋节 (农历八月十五，公历9月或10月)
-        elif (month == 9 and day >= 15) or (month == 10 and day <= 15):
+        elif festival_name == "中秋节":
             festival_blessings = [
                 "🌙 中秋节快乐！愿你月圆人圆，事事圆满！",
                 "🥮 中秋节快乐！愿你和家人团团圆圆！",
@@ -989,8 +1022,7 @@ async def handle_scene(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "✨ 中秋快乐！愿你在节日里收获团圆和快乐！",
                 "🎊 中秋节快乐！愿你心想事成，万事如意！"
             ]
-        # 国庆节 (10月1日)
-        elif month == 10 and day == 1:
+        elif festival_name == "国庆节":
             festival_blessings = [
                 "🇨🇳 国庆节快乐！愿祖国繁荣昌盛！",
                 "🎉 国庆节快乐！愿你在假期里玩得开心！",
@@ -998,8 +1030,7 @@ async def handle_scene(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "🎊 国庆节到，愿你在假期里收获快乐！",
                 "🏮 国庆节快乐！愿你生活美满，万事如意！"
             ]
-        # 圣诞节 (12月25日)
-        elif month == 12 and day == 25:
+        elif festival_name == "圣诞节":
             festival_blessings = [
                 "🎅 圣诞节快乐！愿你收到心仪的礼物！",
                 "🎄 圣诞节快乐！愿你在节日里收获快乐！",
@@ -1007,6 +1038,14 @@ async def handle_scene(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "✨ 圣诞快乐！愿你在新的一年里心想事成！",
                 "🎊 圣诞节快乐！愿你生活美满，万事如意！"
             ]
+        
+        logger.info(f"节日红包检查 - 节日祝福列表: {festival_blessings}")
+        
+        if festival_blessings:
+            # 当天是节日，使用节日祝福语
+            redpacket_data['blessing'] = random.choice(festival_blessings)
+            # 直接创建红包
+            return await create_redpacket(update, context)
         else:
             # 当天不是节日，跳转到自定义祝福语
             try:
