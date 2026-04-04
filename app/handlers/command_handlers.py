@@ -61,6 +61,19 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     logger.info(f"用户 {user_id} 发送 /start 命令")
     
+    # 检查是否是群聊
+    if update.message and update.message.chat.type in ['group', 'supergroup']:
+        # 群聊中不显示面板，只发送简单的欢迎消息
+        await update.message.reply_text(
+            "欢迎使用 Emos 魔法机器人！\n\n" 
+            "在群聊中，您可以直接使用游戏命令，例如：\n" 
+            "- /guess 10 大 - 猜大小游戏\n" 
+            "- /slot 10 - 老虎机游戏\n" 
+            "- /blackjack 10 - 21点游戏\n\n" 
+            "更多游戏和功能请在私聊中使用 /start 命令查看。"
+        )
+        return
+    
     # 检查是否是CallbackQuery类型的更新
     if update.callback_query:
         # 通过按钮回调调用，直接显示游戏菜单
@@ -77,12 +90,11 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     is_logged_in = True
                     break
         
-        # 创建按钮菜单，根据登录状态决定是否显示授权登录按钮
+        # 创建按钮菜单，根据登录状态决定是否显示授权登录按钮（不包含余额查询）
         if is_logged_in:
             # 已登录，隐藏授权登录按钮
             keyboard = [
                 [InlineKeyboardButton("🎮 游戏厅", callback_data='games'),
-                 InlineKeyboardButton("💰 余额", callback_data='balance'),
                  InlineKeyboardButton("📅 每日签到", callback_data='daily')],
                 [InlineKeyboardButton("💸 充值", callback_data='recharge'),
                  InlineKeyboardButton("💎 提现", callback_data='withdraw'),
@@ -95,8 +107,7 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 [InlineKeyboardButton("🔐 登录授权", callback_data='login'),
                  InlineKeyboardButton("🎮 游戏厅", callback_data='games'),
                  InlineKeyboardButton("📝 游戏规则", callback_data='help')],
-                [InlineKeyboardButton("💰 余额", callback_data='balance'),
-                 InlineKeyboardButton("📅 每日签到", callback_data='daily'),
+                [InlineKeyboardButton("📅 每日签到", callback_data='daily'),
                  InlineKeyboardButton("🔙 返回", callback_data='back')]
             ]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -108,7 +119,7 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
     
-    # 正常的Message类型更新
+    # 正常的Message类型更新（私聊）
     text = update.message.text
     logger.info(f"完整的start命令文本: {text}")
     
@@ -148,17 +159,16 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
                 return
     
-    # 显示欢迎消息和菜单
+    # 显示欢迎消息和菜单（私聊）
     welcome_message = (
         f"欢迎使用 Emos 魔法机器人！\n\n"
         f"我是你的游戏助手，为你提供各种有趣的游戏和功能。\n\n"
         f"点击下方按钮开始探索："
     )
     
-    # 创建初始菜单按钮
+    # 创建初始菜单按钮（不包含余额查询）
     keyboard = [
         [InlineKeyboardButton("🎮 游戏厅", callback_data='games'),
-         InlineKeyboardButton("💰 余额", callback_data='balance'),
          InlineKeyboardButton("📅 每日签到", callback_data='daily')],
         [InlineKeyboardButton("💸 充值", callback_data='recharge'),
          InlineKeyboardButton("💎 提现", callback_data='withdraw'),
@@ -172,6 +182,15 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def balance_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """处理余额查询"""
     user_id = update.effective_user.id
+    
+    # 检查是否是群聊
+    if update.message and update.message.chat.type in ['group', 'supergroup']:
+        # 群聊中不显示余额，只发送提示消息
+        await update.message.reply_text(
+            "余额查询功能仅在私聊中可用。\n\n" 
+            "请在私聊中使用 /balance 命令查看您的余额。"
+        )
+        return
     
     # 检查用户是否已登录
     if user_id not in user_tokens:
@@ -239,7 +258,7 @@ async def balance_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 获取连续签到天数
     streak = get_user_streak(user_id_str, user_id)
     
-    # 构建余额消息
+    # 构建余额消息（不包含返回按钮）
     balance_message = (
         f"💰 您的余额\n\n"
         f"游戏币：{balance} 🪙\n"
@@ -250,21 +269,11 @@ async def balance_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"💡 参与游戏可以获得更多积分！"
     )
     
-    # 创建返回按钮
-    keyboard = [[InlineKeyboardButton("🔙 返回", callback_data='back')]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
     # 检查是否是CallbackQuery类型的更新
     if hasattr(update, 'callback_query') and update.callback_query:
-        await update.callback_query.edit_message_text(
-            balance_message,
-            reply_markup=reply_markup
-        )
+        await update.callback_query.edit_message_text(balance_message)
     elif hasattr(update, 'message') and update.message:
-        await update.message.reply_text(
-            balance_message,
-            reply_markup=reply_markup
-        )
+        await update.message.reply_text(balance_message)
 
 
 async def guess_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2046,7 +2055,7 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # 处理游戏相关的回调
     if data == 'games':
-        # 显示游戏菜单（包含充值提现）
+        # 显示游戏菜单（不包含余额查询）
         keyboard = [
             [InlineKeyboardButton("🎲 猜大小", callback_data='guess'),
              InlineKeyboardButton("✊ 猜拳", callback_data='shoot')],
@@ -2061,29 +2070,6 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "🎮 游戏厅\n\n请选择游戏或操作：",
             reply_markup=reply_markup
         )
-        return True
-    elif data == 'balance':
-        # 显示余额
-        user_id = update.effective_user.id
-        user_info = user_tokens.get(user_id)
-        if user_info:
-            user_id_str = user_info.get('user_id', str(user_id))
-            balance = get_balance(user_id_str)
-            score = get_user_score(user_id_str)
-            level = get_user_level(score)
-            streak = get_user_streak(user_id_str, user_id)
-            balance_message = (
-                f"💰 您的余额\n\n"
-                f"游戏币：{balance} 🪙\n"
-                f"积分：{score} 分\n"
-                f"等级：{level} 级\n"
-                f"连续签到：{streak} 天\n\n"
-                f"💡 每日签到可获得游戏币和积分！\n"
-                f"💡 参与游戏可以获得更多积分！"
-            )
-            await query.edit_message_text(balance_message)
-        else:
-            await query.edit_message_text("❌ 请先使用 /start 命令登录！")
         return True
     elif data == 'daily':
         # 处理每日签到

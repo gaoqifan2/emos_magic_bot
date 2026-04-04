@@ -13,16 +13,16 @@ async def rules_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """显示游戏规则"""
     
     rules_text = """
-🎮 *游戏规则说明*
+🎮 游戏规则说明
 ━━━━━━━━━━━━━━━━━━
 
-🎲 *猜大小游戏* /guess
+🎲 猜大小游戏 /guess
 • 私聊：/guess <金额> <大/小>
 • 群聊：回复消息 + /guess <金额> <大/小>
 • 规则：4-6为大，1-3为小
 • 赔率：1:1（扣除10%服务费）
 
-🎰 *老虎机游戏* /slot
+🎰 老虎机游戏 /slot
 • 私聊：/slot <金额>
 • 规则：3个相同图案即中奖
 • 赔率：
@@ -42,12 +42,12 @@ async def rules_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
   - 每日衰减：10%
   - 触发7️⃣-BAR-7️⃣组合获得奖池
 
-🃏 *21点游戏* /blackjack
+🃏 21点游戏 /blackjack
 • 私聊：/blackjack <金额>
 • 规则：点数接近21点，超过21点爆牌
 • 赔率：1:1（黑杰克1.5:1）
 
-✊ *猜拳游戏* /gameshoot
+✊ 猜拳游戏 /gameshoot
 • 私聊：/gameshoot <金额>
 • 群聊：回复消息 + /gameshoot <金额>
 • 规则：石头剪刀布
@@ -57,20 +57,20 @@ async def rules_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
   - 平局：双方各扣5%服务费
   - 输家：无额外税收
 
-🎭 *打劫游戏* /rob
+🎭 打劫游戏 /rob
 • 群聊：回复消息 + /rob <金额>
 • 规则：成功率50%
 • 成功：抢到金额（扣除10%税）
 • 失败：损失输入金额
 • 限制：每天最多3次，金额10-10000
 
-👥 *群聊庄家模式* /createguess
+👥 群聊庄家模式 /createguess
 • 创建：/createguess <金额> <大/小>
 • 下注：/guess_bet <金额> <大/小>
 • 规则：多人下注，庄家开奖
 • 赔率：动态计算
 
-🃏 *扑克牌比大小* /cardduel
+🃏 扑克牌比大小 /cardduel
 • 单挑模式：回复对方消息 + /cardduel <金额>
 • 群战模式：/cardduel <金额>（任何人可加入）
 • 加入：/join 或点击按钮
@@ -87,7 +87,7 @@ async def rules_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
   - 群战：赢家通吃所有下注
 • 税收：赢家扣除10%服务费
 
-🐮 *牛牛游戏* /niuniu
+🐮 牛牛游戏 /niuniu
 • 单挑模式：回复对方消息 + /niuniu <金额>
 • 群战模式：/niuniu <金额>（任何人可加入）
 • 加入：/join 或点击按钮
@@ -114,4 +114,4 @@ async def rules_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 💡 使用 /help 查看所有命令
 """
     
-    await update.message.reply_text(rules_text, parse_mode='Markdown')
+    await update.message.reply_text(rules_text)
