@@ -1621,8 +1621,9 @@ async def gameshoot_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "✊ 猜拳游戏\n\n"
             "请输入完整命令, 例如:\n"
-            "`/gameshoot 10`\n\n"
-            "直接复制:`/gameshoot 10`",
+            "普通单挑: `/gameshoot 10`\n"
+            "庄家模式: `/gameshoot 10 3` (10是金额, 3是PK人数)\n\n"
+            "直接复制:`/gameshoot 10` 或 `/gameshoot 10 3`",
             parse_mode='Markdown'
         )
         return
@@ -1631,6 +1632,22 @@ async def gameshoot_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         amount = int(args[0])
         if amount <= 0:
             await update.message.reply_text("下注金额必须大于0")
+            return
+        
+        # 检查是否是庄家模式
+        if len(args) >= 2:
+            pk_count = int(args[1])
+            if pk_count <= 0 or pk_count > 100:
+                await update.message.reply_text("PK人数必须在1-100之间")
+                return
+            
+            # 检查是否是群聊
+            if update.message.chat.type not in ['group', 'supergroup']:
+                await update.message.reply_text("庄家模式只能在群聊中使用")
+                return
+            
+            # 开始庄家模式
+            await create_shoot_banker_game(update, context, user_id, amount, pk_count)
             return
     except ValueError:
         await update.message.reply_text("请输入有效的数字")
@@ -1797,6 +1814,277 @@ async def create_shoot_game_with_buttons(update: Update, context: ContextTypes.D
     
     message = await update.message.reply_text(text, reply_markup=reply_markup)
     shoot_games[chat_id]['message_id'] = message.message_id
+
+async def create_shoot_banker_game(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int, amount: int, pk_count: int):
+    chat_id = update.effective_chat.id
+    user = update.effective_user
+    
+    # 获取用户信息
+    user_info = user_tokens[user_id]
+    emos_username = user_info.get('username', user.first_name)
+    emos_user_id = user_info.get('user_id', str(user_id))
+    
+    # 检查用户余额（庄家押注金额）
+    from app.database import get_balance
+    balance = get_balance(emos_user_id)
+    if balance < amount:
+        await update.message.reply_text(f"游戏币不足!当前余额:{balance}")
+        return
+    
+    # 生成游戏编号
+    game_no = f"shoot_banker_{chat_id}_{int(datetime.now().timestamp())}"
+    
+    # 清理之前的游戏
+    if chat_id in shoot_games:
+        del shoot_games[chat_id]
+    
+    # 创建庄家模式游戏数据
+    shoot_games[chat_id] = {
+        'type': 'banker',
+        'game_no': game_no,
+        'banker': {
+            'user_id': user_id,
+            'name': emos_username,
+            'emos_id': emos_user_id,
+            'choice': None,
+            'amount': amount
+        },
+        'pk_count': pk_count,
+        'players': {},  # 挑战者
+        'created_at': datetime.now(),
+        'end_time': datetime.now() + timedelta(minutes=1),
+        'chat_id': chat_id,
+        'message_id': None,
+        'status': 'waiting',  # waiting: 等待参与, playing: 等待出拳, settling: 结算中
+        'banker_choice_collected': False
+    }
+    
+    # 创建参与按钮
+    keyboard = [
+        [
+            InlineKeyboardButton("✊ 石头", callback_data=f"shoot_banker_join_{chat_id}"),
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    # 发布游戏信息
+    text = (
+        f"🎮 猜拳庄家模式 - {game_no}\n\n"
+        f"庄家: {emos_username}\n"
+        f"下注金额: {amount} 🪙\n"
+        f"PK人数: {pk_count} 人\n\n"
+        f"⏱️ 1分钟后自动结算\n\n"
+        f"点击下方按钮参与游戏"
+    )
+    
+    message = await update.message.reply_text(text, reply_markup=reply_markup)
+    shoot_games[chat_id]['message_id'] = message.message_id
+
+async def update_shoot_banker_game_message(chat_id: int, bot):
+    if chat_id not in shoot_games:
+        return
+    
+    game = shoot_games[chat_id]
+    if game['type'] != 'banker':
+        return
+    
+    try:
+        if game['status'] == 'waiting':
+            # 等待参与状态
+            player_list = []
+            for player_id, player_data in game['players'].items():
+                player_list.append(player_data['name'])
+            
+            text = (
+                f"🎮 猜拳庄家模式 - {game['game_no']}\n\n"
+                f"庄家: {game['banker']['name']}\n"
+                f"下注金额: {game['banker']['amount']} 🪙\n"
+                f"PK人数: {len(game['players'])}/{game['pk_count']} 人\n\n"
+            )
+            
+            if player_list:
+                text += f"已参与: {', '.join(player_list)}\n\n"
+            
+            text += (
+                f"⏱️ 1分钟后自动结算\n\n"
+                f"点击下方按钮参与游戏"
+            )
+            
+            # 创建参与按钮
+            keyboard = [
+                [
+                    InlineKeyboardButton("✊ 石头", callback_data=f"shoot_banker_join_{chat_id}"),
+                ]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=game['message_id'],
+                text=text,
+                reply_markup=reply_markup
+            )
+        
+        elif game['status'] == 'playing':
+            # 出拳状态
+            text = (
+                f"🎮 猜拳庄家模式 - {game['game_no']}\n\n"
+                f"庄家: {game['banker']['name']}\n"
+                f"下注金额: {game['banker']['amount']} 🪙\n"
+                f"PK人数: {len(game['players'])}/{game['pk_count']} 人\n\n"
+                f"请选择你的出拳：\n\n"
+            )
+            
+            # 庄家状态
+            if game['banker']['choice']:
+                text += f"✅ {game['banker']['name']} 已出拳\n"
+            else:
+                text += f"⏳ {game['banker']['name']} 等待出拳...\n"
+            
+            # 玩家状态
+            for player_id, player_data in game['players'].items():
+                if player_data['choice']:
+                    text += f"✅ {player_data['name']} 已出拳\n"
+                else:
+                    text += f"⏳ {player_data['name']} 等待出拳...\n"
+            
+            # 创建出拳按钮
+            keyboard = [
+                [
+                    InlineKeyboardButton("✊ 石头", callback_data=f"shoot_banker_choice_{chat_id}_rock"),
+                    InlineKeyboardButton("✌️ 剪刀", callback_data=f"shoot_banker_choice_{chat_id}_scissors"),
+                    InlineKeyboardButton("🖐 布", callback_data=f"shoot_banker_choice_{chat_id}_paper")
+                ]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=game['message_id'],
+                text=text,
+                reply_markup=reply_markup
+            )
+    
+    except Exception as e:
+        logger.error(f"更新庄家模式游戏消息失败: {e}")
+
+async def start_shoot_banker_game(chat_id: int, bot):
+    if chat_id not in shoot_games:
+        return
+    
+    game = shoot_games[chat_id]
+    if game['type'] != 'banker':
+        return
+    
+    game['status'] = 'playing'
+    await update_shoot_banker_game_message(chat_id, bot)
+
+async def settle_shoot_banker_game(chat_id: int, bot):
+    if chat_id not in shoot_games:
+        return
+    
+    game = shoot_games[chat_id]
+    if game['type'] != 'banker':
+        return
+    
+    game['status'] = 'settling'
+    
+    # 获取结果
+    banker_choice = game['banker']['choice']
+    amount = game['banker']['amount']
+    
+    # 构建结果文本
+    result_text = (
+        f"🎮 猜拳庄家模式结果 - {game['game_no']}\n\n"
+        f"庄家: {game['banker']['name']}\n"
+        f"庄家选择: {banker_choice} {get_choice_emoji(banker_choice)}\n\n"
+        f"PK人数: {len(game['players'])} 人\n\n"
+    )
+    
+    # 初始化结果统计
+    total_tax = 0
+    banker_net = 0
+    player_results = []
+    
+    # 导入数据库函数
+    from app.database import get_balance, update_balance, add_game_record
+    
+    # 遍历所有玩家进行结算
+    for player_id, player_data in game['players'].items():
+        player_choice = player_data['choice']
+        player_name = player_data['name']
+        player_emos_id = player_data['emos_id']
+        banker_emos_id = game['banker']['emos_id']
+        
+        # 判定胜负
+        result = determine_shoot_result(player_choice, banker_choice)
+        
+        # 计算10%税
+        tax = int(amount * 0.1)
+        total_tax += tax
+        
+        player_text = f"{player_name}: {player_choice} {get_choice_emoji(player_choice)} - "
+        
+        if result == 'win':
+            # 玩家赢
+            win_amount = amount
+            net_win = win_amount - tax
+            player_text += f"🎉 赢了! 净赚 {net_win} 🪙 (税-{tax})"
+            
+            # 更新余额
+            update_balance(player_emos_id, net_win)
+            update_balance(banker_emos_id, -amount)
+            
+            # 添加游戏记录
+            add_game_record(player_emos_id, '猜拳庄家模式', 'win', net_win, player_choice, banker_choice)
+            add_game_record(banker_emos_id, '猜拳庄家模式', 'lose', -amount, banker_choice, player_choice)
+            
+            banker_net -= amount
+        
+        elif result == 'lose':
+            # 玩家输
+            player_text += f"😢 输了! 损失 {amount} 🪙 (税-{tax})"
+            
+            # 更新余额
+            update_balance(player_emos_id, -amount)
+            update_balance(banker_emos_id, amount - tax)
+            
+            # 添加游戏记录
+            add_game_record(player_emos_id, '猜拳庄家模式', 'lose', -amount, player_choice, banker_choice)
+            add_game_record(banker_emos_id, '猜拳庄家模式', 'win', amount - tax, banker_choice, player_choice)
+            
+            banker_net += (amount - tax)
+        
+        else:
+            # 平局
+            player_text += f"🤝 平局! (税-{tax})"
+            
+            # 只收税，不改变余额
+            total_tax += tax
+        
+        player_results.append(player_text)
+    
+    # 添加玩家结果
+    result_text += "\n".join(player_results)
+    result_text += f"\n\n💰 总税收: {total_tax} 🪙"
+    
+    # 添加庄家净收益
+    result_text += f"\n💼 庄家净收益: {banker_net} 🪙"
+    
+    # 更新消息
+    try:
+        await bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=game['message_id'],
+            text=result_text
+        )
+    except Exception as e:
+        logger.error(f"更新庄家模式结果消息失败: {e}")
+        # 发送新消息
+        await bot.send_message(chat_id=chat_id, text=result_text)
+    
+    # 清理游戏
+    del shoot_games[chat_id]
 
 async def create_shoot_game(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int, amount: int, player_count: int = None):
     chat_id = update.effective_chat.id
@@ -3092,6 +3380,129 @@ async def shoot_callback_handler(update: Update, context: ContextTypes.DEFAULT_T
     user_id = update.effective_user.id
     data = query.data
     
+    # 庄家模式 - 加入游戏
+    if data.startswith("shoot_banker_join_"):
+        parts = data.split("_")
+        chat_id = int(parts[3])
+        
+        if chat_id not in shoot_games:
+            await query.answer("游戏不存在或已结束!")
+            return
+        
+        game = shoot_games[chat_id]
+        if game['type'] != 'banker':
+            await query.answer("这不是庄家模式游戏!")
+            return
+        
+        if game['status'] != 'waiting':
+            await query.answer("游戏已开始或已结束!")
+            return
+        
+        if user_id == game['banker']['user_id']:
+            await query.answer("庄家不能参与自己的游戏!")
+            return
+        
+        if user_id in game['players']:
+            await query.answer("您已经加入了这个游戏!")
+            return
+        
+        # 检查用户是否已登录
+        from app.config import user_tokens
+        if user_id not in user_tokens:
+            await query.answer("请先使用 /start 命令登录")
+            return
+        
+        # 检查用户余额
+        user_info = user_tokens[user_id]
+        emos_user_id = user_info.get('user_id', str(user_id))
+        from app.database import get_balance
+        balance = get_balance(emos_user_id)
+        if balance < game['banker']['amount']:
+            await query.answer(f"游戏币不足!当前余额:{balance}")
+            return
+        
+        emos_username = user_info.get('username', update.effective_user.first_name)
+        
+        # 添加用户到游戏
+        game['players'][user_id] = {
+            'name': emos_username,
+            'emos_id': emos_user_id,
+            'choice': None
+        }
+        
+        await query.answer("加入成功!")
+        
+        # 发送确认消息给用户
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=f"✅ {emos_username} 已成功加入猜拳庄家模式 - {game['game_no']}！\n\n请等待游戏开始..."
+        )
+        
+        # 更新游戏消息
+        await update_shoot_banker_game_message(chat_id, context.bot)
+        
+        # 检查是否达到PK人数
+        if len(game['players']) >= game['pk_count']:
+            await start_shoot_banker_game(chat_id, context.bot)
+        
+        return
+    
+    # 庄家模式 - 出拳
+    if data.startswith("shoot_banker_choice_"):
+        parts = data.split("_")
+        chat_id = int(parts[3])
+        choice_type = parts[4]
+        
+        if chat_id not in shoot_games:
+            await query.answer("游戏不存在或已结束!")
+            return
+        
+        game = shoot_games[chat_id]
+        if game['type'] != 'banker':
+            await query.answer("这不是庄家模式游戏!")
+            return
+        
+        if game['status'] != 'playing':
+            await query.answer("游戏不在出拳阶段!")
+            return
+        
+        choice_map = {'rock': '石头', 'scissors': '剪刀', 'paper': '布'}
+        user_choice = choice_map.get(choice_type, '石头')
+        
+        # 检查是否是庄家
+        if user_id == game['banker']['user_id']:
+            if game['banker']['choice'] is not None:
+                await query.answer("您已经出拳了!")
+                return
+            game['banker']['choice'] = user_choice
+            await query.answer(f"庄家选择了{user_choice}!")
+        elif user_id in game['players']:
+            if game['players'][user_id]['choice'] is not None:
+                await query.answer("您已经出拳了!")
+                return
+            game['players'][user_id]['choice'] = user_choice
+            await query.answer(f"您选择了{user_choice}!")
+        else:
+            await query.answer("您没有参与这个游戏!")
+            return
+        
+        # 更新游戏消息
+        await update_shoot_banker_game_message(chat_id, context.bot)
+        
+        # 检查是否所有人都出拳了
+        all_choices = True
+        if game['banker']['choice'] is None:
+            all_choices = False
+        for player_id, player_data in game['players'].items():
+            if player_data['choice'] is None:
+                all_choices = False
+                break
+        
+        if all_choices:
+            await settle_shoot_banker_game(chat_id, context.bot)
+        
+        return
+    
     # AI对战模式
     if data.startswith("shoot_ai_"):
         # 格式: shoot_ai_rock_10
@@ -3856,9 +4267,15 @@ async def check_shoot_games_task(application):
         expired_games = []
         
         for chat_id, game in list(shoot_games.items()):
-            # 检查是否超?分钟
-            if (current_time - game['created_at']).total_seconds() > 60:
-                expired_games.append(chat_id)
+            # 检查是否超时
+            if game.get('type') == 'banker':
+                # 庄家模式
+                if current_time >= game.get('end_time', game['created_at'] + timedelta(minutes=1)):
+                    expired_games.append(chat_id)
+            else:
+                # 普通模式
+                if (current_time - game['created_at']).total_seconds() > 60:
+                    expired_games.append(chat_id)
         
         for chat_id in expired_games:
             await end_shoot_game(chat_id, application)
@@ -3868,6 +4285,11 @@ async def end_shoot_game(chat_id: str, application):
         return
     
     game = shoot_games[chat_id]
+    
+    # 检查是否是庄家模式
+    if game.get('type') == 'banker':
+        await end_shoot_banker_game(chat_id, application)
+        return
     
     # 如果是等待中的游戏, 且人数不?
     if game['status'] == 'waiting':
@@ -3908,6 +4330,64 @@ async def end_shoot_game(chat_id: str, application):
             return
     
     del shoot_games[chat_id]
+
+async def end_shoot_banker_game(chat_id: int, application):
+    if chat_id not in shoot_games:
+        return
+    
+    game = shoot_games[chat_id]
+    if game.get('type') != 'banker':
+        return
+    
+    bot = application.bot
+    
+    # 获取游戏状态
+    game_no = game['game_no']
+    status = game['status']
+    banker = game['banker']
+    players = game['players']
+    amount = banker['amount']
+    
+    if status == 'waiting':
+        # 等待参与阶段超时
+        if len(players) == 0:
+            # 无人参与，直接结束，不扣税
+            await bot.send_message(
+                chat_id=chat_id,
+                text=f"🎮 猜拳庄家模式结束 - {game_no}\n\n"
+                     f"庄家: {banker['name']}\n"
+                     f"⏱️ 1分钟内无人参与, 游戏自动结束\n"
+                     f"💰 无人参与，不扣税"
+            )
+        else:
+            # 有人参与，开始游戏
+            game['status'] = 'playing'
+            # 更新游戏消息显示出拳按钮
+            await update_shoot_banker_game_message(chat_id, bot)
+            return
+    
+    elif status == 'playing':
+        # 出拳阶段超时，开始结算
+        # 随机选择未出拳的人的出拳
+        import random
+        choices = ['石头', '剪刀', '布']
+        
+        # 庄家未出拳，随机选择
+        if banker['choice'] is None:
+            banker['choice'] = random.choice(choices)
+        
+        # 玩家未出拳，随机选择
+        for player_id, player_data in players.items():
+            if player_data['choice'] is None:
+                player_data['choice'] = random.choice(choices)
+        
+        # 开始结算
+        await settle_shoot_banker_game(chat_id, bot)
+        return
+    
+    # 清理游戏
+    if chat_id in shoot_games:
+        del shoot_games[chat_id]
     
 
 async def init_http_client():
