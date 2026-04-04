@@ -1662,6 +1662,14 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = update.effective_user.id
         user_info = user_tokens.get(user_id)
         
+        # 检查是否在群聊中
+        chat_id = update.effective_chat.id
+        chat_type = update.effective_chat.type
+        if chat_type in ['group', 'supergroup']:
+            logger.info(f"在群聊中点击游戏选择，提示私聊充值")
+            await update.callback_query.edit_message_text("❌ 充值只能在私聊中进行！\n\n请私聊使用 /start 命令后进行充值")
+            return
+        
         # 检查user_info是字典还是字符串
         if isinstance(user_info, dict):
             token = user_info.get('token')
