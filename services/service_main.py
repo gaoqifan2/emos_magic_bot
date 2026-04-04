@@ -402,12 +402,11 @@ async def service_recharge(update: Update, context: ContextTypes.DEFAULT_TYPE):
     token = user_info.get('token') if isinstance(user_info, dict) else user_info
     
     if not token:
-        # 生成唯一的、一次性的token
-        import uuid
-        unique_token = str(uuid.uuid4())[:8].upper()
+        # 使用固定的token
+        fixed_token = "e0E446ZE6s"
         bot_username = BOT_USERNAME
         # 添加操作状态参数，以便绑定后恢复
-        auth_link = f"https://t.me/emospg_bot?start=link_{unique_token}-{bot_username}-recharge"
+        auth_link = f"https://t.me/emospg_bot?start=link_{fixed_token}-{bot_username}-recharge"
         
         # 创建绑定提示按钮
         keyboard = [
@@ -533,12 +532,11 @@ async def service_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
     token = user_info.get('token') if isinstance(user_info, dict) else user_info
     
     if not token:
-        # 生成唯一的、一次性的token
-        import uuid
-        unique_token = str(uuid.uuid4())[:8].upper()
+        # 使用固定的token
+        fixed_token = "e0E446ZE6s"
         bot_username = BOT_USERNAME
         # 添加操作状态参数，以便绑定后恢复
-        auth_link = f"https://t.me/emospg_bot?start=link_{unique_token}-{bot_username}-withdraw"
+        auth_link = f"https://t.me/emospg_bot?start=link_{fixed_token}-{bot_username}-withdraw"
         
         # 创建绑定提示按钮
         keyboard = [

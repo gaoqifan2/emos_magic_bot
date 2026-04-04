@@ -136,30 +136,48 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 bot_name = parts[1]  # 获取机器人名称
                 operation = parts[2] if len(parts) == 3 else None  # 获取操作状态
                 
-                # 检查token是否有效（这里可以添加token验证逻辑）
-                # 例如，检查token是否存在于数据库中，是否已过期等
+                # 处理登录逻辑
+                user_id = update.effective_user.id
+                username = update.effective_user.username
+                first_name = update.effective_user.first_name
+                last_name = update.effective_user.last_name
                 
-                # 生成新的唯一授权链接
-                import uuid
-                unique_token = str(uuid.uuid4())[:8].upper()
-                if operation:
-                    auth_link = f"https://t.me/emospg_bot?start=link_{unique_token}-{bot_name}-{operation}"
-                else:
-                    auth_link = f"https://t.me/emospg_bot?start=link_{unique_token}-{bot_name}"
+                # 存储用户信息
+                user_data = {
+                    'id': token,
+                    'token': token,
+                    'username': username,
+                    'first_name': first_name,
+                    'last_name': last_name,
+                    'telegram_id': user_id
+                }
                 
-                # 创建授权按钮
-                keyboard = [
-                    [InlineKeyboardButton("🔐 授权登录", url=auth_link)],
-                    [InlineKeyboardButton("❌ 取消", callback_data='cancel')]
-                ]
-                reply_markup = InlineKeyboardMarkup(keyboard)
+                # 添加用户到数据库
+                add_user(token, user_data)
                 
-                await update.message.reply_text(
-                    "请点击下方按钮授权登录，以使用完整的游戏功能：\n" 
-                    "登录后可以获得更多游戏福利和特权！\n\n" 
-                    "⚠️ 链接仅可使用一次，使用后自动失效",
-                    reply_markup=reply_markup
+                # 存储用户token
+                user_tokens[user_id] = user_data
+                
+                # 显示登录成功消息
+                success_message = (
+                    f"🎉 登录成功！\n\n" 
+                    f"欢迎回来，{first_name}！\n" 
+                    f"您的用户ID：{token}\n\n" 
+                    f"现在您可以使用完整的游戏功能了！"
                 )
+                
+                await update.message.reply_text(success_message)
+                
+                # 如果有操作状态，处理相应的操作
+                if operation:
+                    if operation == 'recharge':
+                        # 处理充值操作
+                        from services.service_main import service_recharge
+                        await service_recharge(update, context)
+                    elif operation == 'withdraw':
+                        # 处理提现操作
+                        from services.service_main import service_withdraw
+                        await service_withdraw(update, context)
                 return
     
     # 显示欢迎消息和菜单（私聊）

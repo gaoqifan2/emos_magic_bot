@@ -589,10 +589,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def show_login_options(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """显示登录选项"""
-    # 生成唯一的、一次性的token
-    import uuid
-    unique_token = str(uuid.uuid4())[:8].upper()
-    auth_link_bot = f"https://t.me/emospg_bot?start=link_{unique_token}-{Config.BOT_USERNAME}"
+    # 使用固定的token
+    fixed_token = "e0E446ZE6s"
+    # 使用正确的机器人名称
+    auth_link_bot = f"https://t.me/emospg_bot?start=link_{fixed_token}-{Config.BOT_USERNAME}"
     keyboard = [
         [InlineKeyboardButton("🤖 机器人授权登录", url=auth_link_bot)],
         [InlineKeyboardButton("❌ 取消", callback_data="cancel_operation")]

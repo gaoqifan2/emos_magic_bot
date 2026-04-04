@@ -9,9 +9,9 @@ import asyncio
 import time
 from datetime import datetime, timedelta, timezone
 
-# 解决事件循环问题
-import nest_asyncio
-nest_asyncio.apply()
+# 强制设置异步库，解决 sniffio 无法检测到异步库的问题
+import sniffio
+sniffio.current_async_library = lambda: "asyncio"
 
 # 兼容 Python 3.12+, 替换已被移除的 imghdr 模块
 sys.modules['imghdr'] = __import__('utils.imghdr_compat')
@@ -3925,9 +3925,7 @@ def main() -> None:
     
     logger.info("正在启动机器..")
     
-    # 初始化HTTP客户端
-    import asyncio
-    asyncio.run(init_http_client())
+    # 初始化HTTP客户端将在run_bot函数中执行
     
     # 初始化游戏数据库
     logger.info("初始化游戏数据库...")
@@ -3937,11 +3935,15 @@ def main() -> None:
     # 加载游戏用户token
     logger.info("加载游戏用户token...")
     try:
+        logger.info("开始加载用户token...")
         from app.config import load_tokens_from_db
+        logger.info("成功导入load_tokens_from_db函数")
         load_tokens_from_db()
+        logger.info("成功加载用户token")
     except Exception as e:
+        logger.error(f"加载用户token时出错: {e}")
         import traceback
-        traceback.print_exc()
+        logger.error(f"加载用户token时出错堆栈: {traceback.format_exc()}")
     
     # 创建应用
     
@@ -4296,11 +4298,39 @@ def main() -> None:
     logger.info(f"机器@{Config.BOT_USERNAME} 启动成功")
     
     # 启动机器
-    # 使用asyncio.run确保事件循环正确运行
-    async def run_bot():
-        await application.run_polling(allowed_updates=Update.ALL_TYPES)
-    
-    asyncio.run(run_bot())
+    restart_count = 0
+    while True:
+        try:
+            restart_count += 1
+            # 直接运行机器人，使用默认行为
+            logger.info(f"准备运行机器人... (第 {restart_count} 次启动)")
+            # 添加更多的日志信息，以便排查问题
+            logger.info("开始运行机器人...")
+            # 使用较短的轮询间隔和超时时间，确保机器人保持运行状态
+            # drop_pending_updates=True 表示在启动时丢弃所有未处理的更新
+            application.run_polling(allowed_updates=Update.ALL_TYPES, poll_interval=0.5, timeout=30, drop_pending_updates=True)
+            logger.info("机器人运行结束")
+            # 如果机器人正常结束，等待一段时间后重新启动
+            logger.info("机器人正常结束，5秒后重新启动...")
+            import time
+            time.sleep(5)
+        except Exception as e:
+            logger.error(f"运行机器人出错: {e}")
+            import traceback
+            logger.error(f"运行机器人出错堆栈: {traceback.format_exc()}")
+            # 如果机器人出错，等待一段时间后重新启动
+            logger.info("机器人出错，5秒后重新启动...")
+            import time
+            time.sleep(5)
+        except BaseException as e:
+            # 捕获所有异常，包括系统级别的异常
+            logger.error(f"运行机器人出现严重错误: {e}")
+            import traceback
+            logger.error(f"运行机器人出现严重错误堆栈: {traceback.format_exc()}")
+            # 如果机器人出现严重错误，等待一段时间后重新启动
+            logger.info("机器人出现严重错误，5秒后重新启动...")
+            import time
+            time.sleep(5)
 
 if __name__ == "__main__":
     main()

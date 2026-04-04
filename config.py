@@ -2,17 +2,16 @@
 import os
 from dataclasses import dataclass
 import boto3
-from utils.http_client import http_client
 
 @dataclass
 class Config:
-    # 正式Bot配置
-    BOT_TOKEN: str = "8682707944:AAGvauAZxz8BRxwFd2piaG3adi01zGQtydY"
-    BOT_USERNAME: str = "emosMagicBox_bot"
+    # # 正式Bot配置
+    # BOT_TOKEN: str = "8682707944:AAGvauAZxz8BRxwFd2piaG3adi01zGQtydY"
+    # BOT_USERNAME: str = "emosMagicBox_bot"
 
-    # # 测试bot
-    # BOT_TOKEN: str = "8714100893:AAFxkl8zL2bpdNzgEBJ9fIseNsAG8D-mSjI"
-    # BOT_USERNAME: str = "emosCheShiBox_bot"
+    # 测试bot
+    BOT_TOKEN: str = "8714100893:AAFxkl8zL2bpdNzgEBJ9fIseNsAG8D-mSjI"
+    BOT_USERNAME: str = "emosCheShiBox_bot"
     
     # API地址
     # 生产环境地址
