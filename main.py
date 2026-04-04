@@ -131,10 +131,10 @@ def clear_operation_data(context):
         if key in context.user_data:
             preserved_data[key] = context.user_data[key]
     
-    # 清理所有数
-    clear_operation_data(context)
+    # 清理所有数据
+    context.user_data.clear()
     
-    # 恢复保留的数
+    # 恢复保留的数据
     for key, value in preserved_data.items():
         context.user_data[key] = value
 
@@ -1790,7 +1790,7 @@ async def create_shoot_game_with_buttons(update: Update, context: ContextTypes.D
     # 发布游戏信息
     text = (
         f"#游戏石头剪刀布 {emos_username} 邀请大家玩 {amount} 🪙 的石头剪刀布\n\n"
-        f"?1分钟后自动结算\n\n"
+        f"⏱️ 1分钟后自动结算\n\n"
         f"请选择你的出拳："
     )
     
