@@ -4063,7 +4063,7 @@ def main() -> None:
                 CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
             ],
             WAITING_CUSTOM_BLESSING: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_blessing),
+                MessageHandler(filters.TEXT, handle_custom_blessing),
                 CallbackQueryHandler(handle_type, pattern="^back_"),
                 CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
             ],
@@ -4074,15 +4074,7 @@ def main() -> None:
                 MessageHandler(filters.Document.ALL, handle_media),
                 CallbackQueryHandler(handle_type, pattern="^back_"),
                 CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
-            ],
-            WAITING_SCENE: [
-                CallbackQueryHandler(handle_scene, pattern="^scene_"),
-                CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
-            ],
-            WAITING_CUSTOM_BLESSING: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_blessing),
-                CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
-            ],
+            ]
         },
         fallbacks=[CommandHandler("cancel", cancel_redpacket)]
         )

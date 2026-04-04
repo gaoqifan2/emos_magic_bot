@@ -248,12 +248,13 @@ async def handle_back(update: Update, context: ContextTypes.DEFAULT_TYPE, data: 
     elif prev_step == 'type':
         redpacket_data['current_step'] = 'type'
         keyboard = [
-            [InlineKeyboardButton("🎲 普通红包", callback_data="type_random")],
-            [InlineKeyboardButton("🔐 口令红包", callback_data="type_password")],
-            [InlineKeyboardButton("🖼️ 图片红包", callback_data="type_image")],
-            [InlineKeyboardButton("🎵 语音红包", callback_data="type_audio")]
+            [InlineKeyboardButton("🎲 普通红包　　　　　　", callback_data="type_random")],
+            [InlineKeyboardButton("🔐 口令红包　　　　　　", callback_data="type_password")],
+            [InlineKeyboardButton("💝 私包　　　　　　　　", callback_data="type_private")],
+            [InlineKeyboardButton("🖼️ 图片红包　　　　　　", callback_data="type_image")],
+            [InlineKeyboardButton("🎵 语音红包　　　　　　", callback_data="type_audio")],
+            [InlineKeyboardButton("⬅️ 返回上一步", callback_data="back_prev")]
         ]
-        keyboard = add_cancel_button(keyboard)
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text("🧧 创建红包\n\n请选择红包类型：", reply_markup=reply_markup)
         return WAITING_TYPE
@@ -916,9 +917,9 @@ async def handle_scene(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await create_redpacket(update, context)
     elif data == 'scene_festival':
         # 节日祝福语
-        # 获取当前日期
+        # 获取当前日期（北京时间）
         import datetime
-        today = datetime.datetime.now()
+        today = datetime.datetime.now(beijing_tz)
         month = today.month
         day = today.day
         
