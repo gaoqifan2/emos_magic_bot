@@ -372,6 +372,15 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             local_user_id = order_info_db.get('user_id')
             logger.info(f"订单归属用户ID: {local_user_id}")
             
+            # 检查本地订单状态
+            local_order_status = order_info_db.get('status')
+            logger.info(f"本地订单状态: {local_order_status}")
+            
+            if local_order_status == 'success':
+                # 订单已经处理过，直接提示用户
+                await loading.edit_text(f"✅ 该订单已经处理过，请勿重复点击链接！\n订单号：`{order_no}`\n状态：已成功", parse_mode="Markdown")
+                return
+            
             # 使用服务商token查询平台订单状态
             service_headers = {"Authorization": f"Bearer {SERVICE_PROVIDER_TOKEN}"}
             

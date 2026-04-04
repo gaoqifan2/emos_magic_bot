@@ -2373,10 +2373,10 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 except ValueError:
                     await update.message.reply_text("请输入有效的数字, 请重新输入")
                     return 104  # 继续等待金额输入
-                else:
-                    await update.message.reply_text("请先登录!发送 /start 登录")
-                    # 清理用户操作数据
-                    clear_operation_data(context)
+            else:
+                await update.message.reply_text("请先登录!发送 /start 登录")
+                # 清理用户操作数据
+                clear_operation_data(context)
             
             # 注意:这里不应该有代码, 因为前面?if-elif 链已经结束
             # 提现处理应该在单独的 elif 分支?
@@ -4246,9 +4246,12 @@ def main() -> None:
     # ===== 游戏规则命令 =====
     print("[DEBUG] 添加游戏规则命令...")
     try:
-        from handlers.rules import rules_handler
+        from handlers.rules import rules_handler, menu_handler, rules_callback
         application.add_handler(CommandHandler("rules", group_command_filter(rules_handler)))
-        print("[DEBUG] 游戏规则命令添加完成")
+        application.add_handler(CommandHandler("menu", group_command_filter(menu_handler)))
+        application.add_handler(CallbackQueryHandler(rules_callback, pattern="^rules_"))
+        application.add_handler(CallbackQueryHandler(rules_callback, pattern="^game_"))
+        print("[DEBUG] 游戏规则和菜单命令添加完成")
     except Exception as e:
         import traceback
         traceback.print_exc()
