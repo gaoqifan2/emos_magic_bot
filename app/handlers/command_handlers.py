@@ -182,16 +182,17 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # 处理支付完成链接请求
         elif start_param.startswith('emosPayAgree-'):
-            # 解析参数：emosPayAgree-[timestamp][random]-[order_id]-[user_id]
+            # 解析参数：emosPayAgree-[platform_order_no]-[order_id]-[user_id]
             parts = start_param.split('-', 3)
             if len(parts) >= 4:
-                # 获取订单ID和用户ID
+                # 获取platform_order_no（2026开头的到93结尾那一段）
+                platform_order_no = parts[1]
                 order_id = parts[2]
                 user_id = parts[3]
                 
                 # 检查订单是否已经处理过
                 from app.database import get_recharge_order_by_platform_no
-                order = get_recharge_order_by_platform_no(order_id)
+                order = get_recharge_order_by_platform_no(platform_order_no)
                 
                 if order:
                     if order['status'] == 'success':
@@ -205,7 +206,7 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         
                         # 更新订单状态为成功
                         game_coin_amount = order['game_coin_amount']
-                        update_recharge_order_status(order_id, 'success', game_coin_amount)
+                        update_recharge_order_status(platform_order_no, 'success', game_coin_amount)
                         
                         # 显示支付成功消息
                         emos_user_id = order['user_id']
@@ -214,7 +215,7 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         
                         success_message = (
                             f"🎉 支付成功！\n\n" 
-                            f"订单号：{order_id}\n" 
+                            f"订单号：{platform_order_no}\n" 
                             f"充值金额：{carrot_amount} 萝卜\n" 
                             f"获得游戏币：{game_coin_amount} 🪙\n" 
                             f"当前余额：{new_balance} 🪙\n\n" 
@@ -1749,12 +1750,10 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         if operation == 'withdraw_amount':
             await process_withdraw(update, context, text)
-            # 清理用户操作状态
+            # 清理用户操作状态（只清除与当前操作相关的状态，保留登录状态）
             context.user_data.pop('current_operation', None)
-            context.user_data.pop('token', None)
+            # 不清除 token、local_user_id、emos_user_id，保留用户登录状态
             context.user_data.pop('game_balance', None)
-            context.user_data.pop('local_user_id', None)
-            context.user_data.pop('emos_user_id', None)
             context.user_data.pop('total_recharge', None)
             context.user_data.pop('total_withdraw', None)
             context.user_data.pop('remaining_withdraw', None)
@@ -1844,10 +1843,10 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 logger.error(f"转账异常堆栈: {traceback.format_exc()}")
                 await loading.edit_text(f"❌ 转账失败：{str(e)}")
             
-            # 清理用户数据
+            # 清理用户数据（只清除与当前操作相关的状态，保留登录状态）
             context.user_data.pop('current_operation', None)
             context.user_data.pop('target_user_id', None)
-            context.user_data.pop('token', None)
+            # 不清除 token，保留用户登录状态
             return
         
         elif operation == 'service_recharge_amount':
@@ -1915,11 +1914,9 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 logger.error(f"充值异常堆栈: {traceback.format_exc()}")
                 await loading.edit_text(f"❌ 充值失败：{str(e)}")
             
-            # 清理用户数据
+            # 清理用户数据（只清除与当前操作相关的状态，保留登录状态）
             context.user_data.pop('current_operation', None)
-            context.user_data.pop('token', None)
-            context.user_data.pop('local_user_id', None)
-            context.user_data.pop('emos_user_id', None)
+            # 不清除 token、local_user_id、emos_user_id，保留用户登录状态
             context.user_data.pop('total_recharge', None)
             context.user_data.pop('remaining_recharge', None)
             return
