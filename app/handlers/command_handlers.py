@@ -1879,6 +1879,11 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             loading = await update.message.reply_text("🔄 正在处理充值...")
             
             try:
+                # 保存用户登录状态
+                saved_token = token
+                saved_local_user_id = context.user_data.get('local_user_id')
+                saved_emos_user_id = context.user_data.get('emos_user_id')
+                
                 # 创建充值订单
                 from services.service_main import create_recharge_order
                 result = await create_recharge_order(user_id, carrot_amount, token=token)
@@ -1887,12 +1892,33 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     # 充值成功
                     payment_url = result.get('payment_url')
                     qr_code = result.get('qr_code')
+                    platform_order_no = result.get('platform_order_no')
+                    game_coin = result.get('game_coin')
+                    
+                    # 存储充值订单到数据库
+                    from app.database import add_recharge_order
+                    from app.database import get_user_by_telegram_id
+                    user_info = get_user_by_telegram_id(user_id)
+                    username = user_info.get('username', '未知') if user_info else '未知'
+                    emos_user_id = user_info.get('user_id') if user_info else token
+                    
+                    add_recharge_order(
+                        order_no=result['order_no'],
+                        user_id=emos_user_id,
+                        username=username,
+                        telegram_user_id=user_id,
+                        carrot_amount=carrot_amount,
+                        game_coin_amount=game_coin,
+                        platform_order_no=platform_order_no,
+                        pay_url=payment_url
+                    )
                     
                     # 显示充值信息
                     message = f"✅ 充值订单创建成功！\n\n"
                     message += f"📋 订单号：`{result['order_no']}`\n"
+                    message += f"平台订单号：`{platform_order_no}`\n"
                     message += f"💰 充值金额：{carrot_amount} 萝卜\n"
-                    message += f"🪙 获得游戏币：{result['game_coin']} 🪙\n"
+                    message += f"🪙 获得游戏币：{game_coin} 🪙\n"
                     
                     if payment_url:
                         # 创建充值按钮
@@ -1913,6 +1939,14 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 import traceback
                 logger.error(f"充值异常堆栈: {traceback.format_exc()}")
                 await loading.edit_text(f"❌ 充值失败：{str(e)}")
+            
+            # 恢复用户登录状态
+            if saved_token:
+                context.user_data['token'] = saved_token
+            if saved_local_user_id:
+                context.user_data['local_user_id'] = saved_local_user_id
+            if saved_emos_user_id:
+                context.user_data['emos_user_id'] = saved_emos_user_id
             
             # 清理用户数据（只清除与当前操作相关的状态，保留登录状态）
             context.user_data.pop('current_operation', None)
