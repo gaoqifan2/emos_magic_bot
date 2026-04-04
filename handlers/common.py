@@ -438,7 +438,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     # 计算剩余可充值额度
                     from app.database import get_user_total_recharge
                     total_recharge = get_user_total_recharge(local_user_id)
-                    max_recharge = 100  # 充值上限100萝卜
+                    max_recharge = 1500  # 充值上限1500萝卜
                     remaining_recharge = max_recharge - total_recharge
                     
                     message = f"✅ {update.effective_user.first_name}，充值成功！\n\n"
@@ -650,8 +650,24 @@ async def show_menu(update, message_text: str):
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    # 检查消息中是否包含Markdown格式
-    has_markdown = '`' in message_text or '```' in message_text
+    # 检查消息中是否包含Markdown格式，且确保标记正确闭合
+    has_backtick = '`' in message_text
+    has_code_block = '```' in message_text
+    
+    # 检查 Markdown 标记是否正确闭合
+    if has_backtick:
+        backtick_count = message_text.count('`')
+        if backtick_count % 2 != 0:
+            # 单个反引号，不是有效的 Markdown
+            has_backtick = False
+    
+    if has_code_block:
+        code_block_count = message_text.count('```')
+        if code_block_count % 2 != 0:
+            # 单个代码块标记，不是有效的 Markdown
+            has_code_block = False
+    
+    has_markdown = has_backtick or has_code_block
     parse_mode = "Markdown" if has_markdown else None
     
     if isinstance(update, Update) and update.message:
@@ -760,6 +776,17 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 同步魔盒的 user_tokens 到游戏模块
     for key, value in user_tokens.items():
         game_user_tokens[key] = value
+    # 确保当前用户的信息在 game_user_tokens 中
+    user_id = update.effective_user.id
+    if user_id in user_tokens:
+        game_user_tokens[user_id] = user_tokens[user_id]
+    
+    # 检查是否在群聊中，如果是，禁止处理充值和提现
+    if update.effective_chat.type in ['group', 'supergroup']:
+        if data in ['recharge', 'withdraw']:
+            await query.answer("充值和提现只能在私聊中进行！", show_alert=True)
+            return
+    
     # 调用游戏回调处理器
     game_handled = await game_callback_handler(update, context)
     if game_handled:

@@ -6,13 +6,13 @@ from utils.http_client import http_client
 
 @dataclass
 class Config:
-    # # 正式Bot配置
-    # BOT_TOKEN: str = "8682707944:AAGvauAZxz8BRxwFd2piaG3adi01zGQtydY"
-    # BOT_USERNAME: str = "emosMagicBox_bot"
+    # 正式Bot配置
+    BOT_TOKEN: str = "8682707944:AAGvauAZxz8BRxwFd2piaG3adi01zGQtydY"
+    BOT_USERNAME: str = "emosMagicBox_bot"
 
-    # 测试bot
-    BOT_TOKEN: str = "8714100893:AAFxkl8zL2bpdNzgEBJ9fIseNsAG8D-mSjI"
-    BOT_USERNAME: str = "emosCheShiBox_bot"
+    # # 测试bot
+    # BOT_TOKEN: str = "8714100893:AAFxkl8zL2bpdNzgEBJ9fIseNsAG8D-mSjI"
+    # BOT_USERNAME: str = "emosCheShiBox_bot"
     
     # API地址
     # 生产环境地址
@@ -49,18 +49,19 @@ BOT_COMMANDS = [
     ("playing", "正在播放"),
     ("rank_carrot", "萝卜榜"),
     ("redpocket", "创建红包"),
-    ("rank_upload", "上传榜"),
     ("gameshoot", "猜拳游戏"),
-    ("slot", "老虎机游戏"),
-    ("blackjack", "21点游戏"),
-    ("balance", "查看余额"),
-    ("guess", "猜大小游戏"),
-    ("createguess", "创建群聊猜大小游戏"),
+     ("createguess", "创建群聊猜大小游戏"),
     ("guess_bet", "群聊猜大小下注"),
     ("rob", "打劫游戏"),
     ("robstatus", "打劫状态"),
-    ("rules", "游戏规则"),
+    ("cardduel", "扑克牌比大小"),
+    ("niuniu", "牛牛游戏"),
+    ("guess", "猜大小游戏"),
+    ("slot", "老虎机游戏"),
+    ("blackjack", "21点游戏"),  
+    ("balance", "查看余额"),
     ("withdraw", "提现"),
+    ("rules", "游戏规则"),
     ("help", "帮助"),
 ]
 
@@ -68,14 +69,16 @@ BOT_COMMANDS = [
 # 空列表表示群聊中不允许任何命令
 GROUP_ALLOWED_COMMANDS = [
     "balance",     # 查看余额
+     "gameshoot",   # 猜拳游戏
+    "createguess",   # 创建猜大小游戏
+    "guess_bet",         # 群聊下注
+    "rob",         # 打劫游戏
+    "robstatus",   # 打劫状态
+    "cardduel",    # 扑克牌比大小
+    "niuniu",      # 牛牛游戏
     "guess", 
     "slot",  
     "blackjack",      # 21点游戏    
-    "createguess",   # 创建猜大小游戏
-    "guess_bet",         # 群聊下注
-    "gameshoot",   # 猜拳游戏
-    "rob",         # 打劫游戏
-    "robstatus",   # 打劫状态
     "rules",       # 游戏规则
 ]
 

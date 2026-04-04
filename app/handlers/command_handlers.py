@@ -677,86 +677,164 @@ async def process_slot(update: Update, context: ContextTypes.DEFAULT_TYPE, amoun
     # 检查是否中奖
     if left_icon == center_icon == right_icon:
         is_win = True
-        win_amount = amount * 2  # 三个相同：固定2倍
-        result = f"{left_icon} {right_icon} {center_icon} - 三个相同！赔率 2 倍！"
-        # 抽水10%
+        # 根据不同图标设置不同赔率
+        if left_icon == "BAR":
+            win_amount = amount * 5  # 三个BAR：5倍
+            result = f"{left_icon} {right_icon} {center_icon} - 三个BAR！赔率 5 倍！"
+        elif left_icon == "7️⃣":
+            win_amount = amount * 4  # 三个7：4倍
+            result = f"{left_icon} {right_icon} {center_icon} - 三个7！赔率 4 倍！"
+        elif left_icon == "🍇":
+            win_amount = amount * 3  # 三个葡萄：3倍
+            result = f"{left_icon} {right_icon} {center_icon} - 三个葡萄！赔率 3 倍！"
+        elif left_icon == "🍒":
+            win_amount = amount * 2  # 三个樱桃：2倍
+            result = f"{left_icon} {right_icon} {center_icon} - 三个樱桃！赔率 2 倍！"
+        else:
+            win_amount = amount * 1  # 其他三个相同：1倍
+            result = f"{left_icon} {right_icon} {center_icon} - 三个相同！赔率 1 倍！"
+        # 抽水15%
         if amount > 0:
-            from app.database.jackpot import add_to_jackpot_pool
-            add_to_jackpot_pool(amount * 0.05)  # 5%进入奖池
-            # 5%给服务器利润（通过其他方式处理）
+            from app.database.jackpot import add_to_jackpot_pool, get_jackpot_pool, JACKPOOL_MAX
+            # 检查奖池是否已满
+            jackpot_amount = get_jackpot_pool()
+            if jackpot_amount >= JACKPOOL_MAX:
+                # 奖池已满，只收10%税
+                add_to_jackpot_pool(0)  # 不再添加到奖池
+            else:
+                # 奖池未满，收15%税（10%服务器，5%奖池）
+                add_to_jackpot_pool(amount * 0.05)  # 5%进入奖池
     elif (left_icon == "7️⃣" and right_icon == "BAR" and center_icon == "7️⃣"):
         # 特殊组合：7-BAR-7
         is_win = True
-        win_amount = amount * 5  # JACKPOT赔率：5倍
-        result = f"{left_icon} {right_icon} {center_icon} - JACKPOT大奖！赔率 5 倍！"
-        # 抽水10%
+        win_amount = amount * 3  # JACKPOT赔率：3倍
+        result = f"{left_icon} {right_icon} {center_icon} - JACKPOT大奖！赔率 3 倍！"
+        # 抽水15%
         if amount > 0:
-            from app.database.jackpot import add_to_jackpot_pool
-            add_to_jackpot_pool(amount * 0.05)  # 5%进入奖池
-            # 5%给服务器利润（通过其他方式处理）
+            from app.database.jackpot import add_to_jackpot_pool, get_jackpot_pool, JACKPOOL_MAX
+            # 检查奖池是否已满
+            jackpot_amount = get_jackpot_pool()
+            if jackpot_amount >= JACKPOOL_MAX:
+                # 奖池已满，只收10%税
+                add_to_jackpot_pool(0)  # 不再添加到奖池
+            else:
+                # 奖池未满，收15%税（10%服务器，5%奖池）
+                add_to_jackpot_pool(amount * 0.05)  # 5%进入奖池
     elif (left_icon == right_icon) or (left_icon == center_icon) or (right_icon == center_icon):
         # 两个相同
         is_win = True
-        win_amount = amount * 0.4  # 两个相同：0.4倍
-        result = f"{left_icon} {right_icon} {center_icon} - 两个相同！赔率 0.4 倍！"
-        # 抽水10%
+        win_amount = amount * 0.5  # 两个相同：0.5倍
+        result = f"{left_icon} {right_icon} {center_icon} - 两个相同！赔率 0.5 倍！"
+        # 抽水15%
         if amount > 0:
-            from app.database.jackpot import add_to_jackpot_pool
-            add_to_jackpot_pool(amount * 0.05)  # 5%进入奖池
-            # 5%给服务器利润（通过其他方式处理）
+            from app.database.jackpot import add_to_jackpot_pool, get_jackpot_pool
+            # 检查奖池是否已满
+            jackpot_amount = get_jackpot_pool()
+            if jackpot_amount >= 10000:
+                # 奖池已满，只收10%税
+                add_to_jackpot_pool(0)  # 不再添加到奖池
+            else:
+                # 奖池未满，收15%税（10%服务器，5%奖池）
+                add_to_jackpot_pool(amount * 0.05)  # 5%进入奖池
     else:
         # 全不同
         result = f"{left_icon} {right_icon} {center_icon} - 全不同！"
-        # 输了，向奖池添加少量金额
-        from app.database.jackpot import add_to_jackpot_pool
-        add_to_jackpot_pool(amount * 0.1)  # 每次下注的10%进入奖池
+        # 输了，向奖池添加10%（全部进入奖池）
+        from app.database.jackpot import add_to_jackpot_pool, get_jackpot_pool, JACKPOOL_MAX
+        # 检查奖池是否已满
+        jackpot_amount = get_jackpot_pool()
+        if jackpot_amount < JACKPOOL_MAX:
+            add_to_jackpot_pool(amount * 0.1)  # 每次下注的10%进入奖池
     
     # 处理余额更新
     if is_win and win_amount > 0:
-        # 处理JACKPOT奖池
-        if (left_icon == "7️⃣" and center_icon == "BAR" and right_icon == "7️⃣"):
-            # 从奖池中扣除JACKPOT金额
-            from app.database.jackpot import get_jackpot_pool, set_jackpot_pool
+        # 检查每日净赢取上限
+        from main import DAILY_NET_WIN_LIMIT
+        from app.database import get_daily_win, update_daily_win, init_daily_win_record
+        daily_win_record = get_daily_win(user_id_str)
+        if daily_win_record is None:
+            init_daily_win_record(user_id_str, username)
+            daily_win_record = {'amount': 0}
+        
+        current_daily_net_win = daily_win_record['amount']
+        remaining_limit = DAILY_NET_WIN_LIMIT - current_daily_net_win
+        
+        if remaining_limit <= 0:
+            # 达到上限，不给予奖励
+            new_balance = get_balance(user_id_str)
+            # 获取当前奖池金额
+            from app.database.jackpot import get_jackpot_pool
             jackpot_amount = get_jackpot_pool()
-            if jackpot_amount > 0:
-                # 奖池金额作为额外奖励
-                jackpot_bonus = min(jackpot_amount, amount * 5)  # 最多额外5倍
-                win_amount += jackpot_bonus
-                set_jackpot_pool(jackpot_amount - jackpot_bonus)  # 从奖池中扣除
-                result += f"\n🎊 奖池奖励：{int(jackpot_bonus)} 🪙"
-        
-        update_balance(user_id_str, win_amount)
-        new_balance = get_balance(user_id_str)
-        
-        # 获取当前奖池金额
-        from app.database.jackpot import get_jackpot_pool
-        jackpot_amount = get_jackpot_pool()
-        
-        result_message = (
-            f"🎰 老虎机游戏结果\n\n"
-            f"{reels[0]} {reels[1]} {reels[2]}\n\n"
-            f"{result}\n"
-            f"获得：{int(win_amount)} 🪙\n"
-            f"当前余额：{new_balance} 🪙\n"
-            f"🎊 当前奖池：{int(jackpot_amount)} 🪙\n\n"
-            f"🎮 游戏规则：\n"
-            f"  - 两个相同：赢0.4倍（抽水10%）\n"
-            f"  - 三个相同：赢2倍（抽水10%）\n"
-            f"  - 7️⃣-BAR-7️⃣：触发Jackpot大奖！5倍 + 奖池\n"
-            f"  - 全不同：输\n\n"
-            f"💰 抽水规则：\n"
-            f"  - 所有中奖情况都扣除10%\n"
-            f"  - 5%给服务器利润，5%注入Jackpot奖池"
-        )
-        # 记录游戏结果
-        add_game_record(user_id_str, 'slot', amount, 'win', int(win_amount), username)
-        # 添加积分
-        add_user_score(user_id_str, 2)
+            
+            result_message = (
+                f"🎰 老虎机游戏结果\n\n"
+                f"{reels[0]} {reels[1]} {reels[2]}\n\n"
+                f"{result}\n"
+                f"⚠️ 今日净赢已达上限!\n"
+                f"每日上限:{DAILY_NET_WIN_LIMIT} 🪙\n"
+                f"今日净赢:{current_daily_net_win} 🪙\n"
+                f"无法获得更多奖励\n"
+                f"当前余额：{new_balance} 🪙\n"
+                f"🎊 当前奖池：{int(jackpot_amount)} 🪙\n\n"
+                f"🎮 游戏规则：\n"
+                f"  - 两个相同：赢0.4倍（抽水10%）\n"
+                f"  - 三个相同：赢2倍（抽水10%）\n"
+                f"  - 7️⃣-BAR-7️⃣：触发Jackpot大奖！5倍 + 奖池\n"
+                f"  - 全不同：输\n\n"
+                f"💰 抽水规则：\n"
+                f"  - 所有中奖情况都扣除10%\n"
+                f"  - 5%给服务器利润，5%注入Jackpot奖池"
+            )
+        else:
+            # 处理JACKPOT奖池
+            if (left_icon == "7️⃣" and center_icon == "BAR" and right_icon == "7️⃣"):
+                # 从奖池中扣除JACKPOT金额
+                from app.database.jackpot import get_jackpot_pool, set_jackpot_pool
+                jackpot_amount = get_jackpot_pool()
+                if jackpot_amount > 0:
+                    # 奖池金额作为额外奖励
+                    jackpot_bonus = min(jackpot_amount, amount * 5)  # 最多额外5倍
+                    win_amount += jackpot_bonus
+                    set_jackpot_pool(jackpot_amount - jackpot_bonus)  # 从奖池中扣除
+                    result += f"\n🎊 奖池奖励：{int(jackpot_bonus)} 🪙"
+            
+            actual_win = min(win_amount, remaining_limit)
+            update_balance(user_id_str, actual_win)
+            update_daily_win(user_id_str, username, actual_win)
+            new_balance = get_balance(user_id_str)
+            new_daily_net_win = current_daily_net_win + actual_win
+            
+            # 获取当前奖池金额
+            from app.database.jackpot import get_jackpot_pool
+            jackpot_amount = get_jackpot_pool()
+            
+            result_message = (
+                f"🎰 老虎机游戏结果\n\n"
+                f"{reels[0]} {reels[1]} {reels[2]}\n\n"
+                f"{result}\n"
+                f"获得：{int(actual_win)} 🪙\n"
+                f"当前余额：{new_balance} 🪙\n"
+                f"📊 今日净赢:{new_daily_net_win}/{DAILY_NET_WIN_LIMIT} 🪙\n"
+                f"🎊 当前奖池：{int(jackpot_amount)} 🪙"
+            )
+            # 记录游戏结果
+            add_game_record(user_id_str, 'slot', amount, 'win', int(actual_win), username)
+            # 添加积分
+            add_user_score(user_id_str, 2)
     else:
         # 输了
         update_balance(user_id_str, -amount)
+        # 输了，更新净赢记录
+        from app.database import update_daily_win
+        update_daily_win(user_id_str, username, -amount)
         
         new_balance = get_balance(user_id_str)
+        
+        # 获取最新的净赢记录
+        from app.database import get_daily_win
+        from main import DAILY_NET_WIN_LIMIT
+        daily_win_record = get_daily_win(user_id_str)
+        current_daily_net_win = daily_win_record['amount'] if daily_win_record else 0
         
         # 获取当前奖池金额
         from app.database.jackpot import get_jackpot_pool
@@ -768,6 +846,7 @@ async def process_slot(update: Update, context: ContextTypes.DEFAULT_TYPE, amoun
             f"{result}\n"
             f"扣除：{amount} 🪙\n"
             f"当前余额：{new_balance} 🪙\n"
+            f"📊 今日净赢:{current_daily_net_win}/{DAILY_NET_WIN_LIMIT} 🪙\n"
             f"🎊 当前奖池：{int(jackpot_amount)} 🪙\n\n"
             f"🎮 游戏规则：\n"
             f"  - 两个相同：赢0.4倍（抽水10%）\n"
@@ -1107,34 +1186,71 @@ async def stand_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             service_fee = int(win_amount * 0.1)
             net_win = win_amount - service_fee
             
-            # 更新余额
-            update_balance(user_id, net_win)
+            # 检查每日净赢取上限
+            from main import DAILY_NET_WIN_LIMIT
+            from app.database import get_daily_win, update_daily_win, init_daily_win_record
+            daily_win_record = get_daily_win(user_id)
+            if daily_win_record is None:
+                init_daily_win_record(user_id, username)
+                daily_win_record = {'amount': 0}
             
-            new_balance = get_balance(user_id)
+            current_daily_net_win = daily_win_record['amount']
+            remaining_limit = DAILY_NET_WIN_LIMIT - current_daily_net_win
             
-            # 构建结果消息
-            result_message = (
-                f"🎲 21点游戏结果\n\n"
-                f"您的牌：{format_blackjack_cards(player_cards)} (点数：{player_score})\n"
-                f"庄家的牌：{format_blackjack_cards(dealer_cards)} (点数：{dealer_score})\n\n"
-            )
-            
-            if dealer_score > 21:
-                result_message += "🎉 庄家爆牌了！您赢了！\n"
+            if remaining_limit <= 0:
+                # 达到上限，不给予奖励
+                new_balance = get_balance(user_id)
+                
+                # 构建结果消息
+                result_message = (
+                    f"🎲 21点游戏结果\n\n"
+                    f"您的牌：{format_blackjack_cards(player_cards)} (点数：{player_score})\n"
+                    f"庄家的牌：{format_blackjack_cards(dealer_cards)} (点数：{dealer_score})\n\n"
+                )
+                
+                if dealer_score > 21:
+                    result_message += "🎉 庄家爆牌了！您赢了！\n"
+                else:
+                    result_message += "🎉 您赢了！\n"
+                
+                result_message += f"⚠️ 今日净赢已达上限!\n"
+                result_message += f"每日上限:{DAILY_NET_WIN_LIMIT} 🪙\n"
+                result_message += f"今日净赢:{current_daily_net_win} 🪙\n"
+                result_message += f"无法获得更多奖励\n"
+                result_message += f"当前余额：{new_balance} 🪙"
             else:
-                result_message += "🎉 您赢了！\n"
-            
-            result_message += f"获得：{win_amount} 🪙\n"
-            result_message += f"服务费：{service_fee} 🪙\n"
-            result_message += f"实际到账：{net_win} 🪙\n"
-            result_message += f"当前余额：{new_balance} 🪙"
-            
-            # 记录游戏结果
-            from app.database import add_game_record
-            add_game_record(user_id, 'blackjack', amount, 'win', net_win, username)
-            # 添加积分
-            from app.database.user_score import add_user_score
-            add_user_score(user_id, 3)
+                actual_win = min(net_win, remaining_limit)
+                # 更新余额
+                update_balance(user_id, actual_win)
+                update_daily_win(user_id, username, actual_win)
+                
+                new_balance = get_balance(user_id)
+                new_daily_net_win = current_daily_net_win + actual_win
+                
+                # 构建结果消息
+                result_message = (
+                    f"🎲 21点游戏结果\n\n"
+                    f"您的牌：{format_blackjack_cards(player_cards)} (点数：{player_score})\n"
+                    f"庄家的牌：{format_blackjack_cards(dealer_cards)} (点数：{dealer_score})\n\n"
+                )
+                
+                if dealer_score > 21:
+                    result_message += "🎉 庄家爆牌了！您赢了！\n"
+                else:
+                    result_message += "🎉 您赢了！\n"
+                
+                result_message += f"获得：{win_amount} 🪙\n"
+                result_message += f"服务费：{service_fee} 🪙\n"
+                result_message += f"实际到账：{actual_win} 🪙\n"
+                result_message += f"当前余额：{new_balance} 🪙\n"
+                result_message += f"📊 今日净赢:{new_daily_net_win}/{DAILY_NET_WIN_LIMIT} 🪙"
+                
+                # 记录游戏结果
+                from app.database import add_game_record
+                add_game_record(user_id, 'blackjack', amount, 'win', actual_win, username)
+                # 添加积分
+                from app.database.user_score import add_user_score
+                add_user_score(user_id, 3)
         elif player_score < dealer_score:
             # 玩家输
             # 重置连胜
@@ -1142,14 +1258,26 @@ async def stand_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             update_user_streak(user_id, local_user_id, 'blackjack', False)
             
             update_balance(user_id, -amount)
+            # 输了，更新净赢记录
+            from app.database import update_daily_win
+            update_daily_win(user_id, username, -amount)
+            
             new_balance = get_balance(user_id)
+            
+            # 获取最新的净赢记录
+            from app.database import get_daily_win
+            from main import DAILY_NET_WIN_LIMIT
+            daily_win_record = get_daily_win(user_id)
+            current_daily_net_win = daily_win_record['amount'] if daily_win_record else 0
+            
             result_message = (
                 f"🎲 21点游戏结果\n\n"
                 f"您的牌：{format_blackjack_cards(player_cards)} (点数：{player_score})\n"
                 f"庄家的牌：{format_blackjack_cards(dealer_cards)} (点数：{dealer_score})\n\n"
                 f"😢 您输了！\n"
                 f"扣除：{amount} 🪙\n"
-                f"当前余额：{new_balance} 🪙"
+                f"当前余额：{new_balance} 🪙\n"
+                f"📊 今日净赢:{current_daily_net_win}/{DAILY_NET_WIN_LIMIT} 🪙"
             )
             # 记录游戏结果
             from app.database import add_game_record
@@ -1750,10 +1878,10 @@ async def process_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE, a
                                         f"✅ 提现申请成功！\n\n"
                                         f"📋 订单号：`{order_no}`\n"
                                         f"🥕 提现萝卜：{carrot_amount}\n"
-                                        f"💼 税费：{tax_carrot} 萝卜（1%）\n"
+                                        f"💼 税费：{tax_carrot * 10} 🪙（1%）\n"
                                         f"🎁 实际到账：{after_tax_carrot} 萝卜\n"
                                         f"🪙 基础游戏币：{base_game_coin}\n"
-                                        f"💸 手续费：{fee_game_coin}\n"
+                                        f"💸 手续费：{fee_game_coin} 🪙\n"
                                         f"💰 扣除游戏币：{total_game_coin}\n"
                                         f"🪙 剩余游戏币：{remaining_balance}\n\n"
                                         f"📊 剩余可提现额度：{remaining_withdraw_limit} 🥕\n"
@@ -1902,19 +2030,19 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return True
     elif data == 'guess':
         # 处理猜大小游戏
-        await query.edit_message_text("🎲 猜大小游戏\n\n请输入下注金额，例如：`/guess 10`\n\n直接复制：`/guess 10`")
+        await query.edit_message_text("🎲 猜大小游戏\n\n请输入下注金额，例如：`/guess 10`\n\n直接复制：`/guess 10`", parse_mode='Markdown')
         return True
     elif data == 'shoot':
         # 处理猜拳游戏
-        await query.edit_message_text("✊ 猜拳游戏\n\n请输入下注金额，例如：`/shoot 10`\n\n直接复制：`/shoot 10`")
+        await query.edit_message_text("✊ 猜拳游戏\n\n请输入下注金额，例如：`/shoot 10`\n\n直接复制：`/shoot 10`", parse_mode='Markdown')
         return True
     elif data == 'slot':
         # 处理老虎机游戏
-        await query.edit_message_text("🎰 老虎机游戏\n\n请输入下注金额，例如：`/slot 10`\n\n直接复制：`/slot 10`")
+        await query.edit_message_text("🎰 老虎机游戏\n\n请输入下注金额，例如：`/slot 10`\n\n直接复制：`/slot 10`", parse_mode='Markdown')
         return True
     elif data == 'blackjack':
         # 处理21点游戏
-        await query.edit_message_text("🃏 21点游戏\n\n请输入下注金额，例如：`/blackjack 10`\n\n直接复制：`/blackjack 10`")
+        await query.edit_message_text("🃏 21点游戏\n\n请输入下注金额，例如：`/blackjack 10`\n\n直接复制：`/blackjack 10`", parse_mode='Markdown')
         return True
     
     # 处理其他游戏相关的回调

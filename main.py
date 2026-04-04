@@ -61,6 +61,9 @@ from telegram.ext import (
 # 导入HTTP客户端
 from utils.http_client import http_client
 
+# 每日从AI游戏净赢取上限
+DAILY_NET_WIN_LIMIT = 10000
+
 # 确保只有一个实例运行
 def ensure_single_instance():
     """确保只有一个实例运行"""
@@ -173,6 +176,7 @@ from app.handlers.command_handlers import (
     blackjack_handler, hit_handler, stand_handler, message_handler, withdraw_handler
 )
 from handlers.robbery import robbery_handler, robbery_status_handler
+from handlers.card_games import cardduel_handler, join_cardduel_handler
 from handlers.redpacket_query import WAITING_QUERY_TYPE
 from handlers.redpacket_query import check_redpacket_command, get_redpacket_id, handle_query_type
 from games.lottery import (
@@ -1090,40 +1094,77 @@ async def process_guess_result(update: Update, dice_value: int, amount: int, gue
         service_fee = int(win_amount * 0.1)
         net_win = win_amount - service_fee
         
-        result_text = (
-            f"🎲 *猜大小游戏结束\n"
-            f"━━━━━━━━━━━━━━━━━━\n\n"
-            f"🎯 您的选择:`{guess}`\n"
-            f"🎲 骰子点数:`{dice_value}`({actual_result})\n\n"
-            f"?*您赢了!*\n"
-            f"💰 获得:`{win_amount}` 🪙\n"
-            f"💸 服务费:`{service_fee}` 🪙\n"
-            f"💵 实际到账:`{net_win}` 🪙\n\n"
-            f"{streak_text}\n"
-            f"📊 战绩:{streak_info['total_wins']}?{streak_info['total_losses']}败\n"
-            f"💎 当前余额:`{current_balance + net_win}` 🪙\n\n"
-            f"━━━━━━━━━━━━━━━━━━"
-        )
+        # 检查每日净赢取上限
+        from app.database import get_daily_win, init_daily_win_record, update_daily_win
+        daily_win_record = get_daily_win(emos_user_id)
+        if daily_win_record is None:
+            init_daily_win_record(emos_user_id, '')
+            daily_win_record = {'amount': 0}
+        
+        current_daily_net_win = daily_win_record['amount']
+        remaining_limit = DAILY_NET_WIN_LIMIT - current_daily_net_win
+        
+        if remaining_limit <= 0:
+            result_text = (
+                f"🎲 猜大小游戏结束\n"
+                f"━━━━━━━━━━━━━━━━━━\n\n"
+                f"🎯 您的选择:`{guess}`\n"
+                f"🎲 骰子点数:`{dice_value}`({actual_result})\n\n"
+                f"🎉 您赢了!\n"
+                f"⚠️ 今日净赢已达上限!\n"
+                f"每日上限:{DAILY_NET_WIN_LIMIT} 🪙\n"
+                f"今日净赢:{current_daily_net_win} 🪙\n"
+                f"无法获得更多奖励\n\n"
+                f"━━━━━━━━━━━━━━━━━━"
+            )
+        else:
+            actual_win = min(net_win, remaining_limit)
+            update_daily_win(emos_user_id, '', actual_win)
+            new_daily_net_win = current_daily_net_win + actual_win
+            
+            result_text = (
+                f"🎲 猜大小游戏结束\n"
+                f"━━━━━━━━━━━━━━━━━━\n\n"
+                f"🎯 您的选择:`{guess}`\n"
+                f"🎲 骰子点数:`{dice_value}`({actual_result})\n\n"
+                f"🎉 您赢了!\n"
+                f"💰 获得:`{win_amount}` 🪙\n"
+                f"💸 服务费:`{service_fee}` 🪙\n"
+                f"💵 实际到账:`{actual_win}` 🪙\n\n"
+                f"{streak_text}\n"
+                f"📊 战绩:{streak_info['total_wins']}胜{streak_info['total_losses']}败\n"
+                f"💎 当前余额:`{current_balance + actual_win}` 🪙\n"
+                f"📊 今日净赢:{new_daily_net_win}/{DAILY_NET_WIN_LIMIT} 🪙\n\n"
+                f"━━━━━━━━━━━━━━━━━━"
+            )
     else:
         # 输了, 失去下注金额
+        from app.database import update_daily_win
+        update_daily_win(emos_user_id, '', -amount)
+        
+        # 获取最新的净赢记录
+        from app.database import get_daily_win
+        daily_win_record = get_daily_win(emos_user_id)
+        current_daily_net_win = daily_win_record['amount'] if daily_win_record else 0
         
         result_text = (
-            f"🎲 *猜大小游戏结束\n"
+            f"🎲 猜大小游戏结束\n"
             f"━━━━━━━━━━━━━━━━━━\n\n"
             f"🎯 您的选择:`{guess}`\n"
             f"🎲 骰子点数:`{dice_value}`({actual_result})\n\n"
-            f"?*您输了!*\n"
+            f"😢 您输了!\n"
             f"💸 扣除:`{amount}` 🪙\n\n"
             f"{streak_text}\n"
-            f"📊 战绩:{streak_info['total_wins']}?{streak_info['total_losses']}败\n"
-            f"💎 当前余额:`{current_balance - amount}` 🪙\n\n"
+            f"📊 战绩:{streak_info['total_wins']}胜{streak_info['total_losses']}败\n"
+            f"💎 当前余额:`{current_balance - amount}` 🪙\n"
+            f"📊 今日净赢:{current_daily_net_win}/{DAILY_NET_WIN_LIMIT} 🪙\n\n"
             f"━━━━━━━━━━━━━━━━━━"
         )
     
     # 尝试更新数据库(异步, 不阻塞主流程)
     async def update_database():
         try:
-            from app.database import update_balance, add_game_record
+            from app.database import update_balance, add_game_record, get_daily_win, update_daily_win, init_daily_win_record
             from app.config import user_tokens
             
             # 获取用户信息
@@ -1136,14 +1177,29 @@ async def process_guess_result(update: Update, dice_value: int, amount: int, gue
                 service_fee = int(win_amount * 0.1)
                 net_win = win_amount - service_fee
                 
-                # 更新余额
-                update_balance(emos_user_id, net_win)
+                # 检查每日净赢取上限
+                daily_win_record = get_daily_win(emos_user_id)
+                if daily_win_record is None:
+                    init_daily_win_record(emos_user_id, username)
+                    daily_win_record = {'amount': 0}
+                
+                current_daily_net_win = daily_win_record['amount']
+                remaining_limit = DAILY_NET_WIN_LIMIT - current_daily_net_win
+                
+                if remaining_limit > 0:
+                    actual_win = min(net_win, remaining_limit)
+                    # 更新余额
+                    update_balance(emos_user_id, actual_win)
+                    # 更新每日净赢记录
+                    update_daily_win(emos_user_id, username, actual_win)
                 # 记录游戏结果
                 add_game_record(emos_user_id, "guess", amount, "win", net_win, username)
             else:
                 # 输了
                 # 更新余额
                 update_balance(emos_user_id, -amount)
+                # 更新每日净赢记录
+                update_daily_win(emos_user_id, username, -amount)
                 # 记录游戏结果
                 add_game_record(emos_user_id, "guess", amount, "lose", 0, username)
             
@@ -1630,7 +1686,7 @@ async def start_shoot_ai(update: Update, context: ContextTypes.DEFAULT_TYPE, use
     # 创建内联键盘
     keyboard = [
         [
-            InlineKeyboardButton("?石头", callback_data=f"shoot_ai_rock_{amount}"),
+            InlineKeyboardButton("✊ 石头", callback_data=f"shoot_ai_rock_{amount}"),
             InlineKeyboardButton("✌️ 剪刀", callback_data=f"shoot_ai_scissors_{amount}"),
             InlineKeyboardButton("🖐 布", callback_data=f"shoot_ai_paper_{amount}")
         ]
@@ -1661,7 +1717,7 @@ async def start_shoot_duel(update: Update, context: ContextTypes.DEFAULT_TYPE, u
     # 创建内联键盘
     keyboard = [
         [
-            InlineKeyboardButton("?石头", callback_data=f"shoot_duel_rock_{game_id}"),
+            InlineKeyboardButton("✊ 石头", callback_data=f"shoot_duel_rock_{game_id}"),
             InlineKeyboardButton("✌️ 剪刀", callback_data=f"shoot_duel_scissors_{game_id}"),
             InlineKeyboardButton("🖐 布", callback_data=f"shoot_duel_paper_{game_id}")
         ]
@@ -1720,7 +1776,7 @@ async def create_shoot_game_with_buttons(update: Update, context: ContextTypes.D
     # 创建选择按钮
     keyboard = [
         [
-            InlineKeyboardButton("?石头", callback_data=f"shoot_group_rock_{chat_id}"),
+            InlineKeyboardButton("✊ 石头", callback_data=f"shoot_group_rock_{chat_id}"),
             InlineKeyboardButton("✌️ 剪刀", callback_data=f"shoot_group_scissors_{chat_id}"),
             InlineKeyboardButton("🖐 布", callback_data=f"shoot_group_paper_{chat_id}")
         ]
@@ -2157,9 +2213,9 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         total_recharge = context.user_data.get('total_recharge', 0)
                         remaining_recharge = context.user_data.get('remaining_recharge', 100)
                         
-                        if total_recharge + amount > 100:
-                            remaining = 100 - total_recharge
-                            await update.message.reply_text(f"充值限额为100萝卜, 您已累计充值{total_recharge}萝卜, 还可充值{remaining}萝卜")
+                        if total_recharge + amount > 1500:
+                            remaining = 1500 - total_recharge
+                            await update.message.reply_text(f"充值限额为1500萝卜, 您已累计充值{total_recharge}萝卜, 还可充值{remaining}萝卜")
                             return
                         
                         # 从context中获取用户信?
@@ -3049,50 +3105,88 @@ async def shoot_callback_handler(update: Update, context: ContextTypes.DEFAULT_T
         emos_username = user_info.get('username', update.effective_user.first_name)
         
         # 处理结果
-        from app.database import get_balance, update_balance, add_game_record
+        from app.database import get_balance, update_balance, add_game_record, get_daily_win, update_daily_win, init_daily_win_record
         if result == 'win':
             win_amount = amount
             service_fee = int(win_amount * 0.1)
             net_win = win_amount - service_fee
-            update_balance(emos_user_id, net_win)
-            new_balance = get_balance(emos_user_id)
-            result_text = (
-                f"🎮 猜拳结果 - 挑战天道\n\n"
-                f"您选择:{user_choice} {get_choice_emoji(user_choice)} 🎉\n"
-                f"天道选择:{ai_choice} {get_choice_emoji(ai_choice)} 😢\n\n"
-                f"🎉 您赢了!\n"
-                f"获得:{win_amount} 🪙\n"
-                f"服务费:{service_fee} 🪙\n"
-                f"实际到账:{net_win} 🪙\n"
-                f"当前余额:{new_balance} 🪙"
-            )
+            
+            # 检查每日净赢取上限
+            daily_win_record = get_daily_win(emos_user_id)
+            if daily_win_record is None:
+                init_daily_win_record(emos_user_id, emos_username)
+                daily_win_record = {'amount': 0}
+            
+            current_daily_net_win = daily_win_record['amount']
+            remaining_limit = DAILY_NET_WIN_LIMIT - current_daily_net_win
+            
+            if remaining_limit <= 0:
+                result_text = (
+                    f"🎮 猜拳结果 - 挑战天道\n\n"
+                    f"您选择:{user_choice} {get_choice_emoji(user_choice)} 🎉\n"
+                    f"天道选择:{ai_choice} {get_choice_emoji(ai_choice)} 😢\n\n"
+                    f"🎉 您赢了!\n"
+                    f"⚠️ 今日净赢已达上限!\n"
+                    f"每日上限:{DAILY_NET_WIN_LIMIT} 🪙\n"
+                    f"今日净赢:{current_daily_net_win} 🪙\n"
+                    f"无法获得更多奖励"
+                )
+            else:
+                actual_win = min(net_win, remaining_limit)
+                update_balance(emos_user_id, actual_win)
+                update_daily_win(emos_user_id, emos_username, actual_win)
+                new_balance = get_balance(emos_user_id)
+                new_daily_net_win = current_daily_net_win + actual_win
+                
+                result_text = (
+                    f"🎮 猜拳结果 - 挑战天道\n\n"
+                    f"您选择:{user_choice} {get_choice_emoji(user_choice)} 🎉\n"
+                    f"天道选择:{ai_choice} {get_choice_emoji(ai_choice)} 😢\n\n"
+                    f"🎉 您赢了!\n"
+                    f"获得:{win_amount} 🪙\n"
+                    f"服务费:{service_fee} 🪙\n"
+                    f"实际到账:{actual_win} 🪙\n"
+                    f"当前余额:{new_balance} 🪙\n\n"
+                    f"📊 今日净赢:{new_daily_net_win}/{DAILY_NET_WIN_LIMIT} 🪙"
+                )
             # 添加游戏记录
             add_game_record(emos_user_id, 'shoot', amount, 'win', net_win, emos_username)
         elif result == 'lose':
             update_balance(emos_user_id, -amount)
+            # 输了，减少净赢记录
+            update_daily_win(emos_user_id, emos_username, -amount)
             new_balance = get_balance(emos_user_id)
+            
+            # 获取最新的净赢记录
+            daily_win_record = get_daily_win(emos_user_id)
+            current_daily_net_win = daily_win_record['amount'] if daily_win_record else 0
+            
             result_text = (
                 f"🎮 猜拳结果 - 挑战天道\n\n"
                 f"您选择:{user_choice} {get_choice_emoji(user_choice)} 😢\n"
                 f"天道选择:{ai_choice} {get_choice_emoji(ai_choice)} 🎉\n\n"
                 f"😢 您输了!\n"
                 f"扣除:{amount} 🪙\n"
-                f"当前余额:{new_balance} 🪙"
+                f"当前余额:{new_balance} 🪙\n\n"
+                f"📊 今日净赢:{current_daily_net_win}/{DAILY_NET_WIN_LIMIT} 🪙"
             )
             # 添加游戏记录
             add_game_record(emos_user_id, 'shoot', amount, 'lose', -amount, emos_username)
         else:
+            # 平局，双方各收5%的税
+            tax = int(amount * 0.05)
+            update_balance(emos_user_id, -tax)
             new_balance = get_balance(emos_user_id)
             result_text = (
                 f"🎮 猜拳结果 - 挑战天道\n\n"
                 f"您选择:{user_choice} {get_choice_emoji(user_choice)} 🤝\n"
                 f"天道选择:{ai_choice} {get_choice_emoji(ai_choice)} 🤝\n\n"
                 f"🤝 平局!\n"
-                f"不扣除游戏币\n"
+                f"扣除服务费:{tax} 🪙\n"
                 f"当前余额:{new_balance} 🪙"
             )
             # 添加游戏记录
-            add_game_record(emos_user_id, 'shoot', amount, 'draw', 0, emos_username)
+            add_game_record(emos_user_id, 'shoot', amount, 'draw', -tax, emos_username)
         
         # 添加再次挑战按钮
         keyboard = [[InlineKeyboardButton("🔄 再次挑战", callback_data=f"shoot_ai_retry_{amount}")]]
@@ -4100,6 +4194,32 @@ def main() -> None:
         application.add_handler(CommandHandler("rob", group_command_filter(robbery_handler)))
         application.add_handler(CommandHandler("robstatus", robbery_status_handler))
         print("[DEBUG] 打劫游戏命令添加完成")
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return
+    
+    # ===== 扑克牌游戏命令 =====
+    print("[DEBUG] 添加扑克牌游戏命令...")
+    try:
+        from handlers.card_games import cardduel_callback_handler
+        application.add_handler(CommandHandler("cardduel", group_command_filter(cardduel_handler)))
+        application.add_handler(CommandHandler("join", group_command_filter(join_cardduel_handler)))
+        application.add_handler(CallbackQueryHandler(cardduel_callback_handler, pattern="^join_card_"))
+        print("[DEBUG] 扑克牌游戏命令添加完成")
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return
+
+    # ===== 牛牛游戏命令 =====
+    print("[DEBUG] 添加牛牛游戏命令...")
+    try:
+        from handlers.card_games import niuniu_handler, join_niuniu_handler, niuniu_callback_handler
+        application.add_handler(CommandHandler("niuniu", group_command_filter(niuniu_handler)))
+        application.add_handler(CommandHandler("join", group_command_filter(join_niuniu_handler)))
+        application.add_handler(CallbackQueryHandler(niuniu_callback_handler, pattern="^join_niuniu_"))
+        print("[DEBUG] 牛牛游戏命令添加完成")
     except Exception as e:
         import traceback
         traceback.print_exc()

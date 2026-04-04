@@ -5,7 +5,13 @@ from app.database.db import get_db_connection
 from utils.http_client import http_client
 
 # 初始奖池金额
-INITIAL_JACKPOT = 0
+INITIAL_JACKPOT = 100
+
+# 奖池最高金额
+JACKPOOL_MAX = 500
+
+# 奖池每日衰减率
+JACKPOOL_DECAY = 0.90
 
 def get_jackpot_pool():
     """获取当前Jackpot奖池金额"""
@@ -42,19 +48,40 @@ def add_to_jackpot_pool(amount):
     
     try:
         with connection.cursor() as cursor:
+            # 获取当前奖池金额
+            cursor.execute('SELECT pool_amount, updated_at FROM jackpot_pool ORDER BY id LIMIT 1')
+            current_pool = cursor.fetchone()
+            current_amount = current_pool['pool_amount'] if current_pool else 0
+            updated_at = current_pool['updated_at'] if current_pool else None
+            
+            # 检查是否需要每日衰减
+            if updated_at:
+                from datetime import datetime, timedelta
+                last_update = updated_at
+                today = datetime.now().date()
+                last_update_date = last_update.date()
+                
+                # 计算相隔的天数
+                days_diff = (today - last_update_date).days
+                if days_diff > 0:
+                    # 应用每日衰减
+                    for _ in range(days_diff):
+                        current_amount *= JACKPOOL_DECAY
+                    current_amount = int(current_amount)
+            
+            # 奖池最大金额限制
+            new_amount = min(current_amount + amount, JACKPOOL_MAX)
+            
             # 更新奖池金额
             cursor.execute('''
                 UPDATE jackpot_pool 
-                SET pool_amount = pool_amount + %s
+                SET pool_amount = %s, updated_at = NOW()
                 ORDER BY id LIMIT 1
-            ''', (amount,))
+            ''', (new_amount,))
             
-            # 获取更新后的金额
-            cursor.execute('SELECT pool_amount FROM jackpot_pool ORDER BY id LIMIT 1')
-            result = cursor.fetchone()
             connection.commit()
             
-            return result['pool_amount'] if result else INITIAL_JACKPOT
+            return new_amount
     except Exception as e:
         print(f"添加Jackpot奖池金额失败: {e}")
         connection.rollback()

@@ -70,11 +70,17 @@ def reset_user_score(telegram_id):
 
 def get_user_level(score):
     """根据贡献分获取用户等级"""
-    if score >= 10000:
-        return "钻石", 100, 1.0  # 100倍，100%奖池
-    elif score >= 2001:
-        return "黄金", 50, 0.5   # 50倍，50%奖池
-    elif score >= 501:
+    if score >= 50000:
+        return "王者", 100, 1.0  # 100倍，100%奖池
+    elif score >= 30000:
+        return "大师", 80, 0.8   # 80倍，80%奖池
+    elif score >= 20000:
+        return "宗师", 60, 0.6   # 60倍，60%奖池
+    elif score >= 10000:
+        return "钻石", 50, 0.5   # 50倍，50%奖池
+    elif score >= 5000:
+        return "黄金", 30, 0.3   # 30倍，30%奖池
+    elif score >= 1000:
         return "白银", 20, 0.2   # 20倍，20%奖池
     else:
-        return "青铜", 5, 0.05    # 5倍，5%奖池
+        return "青铜", 10, 0.1    # 10倍，10%奖池

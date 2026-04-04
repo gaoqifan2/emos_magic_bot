@@ -804,3 +804,91 @@ def update_user_total_withdraw(user_id, amount):
         return False
     finally:
         connection.close()
+
+
+def get_daily_win(user_id):
+    """获取用户今日从AI游戏赢取的金额"""
+    connection = get_db_connection()
+    if not connection:
+        return {'amount': 0, 'date': None}
+    
+    try:
+        from datetime import datetime
+        today = datetime.now().date()
+        with connection.cursor() as cursor:
+            cursor.execute('''
+                SELECT win_amount, win_date 
+                FROM daily_win_records 
+                WHERE user_id = %s
+            ''', (str(user_id),))
+            
+            result = cursor.fetchone()
+            if result:
+                record_date = result['win_date']
+                if record_date != today:
+                    cursor.execute('''
+                        UPDATE daily_win_records 
+                        SET win_amount = 0, win_date = %s 
+                        WHERE user_id = %s
+                    ''', (today, str(user_id)))
+                    connection.commit()
+                    return {'amount': 0, 'date': today}
+                return {'amount': result['win_amount'], 'date': record_date}
+            else:
+                return None
+    except Exception as e:
+        print(f"获取每日赢取记录失败: {e}")
+        return {'amount': 0, 'date': None}
+    finally:
+        connection.close()
+
+
+def update_daily_win(user_id, username, amount):
+    """更新用户今日从AI游戏赢取的金额"""
+    connection = get_db_connection()
+    if not connection:
+        return False
+    
+    try:
+        from datetime import datetime
+        today = datetime.now().date()
+        with connection.cursor() as cursor:
+            cursor.execute('''
+                INSERT INTO daily_win_records (user_id, username, win_amount, win_date)
+                VALUES (%s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE 
+                    win_amount = win_amount + %s, 
+                    win_date = %s,
+                    username = %s
+            ''', (str(user_id), username, amount, today, amount, today, username))
+            connection.commit()
+            return True
+    except Exception as e:
+        print(f"更新每日赢取记录失败: {e}")
+        connection.rollback()
+        return False
+    finally:
+        connection.close()
+
+
+def init_daily_win_record(user_id, username):
+    """初始化用户每日赢取记录"""
+    connection = get_db_connection()
+    if not connection:
+        return False
+    
+    try:
+        from datetime import datetime
+        today = datetime.now().date()
+        with connection.cursor() as cursor:
+            cursor.execute('''
+                INSERT IGNORE INTO daily_win_records (user_id, username, win_amount, win_date)
+                VALUES (%s, %s, 0, %s)
+            ''', (str(user_id), username, today))
+            connection.commit()
+            return True
+    except Exception as e:
+        print(f"初始化每日赢取记录失败: {e}")
+        return False
+    finally:
+        connection.close()
