@@ -545,6 +545,7 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         redpacket_data['cover_url'] = cover_url
         redpacket_data['file_type'] = 'image'
+        redpacket_data['current_step'] = 'complete'
         
         # 根据当前步骤继续
         return await continue_after_media(update, context)
@@ -615,6 +616,7 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         redpacket_data['cover_url'] = audio_url
         redpacket_data['file_type'] = 'audio'
+        redpacket_data['current_step'] = 'complete'
         
         # 根据当前步骤继续
         return await continue_after_media(update, context)
