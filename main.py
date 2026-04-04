@@ -4022,7 +4022,7 @@ def main() -> None:
                 CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
             ],
             WAITING_CARROT: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_carrot),
+                MessageHandler(filters.TEXT, handle_carrot),
                 MessageHandler(filters.PHOTO, handle_media),
                 MessageHandler(filters.VOICE, handle_media),
                 MessageHandler(filters.AUDIO, handle_media),
@@ -4031,7 +4031,7 @@ def main() -> None:
                 CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
             ],
             WAITING_NUMBER: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_number),
+                MessageHandler(filters.TEXT, handle_number),
                 MessageHandler(filters.PHOTO, handle_media),
                 MessageHandler(filters.VOICE, handle_media),
                 MessageHandler(filters.AUDIO, handle_media),
@@ -4040,7 +4040,7 @@ def main() -> None:
                 CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
             ],
             WAITING_BLESSING: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_blessing),
+                MessageHandler(filters.TEXT, handle_blessing),
                 MessageHandler(filters.PHOTO, handle_media),
                 MessageHandler(filters.VOICE, handle_media),
                 MessageHandler(filters.AUDIO, handle_media),
@@ -4049,7 +4049,7 @@ def main() -> None:
                 CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
             ],
             WAITING_PASSWORD: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_password),
+                MessageHandler(filters.TEXT, handle_password),
                 MessageHandler(filters.PHOTO, handle_media),
                 MessageHandler(filters.VOICE, handle_media),
                 MessageHandler(filters.AUDIO, handle_media),
