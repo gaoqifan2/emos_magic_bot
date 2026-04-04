@@ -256,10 +256,18 @@ async def balance_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 检查是否是群聊
     if update.message and update.message.chat.type in ['group', 'supergroup']:
         # 群聊中不显示余额，只发送提示消息
-        await update.message.reply_text(
-            "余额查询功能仅在私聊中可用。\n\n" 
-            "请在私聊中使用 /balance 命令查看您的余额。"
+        msg = await update.message.reply_text(
+            "💰 余额查询\n\n" 
+            "余额查询功能仅在私聊中可用\n\n" 
+            "请在私聊中使用 /balance 命令查看您的余额"
         )
+        # 1分钟后自动删除消息
+        import asyncio
+        await asyncio.sleep(60)
+        try:
+            await msg.delete()
+        except Exception:
+            pass
         return
     
     # 检查用户是否已登录

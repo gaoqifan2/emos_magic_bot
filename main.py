@@ -444,12 +444,12 @@ async def end_guess_game(chat_id, application):
                 })
         else:
             # 正常情况:计算奖金并分配
-            # 计算输方贡献的奖金(扣除10%服务费)
-            prize_pool = int(losing_total * (1 - TAX_RATE))
-            total_service_fee = int(losing_total * TAX_RATE)
-            # 计算庄家的服务费奖励(1% of total_service_fee)
-            banker_service_fee = int(total_service_fee * 0.03)
-            platform_service_fee = total_service_fee - banker_service_fee
+            # 按照新规则分配：输家3%给庄，7%给平台，剩下90%按赢家下注比例分配
+            banker_fee = int(losing_total * 0.03)  # 庄家获得3%
+            platform_fee = int(losing_total * 0.07)  # 平台获得7%
+            total_service_fee = banker_fee + platform_fee
+            # 剩余部分作为奖池
+            prize_pool = losing_total - total_service_fee
             
             # 处理庄家
             banker_user_info = user_tokens.get(game['banker'])
@@ -462,10 +462,10 @@ async def end_guess_game(chat_id, application):
                     # 庄家赢了
                     # 计算庄家的奖金比例
                     banker_ratio = banker_amount / winning_total
-                    # 计算庄家的奖
+                    # 计算庄家的奖（向下取整）
                     banker_prize = int(prize_pool * banker_ratio)
-                    # 加上3%的服务费奖励
-                    total_banker_prize = banker_prize + banker_service_fee
+                    # 加上3%的服务费
+                    total_banker_prize = banker_prize + banker_fee
                     banker_win_amount = banker_amount + total_banker_prize
                     banker_net_profit = total_banker_prize
                     
@@ -511,7 +511,7 @@ async def end_guess_game(chat_id, application):
                     # 闲家赢了
                     # 计算闲家的奖金比例
                     user_ratio = bet_amount / winning_total
-                    # 计算闲家的奖
+                    # 计算闲家的奖（向下取整）
                     user_prize = int(prize_pool * user_ratio)
                     user_win_amount = bet_amount + user_prize
                     user_net_profit = user_prize
@@ -597,8 +597,8 @@ async def end_guess_game(chat_id, application):
             
             # 显示平台服务费和庄家奖励
             if total_service_fee > 0:
-                result_message += f"💰 平台服务费:{platform_service_fee}(输方总额10%)\n"
-                result_message += f"🎁 庄家服务费奖励:{banker_service_fee}(服务费3%)\n"
+                result_message += f"💰 平台服务费:{platform_fee}(输方总额7%)\n"
+                result_message += f"🎁 庄家服务费奖励:{banker_fee}(输方总额3%)\n"
                 result_message += f"━━━━━━━━━━━━━━━━━━━━━━\n"
         
         # 发送结束
@@ -1250,7 +1250,7 @@ async def guess_bet_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # 检查参与
     if len(args) != 2:
-        await update.message.reply_text("请输入猜测的大小和金额, 例如:`/guess_bet 大 10`\n\n直接复制:`/guess_bet 大 10`", parse_mode='Markdown')
+        await update.message.reply_text("请输入猜测的大小和金额, 例如:`/guess_bet 大 100`\n\n直接复制:`/guess_bet 大 100`", parse_mode='Markdown')
         return
     
     guess = args[0]
@@ -1260,8 +1260,8 @@ async def guess_bet_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     try:
         amount = int(args[1])
-        if amount <= 0:
-            await update.message.reply_text("下注金额必须大于0")
+        if amount < 100:
+            await update.message.reply_text("群聊猜大小游戏最低下注金额为100游戏币")
             return
     except ValueError:
         await update.message.reply_text("请输入有效的数字")
@@ -1394,7 +1394,7 @@ async def createguess_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     # 检查参与
     if len(args) != 2:
-        await update.message.reply_text("请输入猜测的大小和金额, 例如:`/createguess 大 10`\n\n直接复制:`/createguess 大 10`", parse_mode='Markdown')
+        await update.message.reply_text("请输入猜测的大小和金额, 例如:`/createguess 大 100`\n\n直接复制:`/createguess 大 100`", parse_mode='Markdown')
         return
     
     guess = args[0]
@@ -1404,8 +1404,8 @@ async def createguess_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     try:
         amount = int(args[1])
-        if amount <= 0:
-            await update.message.reply_text("下注金额必须大于0")
+        if amount < 100:
+            await update.message.reply_text("群聊猜大小游戏最低下注金额为100游戏币")
             return
     except ValueError:
         await update.message.reply_text("请输入有效的数字")
@@ -1617,9 +1617,9 @@ async def gameshoot_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     if not args:
-        # 没有参数, 提示完整指?
+        # 没有参数, 提示完整指令
         await update.message.reply_text(
-            "?猜拳游戏\n\n"
+            "✊ 猜拳游戏\n\n"
             "请输入完整命令, 例如:\n"
             "`/gameshoot 10`\n\n"
             "直接复制:`/gameshoot 10`",

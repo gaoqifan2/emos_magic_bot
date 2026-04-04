@@ -335,10 +335,10 @@ def add_user(user_id, telegram_id=None, username=None, first_name=None, last_nam
                     token = COALESCE(VALUES(token), token)
             ''', (user_id, telegram_id, username, first_name, last_name, token))
             
-            # 创建余额记录
+            # 创建余额记录，新用户送100游戏币
             cursor.execute('''
                 INSERT IGNORE INTO balances (user_id, balance, username)
-                VALUES (%s, 0, %s)
+                VALUES (%s, 100, %s)
             ''', (user_id, username))
             
             connection.commit()
