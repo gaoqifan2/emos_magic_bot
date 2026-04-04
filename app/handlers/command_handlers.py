@@ -179,6 +179,54 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         from services.service_main import service_withdraw
                         await service_withdraw(update, context)
                 return
+        
+        # 处理支付完成链接请求
+        elif start_param.startswith('emosPayAgree-'):
+            # 解析参数：emosPayAgree-[timestamp][random]-[order_id]-[user_id]
+            parts = start_param.split('-', 3)
+            if len(parts) >= 4:
+                # 获取订单ID和用户ID
+                order_id = parts[2]
+                user_id = parts[3]
+                
+                # 检查订单是否已经处理过
+                from app.database import get_recharge_order_by_platform_no
+                order = get_recharge_order_by_platform_no(order_id)
+                
+                if order:
+                    if order['status'] == 'success':
+                        # 订单已经处理过，不给加余额
+                        await update.message.reply_text("❌ 该订单已经处理过，请勿重复点击链接！")
+                        return
+                    else:
+                        # 订单未处理过，处理支付结果
+                        from app.database import update_recharge_order_status
+                        from app.database import get_balance
+                        
+                        # 更新订单状态为成功
+                        game_coin_amount = order['game_coin_amount']
+                        update_recharge_order_status(order_id, 'success', game_coin_amount)
+                        
+                        # 显示支付成功消息
+                        emos_user_id = order['user_id']
+                        carrot_amount = order['carrot_amount']
+                        new_balance = get_balance(emos_user_id)
+                        
+                        success_message = (
+                            f"🎉 支付成功！\n\n" 
+                            f"订单号：{order_id}\n" 
+                            f"充值金额：{carrot_amount} 萝卜\n" 
+                            f"获得游戏币：{game_coin_amount} 🪙\n" 
+                            f"当前余额：{new_balance} 🪙\n\n" 
+                            f"感谢您的支持！"
+                        )
+                        
+                        await update.message.reply_text(success_message)
+                        return
+                else:
+                    # 订单不存在
+                    await update.message.reply_text("❌ 订单不存在，请检查链接是否正确！")
+                    return
     
     # 显示欢迎消息和菜单（私聊）
     welcome_message = (
@@ -1834,7 +1882,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             try:
                 # 创建充值订单
                 from services.service_main import create_recharge_order
-                result = await create_recharge_order(user_id, carrot_amount)
+                result = await create_recharge_order(user_id, carrot_amount, token=token)
                 
                 if result['success']:
                     # 充值成功

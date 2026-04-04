@@ -792,13 +792,14 @@ async def service_game_center(update: Update, context: ContextTypes.DEFAULT_TYPE
         logger.error("获取游戏列表失败")
         await loading.edit_text("❌ 获取游戏列表失败，请稍后重试")
 
-async def create_recharge_order(user_id, carrot_amount, game_id="1"):
+async def create_recharge_order(user_id, carrot_amount, game_id="1", token=None):
     """创建充值订单
     
     Args:
         user_id: 用户ID
         carrot_amount: 萝卜数量
         game_id: 游戏ID
+        token: 用户token（可选）
     
     Returns:
         dict: 订单信息
@@ -810,8 +811,9 @@ async def create_recharge_order(user_id, carrot_amount, game_id="1"):
         order_no = f"R{datetime.now(beijing_tz).strftime('%Y%m%d')}{str(uuid.uuid4())[:8].upper()}"
         
         # 调用平台API
-        user_info = user_tokens.get(user_id)
-        token = user_info.get('token') if isinstance(user_info, dict) else user_info
+        if not token:
+            user_info = user_tokens.get(user_id)
+            token = user_info.get('token') if isinstance(user_info, dict) else user_info
         if not token:
             return {"success": False, "error": "用户未登录"}
         
