@@ -179,6 +179,7 @@ from app.handlers.command_handlers import (
     start_handler, balance_handler, slot_handler, daily_handler, help_handler, 
     blackjack_handler, hit_handler, stand_handler, message_handler, withdraw_handler
 )
+from handlers.rules import rules_handler
 from handlers.robbery import robbery_handler, robbery_status_handler
 from handlers.card_games import cardduel_handler, join_cardduel_handler
 from handlers.redpacket_query import WAITING_QUERY_TYPE
@@ -3977,6 +3978,7 @@ def main() -> None:
         print("[DEBUG] 添加游戏命令 handlers...")
         application.add_handler(CommandHandler("game", group_command_filter(start_handler)))
         application.add_handler(CommandHandler("balance", group_command_filter(balance_handler)))
+        application.add_handler(CommandHandler("rules", group_command_filter(rules_handler)))
         application.add_handler(CommandHandler("guess", group_command_filter(guess_handler)))
         application.add_handler(CommandHandler("guess_bet", group_command_filter(guess_bet_handler)))
         application.add_handler(CommandHandler("slot", group_command_filter(slot_handler)))
@@ -4231,6 +4233,17 @@ def main() -> None:
         application.add_handler(CommandHandler("join", group_command_filter(join_niuniu_handler)))
         application.add_handler(CallbackQueryHandler(niuniu_callback_handler, pattern="^join_niuniu_"))
         print("[DEBUG] 牛牛游戏命令添加完成")
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return
+
+    # ===== 游戏规则命令 =====
+    print("[DEBUG] 添加游戏规则命令...")
+    try:
+        from handlers.rules import rules_handler
+        application.add_handler(CommandHandler("rules", group_command_filter(rules_handler)))
+        print("[DEBUG] 游戏规则命令添加完成")
     except Exception as e:
         import traceback
         traceback.print_exc()
