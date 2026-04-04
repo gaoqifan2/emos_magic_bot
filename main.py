@@ -180,7 +180,6 @@ from app.handlers.command_handlers import (
     start_handler, balance_handler, slot_handler, daily_handler, help_handler, 
     blackjack_handler, hit_handler, stand_handler, message_handler, withdraw_handler
 )
-from handlers.rules import rules_handler
 from handlers.robbery import robbery_handler, robbery_status_handler
 from handlers.card_games import cardduel_handler, join_cardduel_handler
 from handlers.redpacket_query import WAITING_QUERY_TYPE
