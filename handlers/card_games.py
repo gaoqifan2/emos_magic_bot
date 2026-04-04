@@ -604,6 +604,9 @@ async def start_niuniu_group_game_countdown(chat_id: int, context: ContextTypes.
             change = -each_loser_loss
             balance_changes.append(f"  • 👤 {player_data['name']}：{player_balance - change} → {player_balance} 🪙 ({change} 🪙)")
     
+    # 构建余额变动文本
+    balance_changes_text = '\n'.join(balance_changes)
+    
     result_text += (
         f"\n🎉 {winner_name} 获胜！\n\n"
         f"💰 奖金明细：\n"
@@ -615,7 +618,7 @@ async def start_niuniu_group_game_countdown(chat_id: int, context: ContextTypes.
         f"  • 实际获得：{net_win} 🪙\n"
         f"  • 赢家余额：{winner_balance} 🪙\n\n"
         f"📊 余额变动：\n"
-        f"{'\n'.join(balance_changes)}"
+        f"{balance_changes_text}"
     )
     
     # 更新消息
@@ -1039,6 +1042,9 @@ async def start_group_card_game_countdown(chat_id: int, context: ContextTypes.DE
             change = -game['amount']
             balance_changes.append(f"  • 👤 {player_data['name']}：{player_balance - change} → {player_balance} 🪙 ({change} 🪙)")
     
+    # 构建余额变动文本
+    balance_changes_text = '\n'.join(balance_changes)
+    
     result_text += (
         f"\n🎉 {winner_name} 获胜！\n\n"
         f"💰 奖金明细：\n"
@@ -1047,7 +1053,7 @@ async def start_group_card_game_countdown(chat_id: int, context: ContextTypes.DE
         f"  • 实际获得：{net_win} 🪙\n"
         f"  • 赢家余额：{winner_balance} 🪙\n\n"
         f"📊 余额变动：\n"
-        f"{'\n'.join(balance_changes)}"
+        f"{balance_changes_text}"
     )
     
     # 更新消息
