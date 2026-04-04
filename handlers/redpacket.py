@@ -820,17 +820,40 @@ async def create_redpacket(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     await update.callback_query.message.reply_text(message, parse_mode="Markdown", reply_markup=reply_markup)
         else:
             # 尝试编辑消息显示失败信息
+            error_message = f"❌ 创建失败，状态码：{response.status_code}"
+            # 尝试解析 API 返回的错误信息
+            if response.text:
+                try:
+                    error_data = response.json()
+                    if 'error' in error_data:
+                        # 翻译常见的错误信息
+                        error_msg = error_data['error']
+                        if error_msg == '红包口令重复':
+                            error_message = "❌ 创建失败：红包口令重复，请使用其他口令"
+                        elif error_msg == '余额不足':
+                            error_message = "❌ 创建失败：余额不足，请先充值"
+                        elif error_msg == '参数错误':
+                            error_message = "❌ 创建失败：参数错误，请检查输入"
+                        elif error_msg == '红包金额超出限制':
+                            error_message = "❌ 创建失败：红包金额超出限制"
+                        elif error_msg == '红包人数超出限制':
+                            error_message = "❌ 创建失败：红包人数超出限制"
+                        else:
+                            error_message = f"❌ 创建失败：{error_msg}"
+                except Exception:
+                    # 如果解析失败，使用原始状态码
+                    pass
+                logger.error(f"API返回: {response.text}")
+            
             try:
-                await loading.edit_text(f"❌ 创建失败，状态码：{response.status_code}")
+                await loading.edit_text(error_message)
             except Exception as edit_error:
                 logger.error(f"编辑消息失败: {edit_error}")
                 # 尝试发送新消息
                 if update.message:
-                    await update.message.reply_text(f"❌ 创建失败，状态码：{response.status_code}")
+                    await update.message.reply_text(error_message)
                 else:
-                    await update.callback_query.message.reply_text(f"❌ 创建失败，状态码：{response.status_code}")
-            if response.text:
-                logger.error(f"API返回: {response.text}")
+                    await update.callback_query.message.reply_text(error_message)
     except Exception as e:
         logger.error(f"创建红包失败: {e}")
         import traceback
