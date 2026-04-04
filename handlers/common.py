@@ -122,12 +122,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 logger.info(f"Token已存储到user_tokens: 包含非ASCII字符")
             
             # 获取用户信息
-            import requests
             try:
                 api_url = f"{Config.API_BASE_URL}/user"
                 headers = {"Authorization": f"Bearer {token}"}
                 logger.info(f"API请求头: {headers}")
-                response = requests.get(api_url, headers=headers)
+                response = await http_client.get(api_url, headers=headers, timeout=10)
                 logger.info(f"API响应状态码: {response.status_code}")
                 if response.status_code == 200:
                     user_data = response.json()
@@ -205,12 +204,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         except UnicodeEncodeError:
             logger.info(f"Token已存储到user_tokens: 包含非ASCII字符")
         # 获取用户信息
-        import requests
         try:
             api_url = f"{Config.API_BASE_URL}/user"
             headers = {"Authorization": f"Bearer {token}"}
             logger.info(f"API请求头: {headers}")
-            response = requests.get(api_url, headers=headers)
+            response = await http_client.get(api_url, headers=headers, timeout=10)
             logger.info(f"API响应状态码: {response.status_code}")
             if response.status_code == 200:
                 user_data = response.json()
@@ -232,7 +230,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     telegram_id=user_id,
                     username=username,
                     first_name=update.effective_user.first_name,
-                last_name=update.effective_user.last_name
+                    last_name=update.effective_user.last_name
                 )
                 logger.info(f"用户 {user_id} 数据库操作结果: local_user_id={local_user_id}")
                 
@@ -495,11 +493,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         # 存储为字典类型，以匹配游戏模块的期望格式
         user_tokens[user_id] = {'token': token, 'user_id': str(user_id), 'username': update.effective_user.username, 'first_name': update.effective_user.first_name, 'last_name': update.effective_user.last_name}
         # 获取用户信息
-        import requests
         try:
             api_url = f"{Config.API_BASE_URL}/user"
             headers = {"Authorization": f"Bearer {token}"}
-            response = requests.get(api_url, headers=headers)
+            response = await http_client.get(api_url, headers=headers, timeout=10)
             if response.status_code == 200:
                 user_data = response.json()
                 username = user_data.get('username', '用户')
@@ -516,7 +513,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     telegram_id=user_id,
                     username=username,
                     first_name=update.effective_user.first_name,
-                last_name=update.effective_user.last_name
+                    last_name=update.effective_user.last_name
                 )
                 logger.info(f"用户 {user_id} 数据库操作结果: local_user_id={local_user_id}")
                 
@@ -550,11 +547,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             token = user_info.get('token')
         else:
             token = user_info
-        import requests
         try:
             api_url = f"{Config.API_BASE_URL}/user"
             headers = {"Authorization": f"Bearer {token}"}
-            response = requests.get(api_url, headers=headers)
+            response = await http_client.get(api_url, headers=headers, timeout=10)
             if response.status_code == 200:
                 user_data = response.json()
                 username = user_data.get('username', '用户')
@@ -873,9 +869,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # 获取用户余额
         balance = "未知"
         try:
-            import requests
             headers = {"Authorization": f"Bearer {token}"}
-            response = requests.get(
+            response = await http_client.get(
                 f"{Config.API_BASE_URL}/user",
                 headers=headers,
                 timeout=5
@@ -960,9 +955,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # 获取用户余额
             balance = "未知"
             try:
-                import requests
                 headers = {"Authorization": f"Bearer {token}"}
-                response = requests.get(
+                response = await http_client.get(
                     f"{Config.API_BASE_URL}/user",
                     headers=headers,
                     timeout=5

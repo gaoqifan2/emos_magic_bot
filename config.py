@@ -162,3 +162,19 @@ def init_r2_client():
 
 # 全局R2客户端
 # r2_client = init_r2_client()
+
+# 提现限制配置
+# 实际提现限制是累计充值的3倍，这里保留配置结构
+WITHDRAW_LIMITS = {
+    "daily": 0,  # 无每日限制
+    "monthly": 0,  # 无每月限制
+    "lifetime": 0  # 实际为累计充值的3倍
+}
+
+# 充值限制配置
+# 累计充值限额为1000萝卜
+RECHARGE_LIMITS = {
+    "daily": 0,  # 无每日限制
+    "monthly": 0,  # 无每月限制
+    "lifetime": 1000  # 累计充值上限1000萝卜
+}

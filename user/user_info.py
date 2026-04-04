@@ -54,13 +54,12 @@ async def get_user_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
         headers = {"Authorization": f"Bearer {token}"}
         logger.info(f"请求头: {headers}")
         
-        # 使用同步的 requests 库
-        import requests
         logger.info("开始发送请求...")
-        response = requests.get(api_url, headers=headers)
+        response = await http_client.get(api_url, headers=headers, timeout=10)
         logger.info(f"请求完成，状态码: {response.status_code}")
         
-        logger.info(f"响应内容: {response.text}")
+        response_text = await response.aread()
+        logger.info(f"响应内容: {response_text.decode('utf-8')}")
         
         if response.status_code == 200:
             user_data = response.json()
@@ -623,9 +622,8 @@ async def toggle_show_empty(update: Update, context: ContextTypes.DEFAULT_TYPE):
     is_show_empty = True  # 默认显示
     if token:
         try:
-            import requests
             headers = {"Authorization": f"Bearer {token}"}
-            response = requests.get(
+            response = await http_client.get(
                 f"{Config.API_BASE_URL}/user",
                 headers=headers,
                 timeout=5
