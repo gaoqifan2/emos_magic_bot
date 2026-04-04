@@ -2220,6 +2220,8 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         if total_recharge + amount > 1500:
                             remaining = 1500 - total_recharge
                             await update.message.reply_text(f"充值限额为1500萝卜, 您已累计充值{total_recharge}萝卜, 还可充值{remaining}萝卜")
+                            # 清理用户操作数据
+                            clear_operation_data(context)
                             return
                         
                         # 从context中获取用户信?
@@ -2307,6 +2309,9 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                                 
                                                 # 保存订单到本地数据库
                                                 logger.info(f"开始创建充值订? local_order_no={local_order_no}, platform_order_no={order_no}, emos_user_id={emos_user_id}, username={username}")
+                                                
+                                                # 清理用户操作数据
+                                                clear_operation_data(context)
                                                 success = create_recharge_order(
                                                     order_no=local_order_no,
                                                     emos_user_id=emos_user_id,
@@ -2367,8 +2372,10 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 except ValueError:
                     await update.message.reply_text("请输入有效的数字, 请重新输入")
                     return 104  # 继续等待金额输入
-            else:
-                await update.message.reply_text("请先登录!发送 /start 登录")
+                else:
+                    await update.message.reply_text("请先登录!发送 /start 登录")
+                    # 清理用户操作数据
+                    clear_operation_data(context)
             
             # 注意:这里不应该有代码, 因为前面?if-elif 链已经结束
             # 提现处理应该在单独的 elif 分支?
