@@ -2220,6 +2220,10 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     input_text = update.message.text.strip()
     
+    # 检查是否是群聊，如果是群聊，不处理私聊操作
+    if update.message and update.message.chat.type in ['group', 'supergroup']:
+        return
+    
     # 首先检查是否有游戏状态需要处?
     # 检查是否在等待猜大小游戏的输入(使用全局字典?
     user_id = update.effective_user.id
