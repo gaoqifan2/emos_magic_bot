@@ -1883,13 +1883,43 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text("❌ 请输入有效的数字，请重新输入：")
                 return
             
+            # 检查用户是否为服务商
+            is_service = False
+            try:
+                headers = {"Authorization": f"Bearer {token}"}
+                response = await http_client.get(
+                    f"{API_BASE_URL}/pay/base",
+                    headers=headers,
+                    timeout=10
+                )
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    is_service = result.get('status') == 'pass'
+                else:
+                    is_service = False
+            except Exception as e:
+                logger.error(f"检查服务商状态失败: {e}")
+                is_service = False
+            
+            if not is_service:
+                message = await update.message.reply_text("🔒 只有服务商才能使用此功能！")
+                # 30秒后自动消失
+                import asyncio
+                from utils.message_utils import auto_delete_message
+                asyncio.create_task(auto_delete_message(update, context, message, 30))
+                # 清理用户数据
+                context.user_data.pop('current_operation', None)
+                context.user_data.pop('target_user_id', None)
+                return
+            
             # 先发送加载消息，确保loading变量在try块之前定义
             loading = await update.message.reply_text("🔄 正在处理转账...")
             
             # 处理转账
             try:
-                # 服务商转账应该使用服务商的token，而不是用户的token
-                headers = {"Authorization": f"Bearer {SERVICE_PROVIDER_TOKEN}"}
+                # 服务商转账使用服务商自己的token
+                headers = {"Authorization": f"Bearer {token}"}
                 data = {"user_id": target_user_id, "carrot": amount}
                 
                 response = await http_client.post(
@@ -2122,8 +2152,8 @@ async def process_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE, a
                             user_emos_id = user_info.get('user_id')
                             
                             if user_emos_id:
-                                # 使用服务商token转账（税后金额）
-                                service_headers = {"Authorization": f"Bearer {SERVICE_PROVIDER_TOKEN}"}
+                                # 使用用户自己的token转账（税后金额）
+                                service_headers = {"Authorization": f"Bearer {token}"}
                                 transfer_data = {"user_id": user_emos_id, "carrot": after_tax_carrot}
                                 transfer_response = await http_client.post(
                                     f"{Config.API_BASE_URL}/pay/transfer",

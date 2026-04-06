@@ -103,7 +103,7 @@ def get_user_token(user_id):
     Returns:
         token字符串或None
     """
-    user_info = user_tokens.get(user_id)
+    user_info = user_tokens.get(user_id)  
     if not user_info:
         return None
     

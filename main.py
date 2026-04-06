@@ -3157,8 +3157,8 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             loading = await update.message.reply_text("🔄 正在转账...")
                             
                             try:
-                                # 使用服务商token进行转账
-                                headers = {"Authorization": f"Bearer {SERVICE_PROVIDER_TOKEN}"}
+                                # 使用服务商自己的token进行转账
+                                headers = {"Authorization": f"Bearer {token}"}
                                 data = {"user_id": target_user_id, "carrot": amount}
                                 response = await http_client.post(
                                     f"{Config.API_BASE_URL}/pay/transfer",
