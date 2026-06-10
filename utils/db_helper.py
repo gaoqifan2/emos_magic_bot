@@ -1,0 +1,524 @@
+import logging
+import pymysql
+from typing import Optional, Dict, Any
+from datetime import datetime
+
+from config import DB_CONFIG
+from utils.http_client import http_client
+
+logger = logging.getLogger(__name__)
+
+def get_db_connection():
+    """获取数据库连接"""
+    try:
+        conn = pymysql.connect(**DB_CONFIG)
+        return conn
+    except Exception as e:
+        logger.error(f"数据库连接失败: {e}")
+        return None
+
+def ensure_user_exists(emos_user_id: str, token: str, telegram_id: Optional[int] = None, username: Optional[str] = None, 
+                      first_name: Optional[str] = None, last_name: Optional[str] = None) -> Optional[int]:
+    """确保用户存在，如果不存在则创建
+    
+    Returns:
+        用户ID（本地数据库的id）
+    """
+    conn = get_db_connection()
+    if not conn:
+        return None
+    
+    try:
+        with conn.cursor() as cursor:
+            # 检查用户是否存在
+            cursor.execute("SELECT id FROM users WHERE user_id = %s", (emos_user_id,))
+            result = cursor.fetchone()
+            if not result and telegram_id:
+                cursor.execute("SELECT id FROM users WHERE telegram_id = %s", (telegram_id,))
+                result = cursor.fetchone()
+            
+            if result:
+                user_id = result[0]
+                # 更新用户信息（只更新非空字段）
+                update_fields = []
+                update_values = []
+                
+                if token:
+                    update_fields.append("token = %s")
+                    update_values.append(token)
+                if telegram_id is not None:
+                    update_fields.append("telegram_id = %s")
+                    update_values.append(telegram_id)
+                if username:
+                    update_fields.append("username = %s")
+                    update_values.append(username)
+                if first_name:
+                    update_fields.append("first_name = %s")
+                    update_values.append(first_name)
+                if last_name:
+                    update_fields.append("last_name = %s")
+                    update_values.append(last_name)
+                
+                if update_fields:
+                    update_query = f"UPDATE users SET {', '.join(update_fields)} WHERE id = %s"
+                    update_values.append(user_id)
+                    cursor.execute(update_query, update_values)
+                    conn.commit()
+                return user_id
+            else:
+                try:
+                    # 创建新用户
+                    cursor.execute(
+                        "INSERT INTO users (user_id, telegram_id, token, username, first_name, last_name) VALUES (%s, %s, %s, %s, %s, %s)",
+                        (emos_user_id, telegram_id, token, username, first_name, last_name)
+                    )
+                    user_id = cursor.lastrowid
+                    
+                    # 创建余额记录，使用 emos_user_id（字符串）
+                    cursor.execute(
+                        "INSERT INTO balances (user_id, balance, username) VALUES (%s, 0, %s)",
+                        (emos_user_id, username)
+                    )
+                    
+                    conn.commit()
+                    return user_id
+                except pymysql.IntegrityError as e:
+                    # 处理唯一键冲突
+                    logger.warning(f"用户已存在，尝试获取现有用户ID: {e}")
+                    # 再次查询用户
+                    cursor.execute("SELECT id FROM users WHERE user_id = %s", (emos_user_id,))
+                    result = cursor.fetchone()
+                    if not result and telegram_id:
+                        cursor.execute("SELECT id FROM users WHERE telegram_id = %s", (telegram_id,))
+                        result = cursor.fetchone()
+                    if result:
+                        # 更新用户信息
+                        user_id = result[0]
+                        update_fields = []
+                        update_values = []
+                        
+                        if token:
+                            update_fields.append("token = %s")
+                            update_values.append(token)
+                        if telegram_id is not None:
+                            update_fields.append("telegram_id = %s")
+                            update_values.append(telegram_id)
+                        if username:
+                            update_fields.append("username = %s")
+                            update_values.append(username)
+                        if first_name:
+                            update_fields.append("first_name = %s")
+                            update_values.append(first_name)
+                        if last_name:
+                            update_fields.append("last_name = %s")
+                            update_values.append(last_name)
+                        
+                        if update_fields:
+                            update_query = f"UPDATE users SET {', '.join(update_fields)} WHERE id = %s"
+                            update_values.append(user_id)
+                            cursor.execute(update_query, update_values)
+                            conn.commit()
+                        return user_id
+                    else:
+                        logger.error(f"无法获取现有用户ID: {e}")
+                        return None
+    except Exception as e:
+        logger.error(f"操作用户失败: {e}")
+        conn.rollback()
+        return None
+    finally:
+        conn.close()
+
+def create_recharge_order(order_no: str, emos_user_id: str, username: str, telegram_user_id: int, 
+                         carrot_amount: int, platform_order_no: Optional[str] = None,
+                         pay_url: Optional[str] = None, expire_time: Optional[datetime] = None) -> bool:
+    """创建充值订单
+    
+    Args:
+        order_no: 本地订单号
+        emos_user_id: 用户的emos user_id（字符串格式）
+        username: EMOS用户名
+        telegram_user_id: Telegram用户ID
+        carrot_amount: 充值萝卜数量
+        platform_order_no: 平台订单号
+        pay_url: 支付链接
+        expire_time: 过期时间
+    """
+    logger.info(f"开始创建充值订单: order_no={order_no}, platform_order_no={platform_order_no}")
+    conn = get_db_connection()
+    if not conn:
+        logger.error("数据库连接失败")
+        return False
+    
+    try:
+        with conn.cursor() as cursor:
+            logger.info(f"执行SQL插入: order_no={order_no}, platform_order_no={platform_order_no}, user_id={emos_user_id}, username={username}")
+            cursor.execute(
+                """INSERT INTO recharge_orders 
+                   (order_no, user_id, username, telegram_user_id, carrot_amount, game_coin_amount, 
+                    status, platform_order_no, pay_url, expire_time, created_at, updated_at)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())""",
+                (order_no, emos_user_id, username, telegram_user_id, carrot_amount, 
+                 carrot_amount * 10, 'pending', platform_order_no, pay_url, expire_time)
+            )
+            logger.info(f"SQL执行成功，影响行数: {cursor.rowcount}")
+            conn.commit()
+            logger.info(f"事务提交成功")
+            logger.info(f"充值订单已创建: {order_no}, platform_order_no={platform_order_no}")
+            return True
+    except Exception as e:
+        logger.error(f"创建充值订单失败: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        conn.rollback()
+        return False
+    finally:
+        if conn:
+            conn.close()
+            logger.info("数据库连接已关闭")
+
+def update_recharge_order_status(platform_order_no: str, status: str, 
+                                game_coin_amount: Optional[int] = None) -> bool:
+    """更新充值订单状态"""
+    conn = get_db_connection()
+    if not conn:
+        return False
+    
+    try:
+        with conn.cursor() as cursor:
+            if game_coin_amount is not None:
+                cursor.execute(
+                    """UPDATE recharge_orders 
+                       SET status = %s, game_coin_amount = %s 
+                       WHERE platform_order_no = %s""",
+                    (status, game_coin_amount, platform_order_no)
+                )
+            else:
+                cursor.execute(
+                    "UPDATE recharge_orders SET status = %s WHERE platform_order_no = %s",
+                    (status, platform_order_no)
+                )
+            
+            # 如果订单成功，更新用户余额和累计充值金额
+            if status == 'success' and game_coin_amount is not None:
+                cursor.execute(
+                    """SELECT user_id, carrot_amount FROM recharge_orders WHERE platform_order_no = %s""",
+                    (platform_order_no,)
+                )
+                result = cursor.fetchone()
+                if result:
+                    emos_user_id = result[0]
+                    carrot_amount = result[1]
+                    
+                    # 直接使用emos_user_id更新用户余额
+                    cursor.execute(
+                        """UPDATE balances 
+                           SET balance = balance + %s 
+                           WHERE user_id = %s""",
+                        (game_coin_amount, emos_user_id)
+                    )
+                    
+                    # 更新用户累计充值金额
+                    cursor.execute(
+                        """UPDATE users 
+                           SET total_recharge = total_recharge + %s 
+                           WHERE user_id = %s""",
+                        (carrot_amount, emos_user_id)
+                    )
+                    
+                    logger.info(f"更新用户累计充值金额: user_id={emos_user_id}, amount={carrot_amount}")
+            
+            conn.commit()
+            logger.info(f"充值订单状态已更新: {platform_order_no} -> {status}")
+            return True
+    except Exception as e:
+        logger.error(f"更新充值订单失败: {e}")
+        conn.rollback()
+        return False
+    finally:
+        conn.close()
+
+def get_user_by_telegram_id(telegram_user_id: int) -> Optional[Dict[str, Any]]:
+    """根据Telegram用户ID获取用户信息"""
+    conn = get_db_connection()
+    if not conn:
+        return None
+    
+    try:
+        with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+            # 直接查询用户表中的 telegram_id
+            cursor.execute(
+                """SELECT u.*, b.balance 
+                   FROM users u 
+                   LEFT JOIN balances b ON u.user_id = b.user_id 
+                   WHERE u.telegram_id = %s""",
+                (telegram_user_id,)
+            )
+            return cursor.fetchone()
+    except Exception as e:
+        logger.error(f"查询用户失败: {e}")
+        return None
+    finally:
+        conn.close()
+
+def get_order_by_platform_no(platform_order_no: str) -> Optional[Dict[str, Any]]:
+    """根据平台订单号获取订单信息"""
+    logger.info(f"开始查询订单: platform_order_no={platform_order_no}")
+    conn = get_db_connection()
+    if not conn:
+        logger.error("数据库连接失败")
+        return None
+    
+    try:
+        with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+            logger.info(f"执行SQL查询: SELECT * FROM recharge_orders WHERE platform_order_no = '{platform_order_no}'")
+            cursor.execute(
+                "SELECT * FROM recharge_orders WHERE platform_order_no = %s",
+                (platform_order_no,)
+            )
+            result = cursor.fetchone()
+            if result:
+                logger.info(f"✅ 订单找到: {result}")
+            else:
+                logger.info(f"❌ 订单未找到: platform_order_no={platform_order_no}")
+            return result
+    except Exception as e:
+        logger.error(f"查询订单失败: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return None
+    finally:
+        if conn:
+            conn.close()
+            logger.info("数据库连接已关闭")
+
+def get_pending_orders() -> list:
+    """获取所有待处理订单"""
+    conn = get_db_connection()
+    if not conn:
+        return []
+    
+    try:
+        with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute(
+                "SELECT id, order_no, user_id, telegram_user_id, carrot_amount as amount, platform_order_no FROM recharge_orders WHERE status = 'pending'"
+            )
+            orders = cursor.fetchall()
+            logger.info(f"查询到 {len(orders)} 个待处理订单")
+            for order in orders:
+                logger.info(f"待处理订单: ID={order['id']}, 平台订单号={order['platform_order_no']}, 金额={order['amount']}")
+            return orders
+    except Exception as e:
+        logger.error(f"查询待处理订单失败: {e}")
+        return []
+    finally:
+        conn.close()
+
+def get_user_token(user_id: int) -> Optional[str]:
+    """根据用户ID获取用户token"""
+    conn = get_db_connection()
+    if not conn:
+        return None
+    
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "SELECT token FROM users WHERE id = %s",
+                (user_id,)
+            )
+            result = cursor.fetchone()
+            return result[0] if result else None
+    except Exception as e:
+        logger.error(f"获取用户token失败: {e}")
+        return None
+    finally:
+        conn.close()
+
+def get_user_balance(user_id: int) -> Optional[int]:
+    """根据用户ID获取游戏余额"""
+    conn = get_db_connection()
+    if not conn:
+        return None
+    
+    try:
+        with conn.cursor() as cursor:
+            # 先获取用户的字符串格式 user_id
+            cursor.execute("SELECT user_id FROM users WHERE id = %s", (user_id,))
+            user_result = cursor.fetchone()
+            if not user_result:
+                return None
+            emos_user_id = user_result[0]
+            
+            cursor.execute(
+                "SELECT balance FROM balances WHERE user_id = %s",
+                (emos_user_id,)
+            )
+            result = cursor.fetchone()
+            return result[0] if result else None
+    except Exception as e:
+        logger.error(f"获取用户余额失败: {e}")
+        return None
+    finally:
+        conn.close()
+
+def create_withdraw_order(order_no: str, emos_user_id: str, telegram_user_id: int, 
+                        game_coin_amount: int, carrot_amount: int, username: str = None) -> bool:
+    """创建提现订单
+    
+    Args:
+        order_no: 提现订单号
+        emos_user_id: 用户的emos user_id（字符串格式）
+        telegram_user_id: Telegram用户ID
+        game_coin_amount: 提现游戏币数量
+        carrot_amount: 获得萝卜数量
+        username: EMOS用户名
+    """
+    conn = get_db_connection()
+    if not conn:
+        return False
+    
+    try:
+        with conn.cursor() as cursor:
+            # 如果没有传入username，从users表获取
+            if username is None:
+                cursor.execute("SELECT username FROM users WHERE user_id = %s", (emos_user_id,))
+                user_result = cursor.fetchone()
+                if user_result:
+                    username = user_result.get('username', '')
+                else:
+                    username = ''
+            
+            cursor.execute(
+                """INSERT INTO withdrawal_records 
+                   (order_no, user_id, username, telegram_user_id, game_coin_amount, 
+                    carrot_amount, status)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+                (order_no, emos_user_id, username, telegram_user_id, game_coin_amount, 
+                 carrot_amount, 'pending')
+            )
+            conn.commit()
+            logger.info(f"提现订单已创建: {order_no}")
+            return True
+    except Exception as e:
+        logger.error(f"创建提现订单失败: {e}")
+        conn.rollback()
+        return False
+    finally:
+        conn.close()
+
+def update_withdraw_order_status(order_no: str, status: str, 
+                               transfer_result: Optional[str] = None) -> bool:
+    """更新提现订单状态"""
+    conn = get_db_connection()
+    if not conn:
+        return False
+    
+    try:
+        with conn.cursor() as cursor:
+            if transfer_result:
+                cursor.execute(
+                    """UPDATE withdrawal_records 
+                       SET status = %s, transfer_result = %s 
+                       WHERE order_no = %s""",
+                    (status, transfer_result, order_no)
+                )
+            else:
+                cursor.execute(
+                    "UPDATE withdrawal_records SET status = %s WHERE order_no = %s",
+                    (status, order_no)
+                )
+            
+            # 如果订单成功，更新用户余额和累计提现金额
+            if status == 'success':
+                cursor.execute(
+                    """SELECT user_id, game_coin_amount, carrot_amount FROM withdrawal_records 
+                       WHERE order_no = %s""",
+                    (order_no,)
+                )
+                result = cursor.fetchone()
+                if result:
+                    emos_user_id = result[0]
+                    game_coin_amount = result[1]
+                    carrot_amount = result[2]
+                    
+                    # 直接使用emos_user_id更新用户余额
+                    cursor.execute(
+                        """UPDATE balances 
+                           SET balance = balance - %s 
+                           WHERE user_id = %s""",
+                        (game_coin_amount, emos_user_id)
+                    )
+                    
+                    # 更新用户累计提现金额
+                    cursor.execute(
+                        """UPDATE users 
+                           SET total_withdraw = total_withdraw + %s 
+                           WHERE user_id = %s""",
+                        (carrot_amount, emos_user_id)
+                    )
+                    
+                    logger.info(f"更新用户累计提现金额: user_id={emos_user_id}, amount={carrot_amount}")
+            
+            conn.commit()
+            logger.info(f"提现订单状态已更新: {order_no} -> {status}")
+            return True
+    except Exception as e:
+        logger.error(f"更新提现订单失败: {e}")
+        conn.rollback()
+        return False
+    finally:
+        conn.close()
+
+def check_withdraw_limits(emos_user_id: str, carrot_amount: int) -> Dict[str, Any]:
+    """检查用户提现限额
+    
+    Args:
+        emos_user_id: 用户的emos user_id（字符串格式）
+        carrot_amount: 提现萝卜数量
+    
+    Returns:
+        dict: 包含限额检查结果的字典
+    """
+    from datetime import datetime, timedelta
+    
+    conn = get_db_connection()
+    if not conn:
+        return {"success": False, "error": "数据库连接失败"}
+    
+    try:
+        with conn.cursor() as cursor:
+            # 查询用户累计充值和提现金额
+            cursor.execute(
+                """SELECT total_recharge, total_withdraw FROM users WHERE user_id = %s""",
+                (emos_user_id,)
+            )
+            user_result = cursor.fetchone()
+            if not user_result:
+                return {"success": False, "error": "用户不存在"}
+            
+            total_recharge = user_result[0]
+            total_withdraw = user_result[1]
+            
+            # 计算累计充值3倍的限额
+            recharge_limit = total_recharge * 3
+            
+            # 检查限额
+            if total_withdraw + carrot_amount > recharge_limit:
+                remaining_withdraw = recharge_limit - total_withdraw
+                return {
+                    "success": False, 
+                    "error": f"提现限额为累计充值的3倍，累计已充值{total_recharge}萝卜，已提现{total_withdraw}萝卜，剩余可提现{remaining_withdraw}萝卜，无法再提现{carrot_amount}萝卜"
+                }
+            
+            return {
+                "success": True, 
+                "lifetime_total": total_withdraw,
+                "total_recharge": total_recharge,
+                "recharge_limit": recharge_limit,
+                "remaining_withdraw": recharge_limit - total_withdraw
+            }
+    except Exception as e:
+        logger.error(f"检查提现限额失败: {e}")
+        return {"success": False, "error": "检查限额失败"}
+    finally:
+        conn.close()

@@ -1,0 +1,53 @@
+# utils/imghdr_compat.py
+# 兼容 Python 3.12+，替代已被移除的 imghdr 模块
+
+import os
+import struct
+
+
+def what(file, h=None):
+    """确定文件或字节流的图像类型
+    
+    Args:
+        file: 文件路径或字节流
+        h: 可选的字节头
+        
+    Returns:
+        图像类型的字符串，或 None 如果无法识别
+    """
+    if h is None:
+        if isinstance(file, str):
+            with open(file, 'rb') as f:
+                h = f.read(32)
+        else:
+            h = file.read(32)
+    
+    # GIF
+    if h.startswith(b'GIF87a') or h.startswith(b'GIF89a'):
+        return 'gif'
+    
+    # JPEG
+    if h.startswith(b'\xff\xd8'):
+        return 'jpeg'
+    
+    # PNG
+    if h.startswith(b'\x89PNG\r\n\x1a\n'):
+        return 'png'
+    
+    # WebP
+    if h.startswith(b'RIFF') and h[8:12] == b'WEBP':
+        return 'webp'
+    
+    # BMP
+    if h.startswith(b'BM'):
+        return 'bmp'
+    
+    # TIFF
+    if h.startswith(b'II*\x00') or h.startswith(b'MM\x00*'):
+        return 'tiff'
+    
+    return None
+
+
+# 为了兼容，创建与原始 imghdr 相同的接口
+__all__ = ['what']

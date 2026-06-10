@@ -1,0 +1,171 @@
+# Jackpot奖池管理模块
+# 使用数据库持久化存储，所有玩家共享同一个奖池
+
+from app.database.db import get_db_connection
+from utils.http_client import http_client
+
+# 初始奖池金额
+INITIAL_JACKPOT = 100
+
+# 奖池最高金额
+JACKPOOL_MAX = 500
+
+# 奖池每日衰减率
+JACKPOOL_DECAY = 0.90
+
+def get_jackpot_pool():
+    """获取当前Jackpot奖池金额"""
+    connection = get_db_connection()
+    if not connection:
+        return INITIAL_JACKPOT
+    
+    try:
+        with connection.cursor() as cursor:
+            # 查找第一条记录
+            cursor.execute('SELECT pool_amount FROM jackpot_pool ORDER BY id LIMIT 1')
+            result = cursor.fetchone()
+            if result:
+                return result['pool_amount']
+            else:
+                # 如果没有记录，初始化
+                cursor.execute(
+                    'INSERT INTO jackpot_pool (pool_amount) VALUES (%s)',
+                    (INITIAL_JACKPOT,)
+                )
+                connection.commit()
+                return INITIAL_JACKPOT
+    except Exception as e:
+        print(f"获取Jackpot奖池失败: {e}")
+        return INITIAL_JACKPOT
+    finally:
+        connection.close()
+
+def add_to_jackpot_pool(amount):
+    """向Jackpot奖池添加金额（每局抽水）"""
+    connection = get_db_connection()
+    if not connection:
+        return INITIAL_JACKPOT
+    
+    try:
+        with connection.cursor() as cursor:
+            # 获取当前奖池金额
+            cursor.execute('SELECT pool_amount, last_update FROM jackpot_pool ORDER BY id LIMIT 1')
+            current_pool = cursor.fetchone()
+            current_amount = current_pool['pool_amount'] if current_pool else 0
+            updated_at = current_pool['last_update'] if current_pool else None
+            
+            # 检查是否需要每日衰减
+            if updated_at:
+                from datetime import datetime, timedelta
+                last_update = updated_at
+                today = datetime.now().date()
+                last_update_date = last_update.date()
+                
+                # 计算相隔的天数
+                days_diff = (today - last_update_date).days
+                if days_diff > 0:
+                    # 应用每日衰减
+                    for _ in range(days_diff):
+                        current_amount *= JACKPOOL_DECAY
+                    current_amount = int(current_amount)
+            
+            # 奖池最大金额限制
+            new_amount = min(current_amount + amount, JACKPOOL_MAX)
+            
+            # 更新奖池金额
+            cursor.execute('''
+                UPDATE jackpot_pool 
+                SET pool_amount = %s, updated_at = NOW()
+                ORDER BY id LIMIT 1
+            ''', (new_amount,))
+            
+            connection.commit()
+            
+            return new_amount
+    except Exception as e:
+        print(f"添加Jackpot奖池金额失败: {e}")
+        connection.rollback()
+        return INITIAL_JACKPOT
+    finally:
+        connection.close()
+
+def reset_jackpot_pool():
+    """重置Jackpot奖池为初始值（有人中奖后），并重置所有用户的贡献分"""
+    connection = get_db_connection()
+    if not connection:
+        return INITIAL_JACKPOT
+    
+    try:
+        with connection.cursor() as cursor:
+            # 开始事务
+            # 重置Jackpot奖池
+            cursor.execute('''
+                UPDATE jackpot_pool 
+                SET pool_amount = %s
+                ORDER BY id LIMIT 1
+            ''', (INITIAL_JACKPOT,))
+            
+            # 重置所有用户的贡献分
+            cursor.execute('''
+                UPDATE users 
+                SET current_cycle_score = 0
+            ''')
+            
+            # 提交事务
+            connection.commit()
+            return INITIAL_JACKPOT
+    except Exception as e:
+        print(f"重置Jackpot奖池失败: {e}")
+        connection.rollback()
+        return INITIAL_JACKPOT
+    finally:
+        connection.close()
+
+def record_jackpot_win(telegram_id, win_amount):
+    """记录Jackpot中奖信息"""
+    # 由于数据库表结构限制，暂不记录详细中奖信息
+    # 仅返回成功
+    return True
+
+def get_jackpot_stats():
+    """获取Jackpot统计信息"""
+    connection = get_db_connection()
+    if not connection:
+        return None
+    
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute('''
+                SELECT pool_amount, last_update
+                FROM jackpot_pool 
+                ORDER BY id LIMIT 1
+            ''')
+            result = cursor.fetchone()
+            return result
+    except Exception as e:
+        print(f"获取Jackpot统计失败: {e}")
+        return None
+    finally:
+        connection.close()
+
+def set_jackpot_pool(amount):
+    """设置Jackpot奖池为指定金额（管理员手动调整）"""
+    connection = get_db_connection()
+    if not connection:
+        return False
+    
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute('''
+                UPDATE jackpot_pool 
+                SET pool_amount = %s
+                ORDER BY id LIMIT 1
+            ''', (amount,))
+            connection.commit()
+            return True
+    except Exception as e:
+        print(f"设置Jackpot奖池失败: {e}")
+        connection.rollback()
+        return False
+    finally:
+        connection.close()
