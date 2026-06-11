@@ -4627,9 +4627,9 @@ def main() -> None:
         .write_timeout(20) \
         .concurrent_updates(True)
 
-    from config import TELEGRAM_PROXY
-    if TELEGRAM_PROXY:
-        builder = builder.proxy(TELEGRAM_PROXY).get_updates_proxy(TELEGRAM_PROXY)
+#     from config import TELEGRAM_PROXY
+#     if TELEGRAM_PROXY:
+#         builder = builder.proxy(TELEGRAM_PROXY).get_updates_proxy(TELEGRAM_PROXY)
 
     application = builder.build()
     print("[DEBUG] Application创建完成")

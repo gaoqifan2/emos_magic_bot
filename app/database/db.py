@@ -8,8 +8,8 @@ import threading
 from utils.http_client import http_client
 
 # 代理配置（从环境变量读取，默认使用 Clash 端口）
-PROXY_HOST = os.getenv('DB_PROXY_HOST', '127.0.0.1')
-PROXY_PORT = int(os.getenv('DB_PROXY_PORT', '7890'))
+PROXY_HOST = None
+PROXY_PORT = None
 
 class DatabaseConnectionPool:
     def __init__(self, max_connections=5):
@@ -42,7 +42,6 @@ class DatabaseConnectionPool:
             try:
                 # 尝试通过代理连接
                 original_socket = socket.socket
-                socks.set_default_proxy(socks.SOCKS5, PROXY_HOST, PROXY_PORT)
                 socket.socket = socks.socksocket
                 
                 connection = pymysql.connect(

@@ -21,11 +21,11 @@ from utils.http_client import http_client
 
 logger = logging.getLogger(__name__)
 
-# 代理配置
-proxies = {
-    "http": "http://127.0.0.1:7890",
-    "https": "http://127.0.0.1:7890"
-}
+# # 代理配置
+# proxies = {
+#     "http": "http://127.0.0.1:7890",
+#     "https": "http://127.0.0.1:7890"
+# }
 
 # 对话状态 (从1开始，避免与 ConversationHandler.END=0 冲突)
 WAITING_TYPE, WAITING_RECEIVE, WAITING_CARROT, WAITING_NUMBER, WAITING_BLESSING, WAITING_PASSWORD, WAITING_MEDIA, WAITING_SCENE, WAITING_CUSTOM_BLESSING, WAITING_BUBBLE_TEXT = range(1, 11)
@@ -1027,7 +1027,7 @@ async def create_redpacket(update: Update, context: ContextTypes.DEFAULT_TYPE):
             json=payload,
             headers=headers,
             timeout=10,
-            proxies=proxies
+            # proxies=proxies 已删除
         )
         
         if response.status_code == 200:
@@ -1079,7 +1079,7 @@ async def create_redpacket(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     Config.API_USER_ENDPOINT,
                     headers=headers,
                     timeout=5,
-                    proxies=proxies
+                    # proxies=proxies 已删除
                 )
                 if user_response.status_code == 200:
                     user_data = user_response.json()

@@ -18,7 +18,7 @@ class HTTPClient:
     async def init_client(self):
         """初始化HTTP客户端"""
         if self.client is None or self.client.is_closed:
-            proxy = HTTP_PROXY_URL or None
+            proxy = None
             self.client = httpx.AsyncClient(
                 timeout=httpx.Timeout(
                     connect=5.0,      # 连接超时
