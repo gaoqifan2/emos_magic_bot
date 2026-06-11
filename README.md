@@ -64,8 +64,23 @@ R2_BUCKET_NAME=redpacket-images
 R2_PUBLIC_URL=这里填 R2 公开访问地址
 R2_ENDPOINT=这里填 R2 Endpoint
 
+BUBBLE_FONT_PATH=
+
 TELEGRAM_PROXY=
 HTTP_PROXY_URL=
+```
+
+气泡红包会把用户输入渲染成纯白底图片。VPS 上必须有中文字体，否则会变成问号或生成失败。Debian/Trixie 推荐安装：
+
+```bash
+apt update
+apt install -y fonts-noto-cjk
+```
+
+如果系统字体路径特殊，可以在 `.env` 指定：
+
+```env
+BUBBLE_FONT_PATH=/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc
 ```
 
 ## Debian Trixie 直接运行
@@ -94,7 +109,7 @@ deactivate 2>/dev/null || true
 rm -rf venv
 
 apt update
-apt install -y python3 python3-venv python3-dev build-essential
+apt install -y python3 python3-venv python3-dev build-essential fonts-noto-cjk
 
 python3 -m venv venv
 source venv/bin/activate

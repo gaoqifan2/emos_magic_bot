@@ -4,6 +4,7 @@ import random
 import html
 import textwrap
 import asyncio
+import os
 from io import BytesIO
 from datetime import datetime, timedelta, timezone
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
@@ -20,12 +21,6 @@ from utils.http_client import http_client
 from utils.http_client import http_client
 
 logger = logging.getLogger(__name__)
-
-# # 代理配置
-# proxies = {
-#     "http": "http://127.0.0.1:7890",
-#     "https": "http://127.0.0.1:7890"
-# }
 
 # 对话状态 (从1开始，避免与 ConversationHandler.END=0 冲突)
 WAITING_TYPE, WAITING_RECEIVE, WAITING_CARROT, WAITING_NUMBER, WAITING_BLESSING, WAITING_PASSWORD, WAITING_MEDIA, WAITING_SCENE, WAITING_CUSTOM_BLESSING, WAITING_BUBBLE_TEXT = range(1, 11)
@@ -99,46 +94,135 @@ async def upload_r2_async(file_data, file_name, folder):
         timeout=30
     )
 
-def get_bubble_font(size):
+def text_has_cjk(text):
+    return any(
+        "\u3400" <= char <= "\u9fff"
+        or "\uf900" <= char <= "\ufaff"
+        for char in text
+    )
+
+def get_bubble_font(size, require_cjk=False):
     from PIL import ImageFont
+
+    env_font = os.getenv("BUBBLE_FONT_PATH", "").strip()
     font_paths = [
+        env_font,
         "C:/Windows/Fonts/msyh.ttc",
+        "C:/Windows/Fonts/msyhbd.ttc",
         "C:/Windows/Fonts/simhei.ttf",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
         "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/opentype/noto/NotoSerifCJK-Regular.ttc",
         "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
         "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
+        "/usr/share/fonts/truetype/arphic/uming.ttc",
+        "/usr/share/fonts/truetype/arphic/ukai.ttc",
+        "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
     ]
     for font_path in font_paths:
+        if not font_path or not os.path.exists(font_path):
+            continue
         try:
             return ImageFont.truetype(font_path, size)
-        except Exception:
-            continue
+        except Exception as error:
+            logger.warning("Failed to load bubble font %s: %s", font_path, error)
+
+    if require_cjk:
+        raise RuntimeError(
+            "Missing CJK font for bubble image. Install fonts-noto-cjk or set BUBBLE_FONT_PATH."
+        )
     return ImageFont.load_default()
+
+def measure_text_width(draw, text, font):
+    if not text:
+        return 0
+    bbox = draw.textbbox((0, 0), text, font=font)
+    return bbox[2] - bbox[0]
+
+def wrap_bubble_text(text, draw, font, max_width, max_lines):
+    lines = []
+    paragraphs = text.splitlines() or [text]
+
+    for paragraph in paragraphs:
+        paragraph = paragraph.strip()
+        if not paragraph:
+            lines.append("")
+            continue
+
+        current = ""
+        for char in paragraph:
+            candidate = current + char
+            if not current or measure_text_width(draw, candidate, font) <= max_width:
+                current = candidate
+                continue
+
+            lines.append(current)
+            current = char
+            if len(lines) >= max_lines:
+                break
+
+        if current and len(lines) < max_lines:
+            lines.append(current)
+        if len(lines) >= max_lines:
+            break
+
+    if len(lines) > max_lines:
+        lines = lines[:max_lines]
+    if lines and any(len(line) for line in lines) and len(lines) == max_lines:
+        last = lines[-1].rstrip()
+        while last and measure_text_width(draw, last + "...", font) > max_width:
+            last = last[:-1]
+        lines[-1] = (last or lines[-1][:1]) + "..."
+
+    return lines or [""]
 
 def build_bubble_png(text):
     from PIL import Image, ImageDraw
 
-    lines = []
-    for paragraph in text.splitlines() or [text]:
-        wrapped = textwrap.wrap(paragraph, width=14) or ['']
-        lines.extend(wrapped)
-    lines = lines[:6]
+    width = 1080
+    height = 1080
+    margin_x = 90
+    margin_y = 110
+    max_width = width - margin_x * 2
+    max_height = height - margin_y * 2
+    max_lines = 8
+    requires_cjk = text_has_cjk(text)
 
-    width = 760
-    line_height = 58
-    height = max(360, 150 + len(lines) * line_height)
     image = Image.new("RGB", (width, height), (255, 255, 255))
     draw = ImageDraw.Draw(image)
 
-    font = get_bubble_font(42)
-    total_text_height = len(lines) * line_height
-    y = max(48, (height - total_text_height) // 2)
-    for line in lines:
-        bbox = draw.textbbox((0, 0), line, font=font)
+    selected_font = None
+    selected_lines = None
+    selected_line_height = None
+    for font_size in (108, 100, 92, 84, 76, 68, 60, 54, 48):
+        font = get_bubble_font(font_size, require_cjk=requires_cjk)
+        line_height = int(font_size * 1.32)
+        lines = wrap_bubble_text(text, draw, font, max_width, max_lines)
+        total_height = len(lines) * line_height
+        if total_height <= max_height:
+            selected_font = font
+            selected_lines = lines
+            selected_line_height = line_height
+            break
+
+    if selected_font is None:
+        selected_font = get_bubble_font(48, require_cjk=requires_cjk)
+        selected_line_height = 64
+        selected_lines = wrap_bubble_text(text, draw, selected_font, max_width, max_lines)
+
+    total_text_height = len(selected_lines) * selected_line_height
+    y = max(margin_y, (height - total_text_height) // 2)
+    for line in selected_lines:
+        bbox = draw.textbbox((0, 0), line, font=selected_font)
         text_width = bbox[2] - bbox[0]
-        draw.text(((width - text_width) // 2, y), line, font=font, fill=(0, 0, 0))
-        y += line_height
+        draw.text(
+            ((width - text_width) // 2, y),
+            line,
+            font=selected_font,
+            fill=(0, 0, 0),
+        )
+        y += selected_line_height
 
     output = BytesIO()
     image.save(output, format="PNG", optimize=True)
