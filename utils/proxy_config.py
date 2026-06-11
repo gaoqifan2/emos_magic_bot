@@ -1,4 +1,16 @@
-proxies = {
-    "http": "http://127.0.0.1:7890",
-    "https": "http://127.0.0.1:7890"
-}
+import os
+
+from config import HTTP_PROXY_URL
+
+
+def _build_proxies():
+    proxy = HTTP_PROXY_URL or os.getenv("REQUESTS_PROXY_URL", "")
+    if not proxy:
+        return None
+    return {
+        "http": proxy,
+        "https": proxy,
+    }
+
+
+proxies = _build_proxies()

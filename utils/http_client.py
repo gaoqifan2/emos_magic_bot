@@ -7,6 +7,7 @@ HTTP客户端工具模块
 
 import httpx
 from typing import Optional, Dict, Any
+from config import HTTP_PROXY_URL
 
 class HTTPClient:
     """HTTP客户端管理类"""
@@ -17,7 +18,7 @@ class HTTPClient:
     async def init_client(self):
         """初始化HTTP客户端"""
         if self.client is None or self.client.is_closed:
-            proxy = "http://127.0.0.1:7890"
+            proxy = HTTP_PROXY_URL or None
             self.client = httpx.AsyncClient(
                 timeout=httpx.Timeout(
                     connect=5.0,      # 连接超时

@@ -4619,16 +4619,19 @@ def main() -> None:
     
     print(f"[DEBUG] 并发配置: workers={concurrent_workers}, pool_size={connection_pool_size}")
     
-    application = Application.builder() \
+    builder = Application.builder() \
         .token(Config.BOT_TOKEN) \
         .post_init(post_init_wrapper) \
-        .proxy("http://127.0.0.1:7890") \
-        .get_updates_proxy("http://127.0.0.1:7890") \
         .connect_timeout(20) \
         .read_timeout(30) \
         .write_timeout(20) \
-        .concurrent_updates(True) \
-        .build()
+        .concurrent_updates(True)
+
+    from config import TELEGRAM_PROXY
+    if TELEGRAM_PROXY:
+        builder = builder.proxy(TELEGRAM_PROXY).get_updates_proxy(TELEGRAM_PROXY)
+
+    application = builder.build()
     print("[DEBUG] Application创建完成")
     
     try:

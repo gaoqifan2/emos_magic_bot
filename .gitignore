@@ -1,20 +1,25 @@
-# Python 缓存
+# Python cache
 __pycache__/
-*.pyc
+*.py[cod]
 
-# 日志文件
+# Runtime files
 logs/
 *.log
+bot.lock
+bot_runtime.log
+bot_runtime.err.log
+local_database.db
 
-# 虚拟环境
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Virtual environments
 venv/
 env/
-.env
+.venv/
 
-# IDE 配置
+# IDE
 .vscode/
-.idea/"__pycache__/" 
-"*.pyc" 
-"bot.lock" 
-".env" 
-"logs/" 
+.idea/
