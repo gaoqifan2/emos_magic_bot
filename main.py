@@ -4761,11 +4761,11 @@ def main() -> None:
             entry_points=[
                 CommandHandler("check_redpacket", group_command_filter(check_redpacket_command)),
                 CallbackQueryHandler(check_redpacket_command, pattern="^menu_check_redpacket$"),
-                CallbackQueryHandler(handle_query_type, pattern="^(my_redpackets|input_id)$")
+                CallbackQueryHandler(handle_query_type, pattern="^(my_redpackets|my_redpackets_page_\\d+|input_id)$")
             ],
             states={
                 WAITING_QUERY_TYPE: [
-                    CallbackQueryHandler(handle_query_type, pattern="^(my_redpackets|input_id)$"),
+                    CallbackQueryHandler(handle_query_type, pattern="^(my_redpackets|my_redpackets_page_\\d+|input_id)$"),
                     CallbackQueryHandler(button_callback, pattern="^menu_redpacket_main$"),
                     CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
                 ],
