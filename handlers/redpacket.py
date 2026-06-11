@@ -180,25 +180,23 @@ def wrap_bubble_text(text, draw, font, max_width, max_lines):
 def build_bubble_png(text):
     from PIL import Image, ImageDraw
 
-    width = 1080
-    height = 1080
-    margin_x = 90
-    margin_y = 110
-    max_width = width - margin_x * 2
-    max_height = height - margin_y * 2
+    max_width = 620
+    max_height = 420
+    padding_x = 18
+    padding_y = 10
     max_lines = 8
     requires_cjk = text_has_cjk(text)
 
-    image = Image.new("RGB", (width, height), (255, 255, 255))
-    draw = ImageDraw.Draw(image)
+    measure_image = Image.new("RGB", (1, 1), (255, 255, 255))
+    measure_draw = ImageDraw.Draw(measure_image)
 
     selected_font = None
     selected_lines = None
     selected_line_height = None
-    for font_size in (108, 100, 92, 84, 76, 68, 60, 54, 48):
+    for font_size in (42, 38, 34, 30, 26):
         font = get_bubble_font(font_size, require_cjk=requires_cjk)
         line_height = int(font_size * 1.32)
-        lines = wrap_bubble_text(text, draw, font, max_width, max_lines)
+        lines = wrap_bubble_text(text, measure_draw, font, max_width, max_lines)
         total_height = len(lines) * line_height
         if total_height <= max_height:
             selected_font = font
@@ -207,22 +205,37 @@ def build_bubble_png(text):
             break
 
     if selected_font is None:
-        selected_font = get_bubble_font(48, require_cjk=requires_cjk)
-        selected_line_height = 64
-        selected_lines = wrap_bubble_text(text, draw, selected_font, max_width, max_lines)
+        selected_font = get_bubble_font(26, require_cjk=requires_cjk)
+        selected_line_height = 34
+        selected_lines = wrap_bubble_text(text, measure_draw, selected_font, max_width, max_lines)
 
-    total_text_height = len(selected_lines) * selected_line_height
-    y = max(margin_y, (height - total_text_height) // 2)
-    for line in selected_lines:
-        bbox = draw.textbbox((0, 0), line, font=selected_font)
+    line_bboxes = [
+        measure_draw.textbbox((0, 0), line, font=selected_font)
+        for line in selected_lines
+    ]
+    line_widths = [bbox[2] - bbox[0] for bbox in line_bboxes]
+    line_heights = [bbox[3] - bbox[1] for bbox in line_bboxes]
+    content_width = max(line_widths) if line_widths else 0
+    line_gap = max(8, int(selected_line_height * 0.16))
+    content_height = sum(line_heights) + max(0, len(selected_lines) - 1) * line_gap
+
+    width = max(1, content_width + padding_x * 2)
+    height = max(1, content_height + padding_y * 2)
+
+    image = Image.new("RGB", (width, height), (255, 255, 255))
+    draw = ImageDraw.Draw(image)
+
+    y = padding_y
+    for line, bbox in zip(selected_lines, line_bboxes):
         text_width = bbox[2] - bbox[0]
+        text_height = bbox[3] - bbox[1]
         draw.text(
-            ((width - text_width) // 2, y),
+            ((width - text_width) // 2 - bbox[0], y - bbox[1]),
             line,
             font=selected_font,
             fill=(0, 0, 0),
         )
-        y += selected_line_height
+        y += text_height + line_gap
 
     output = BytesIO()
     image.save(output, format="PNG", optimize=True)
