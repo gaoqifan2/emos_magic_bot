@@ -17,10 +17,7 @@ class HTTPClient:
     async def init_client(self):
         """初始化HTTP客户端"""
         if self.client is None or self.client.is_closed:
-            proxies = {
-                "http://": "http://127.0.0.1:7890",
-                "https://": "http://127.0.0.1:7890"
-            }
+            proxy = "http://127.0.0.1:7890"
             self.client = httpx.AsyncClient(
                 timeout=httpx.Timeout(
                     connect=5.0,      # 连接超时
@@ -38,7 +35,7 @@ class HTTPClient:
                 headers={
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
                 },
-                proxies=proxies
+                proxy=proxy
             )
     
     async def close(self):

@@ -58,7 +58,7 @@ class R2Client:
             ext = 'jpg'
         
         # 确保扩展名有效
-        valid_exts = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'ogg', 'mp3', 'wav', 'm4a', 'aac', 'flac', 'opus', 'webm']
+        valid_exts = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg', 'ogg', 'mp3', 'wav', 'm4a', 'aac', 'flac', 'opus', 'webm']
         if ext not in valid_exts:
             ext = 'jpg'
         
@@ -75,6 +75,8 @@ class R2Client:
                 content_type = 'image/webp'
             elif ext == 'bmp':
                 content_type = 'image/bmp'
+            elif ext == 'svg':
+                content_type = 'image/svg+xml'
             elif ext == 'ogg':
                 content_type = 'audio/ogg'
             elif ext == 'mp3':

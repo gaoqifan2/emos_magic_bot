@@ -17,18 +17,135 @@ def load_tokens_from_db():
     print("[load_tokens] 开始加载用户token...")
     import sys
     sys.stdout.flush()
+
+    def cache_rows(rows):
+        count = 0
+        for result in rows:
+            try:
+                if 'telegram_id' not in result or 'token' not in result:
+                    print(f"记录缺少必要字段: {result}")
+                    continue
+                telegram_id = result['telegram_id']
+                token = result['token']
+                if not telegram_id or not token:
+                    continue
+                if isinstance(telegram_id, str):
+                    try:
+                        telegram_id = int(telegram_id)
+                    except Exception:
+                        print(f"telegram_id 不是有效的整数: {telegram_id}")
+                        continue
+                user_tokens[telegram_id] = {
+                    'token': token,
+                    'user_id': result.get('user_id', ''),
+                    'username': result.get('username', ''),
+                    'first_name': result.get('first_name', ''),
+                    'last_name': result.get('last_name', '')
+                }
+                count += 1
+            except Exception as e:
+                print(f"处理单条记录时出错: {e}")
+                import traceback
+                print(f"错误堆栈: {traceback.format_exc()}")
+        return count
+
+    total_count = 0
+
     try:
-        print("[load_tokens] 正在导入get_db_connection...")
+        print("[load_tokens] 正在从MySQL加载token...")
         sys.stdout.flush()
-        from app.database import get_db_connection
-        
-        print("[load_tokens] 正在获取数据库连接...")
-        sys.stdout.flush()
+        import pymysql
+        from utils.db_helper import get_db_connection
         connection = get_db_connection()
         if not connection:
-            print("[load_tokens] 数据库连接失败，跳过加载 token")
+            print("[load_tokens] MySQL连接失败，跳过MySQL加载")
+        else:
+            try:
+                with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+                    cursor.execute(
+                        "SELECT user_id, telegram_id, token, username, first_name, last_name "
+                        "FROM users WHERE token IS NOT NULL AND token <> '' AND telegram_id IS NOT NULL"
+                    )
+                    results = cursor.fetchall()
+                    print(f"[load_tokens] MySQL查询到 {len(results)} 个用户记录")
+                    total_count += cache_rows(results)
+            except Exception as e:
+                print(f"[load_tokens] 从MySQL加载 token 时出错: {e}")
+                import traceback
+                traceback.print_exc()
+            finally:
+                connection.close()
+                print("[load_tokens] MySQL连接已关闭")
+    except Exception as e:
+        print(f"[load_tokens] MySQL加载流程出错: {e}")
+        import traceback
+        traceback.print_exc()
+
+    try:
+        print("[load_tokens] 正在从本地SQLite加载token...")
+        sys.stdout.flush()
+        from app.database import get_db_connection
+        connection = get_db_connection()
+        if not connection:
+            print("[load_tokens] SQLite连接失败，跳过SQLite加载")
+        else:
+            try:
+                cursor = connection.cursor()
+                cursor.execute(
+                    "SELECT user_id, telegram_id, token, username, first_name, last_name "
+                    "FROM users WHERE token IS NOT NULL AND token <> '' AND telegram_id IS NOT NULL"
+                )
+                results = [dict(row) for row in cursor.fetchall()]
+                print(f"[load_tokens] SQLite查询到 {len(results)} 个用户记录")
+                total_count += cache_rows(results)
+            except Exception as e:
+                print(f"[load_tokens] 从SQLite加载 token 时出错: {e}")
+                import traceback
+                traceback.print_exc()
+            finally:
+                connection.close()
+                print("[load_tokens] SQLite连接已关闭")
+    except Exception as e:
+        print(f"[load_tokens] SQLite加载流程出错: {e}")
+        import traceback
+        traceback.print_exc()
+
+    print(f"[load_tokens] 共加载了 {total_count} 个用户的 token")
+    print("[load_tokens] 加载用户token完成!")
+    sys.stdout.flush()
+
+# 保存 token 到数据库
+def save_token_to_db(telegram_id, token, user_id=None, username=None, first_name='', last_name=''):
+    """将用户的 token 保存到本地SQLite缓存"""
+    try:
+        from app.database import add_user
+        add_user(user_id or str(telegram_id), telegram_id, username, first_name, last_name, token)
+    except Exception as e:
+        print(f"保存 token 到本地SQLite时出错: {e}")
+    # 同时更新内存中的 token
+    user_tokens[telegram_id] = {'token': token, 'user_id': user_id, 'username': username, 'first_name': first_name, 'last_name': last_name}
+
+    try:
+        from utils.db_helper import ensure_user_exists
+        if user_id:
+            ensure_user_exists(
+                emos_user_id=user_id,
+                token=token,
+                telegram_id=telegram_id,
+                username=username,
+                first_name=first_name,
+                last_name=last_name
+            )
+    except Exception as e:
+        print(f"同步 token 到MySQL时出错: {e}")
+
+def old_load_tokens_from_db_unused():
+    """旧加载逻辑保留占位，避免误用。"""
+    try:
+        from app.database import get_db_connection
+        connection = get_db_connection()
+        if not connection:
             return
-        
         try:
             cursor = connection.cursor()
             # 查询所有用户的 token
@@ -88,17 +205,6 @@ def load_tokens_from_db():
     
     print("[load_tokens] 加载用户token完成!")
     sys.stdout.flush()
-
-# 保存 token 到数据库
-def save_token_to_db(telegram_id, token, user_id=None, username=None, first_name='', last_name=''):
-    """将用户的 token 保存到数据库"""
-    try:
-        from app.database import update_user_token
-        update_user_token(telegram_id, token, first_name, last_name)
-    except Exception as e:
-        print(f"保存 token 到数据库时出错: {e}")
-    # 同时更新内存中的 token
-    user_tokens[telegram_id] = {'token': token, 'user_id': user_id, 'username': username, 'first_name': first_name, 'last_name': last_name}
 
 # 获取用户信息
 def get_user_info(token):

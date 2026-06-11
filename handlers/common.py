@@ -155,6 +155,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                         last_name=update.effective_user.last_name
                     )
                     logger.info(f"用户 {user_id} 数据库操作结果: local_user_id={local_user_id}")
+                    try:
+                        from app.config import save_token_to_db
+                        save_token_to_db(
+                            telegram_id=user_id,
+                            token=token,
+                            user_id=user_id_api,
+                            username=username,
+                            first_name=update.effective_user.first_name,
+                            last_name=update.effective_user.last_name
+                        )
+                    except Exception as cache_error:
+                        logger.error(f"保存本地登录缓存失败: {cache_error}")
                     
                     # 删除登录面板消息
                     if 'login_message_id' in context.user_data and 'login_chat_id' in context.user_data:
@@ -233,6 +245,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     last_name=update.effective_user.last_name
                 )
                 logger.info(f"用户 {user_id} 数据库操作结果: local_user_id={local_user_id}")
+                try:
+                    from app.config import save_token_to_db
+                    save_token_to_db(
+                        telegram_id=user_id,
+                        token=token,
+                        user_id=user_id_api,
+                        username=username,
+                        first_name=update.effective_user.first_name,
+                        last_name=update.effective_user.last_name
+                    )
+                except Exception as cache_error:
+                    logger.error(f"保存本地登录缓存失败: {cache_error}")
                 
                 # 删除登录面板消息
                 if 'login_message_id' in context.user_data and 'login_chat_id' in context.user_data:
@@ -525,6 +549,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     last_name=update.effective_user.last_name
                 )
                 logger.info(f"用户 {user_id} 数据库操作结果: local_user_id={local_user_id}")
+                try:
+                    from app.config import save_token_to_db
+                    save_token_to_db(
+                        telegram_id=user_id,
+                        token=token,
+                        user_id=user_id_api,
+                        username=username,
+                        first_name=update.effective_user.first_name,
+                        last_name=update.effective_user.last_name
+                    )
+                except Exception as cache_error:
+                    logger.error(f"保存本地登录缓存失败: {cache_error}")
                 
                 # 删除登录面板消息
                 if 'login_message_id' in context.user_data and 'login_chat_id' in context.user_data:
@@ -551,6 +587,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if user_id in user_tokens:
         # 获取用户信息
         user_info = user_tokens[user_id]
+        cached_username = update.effective_user.first_name or "用户"
+        cached_user_id = "未知"
+        if isinstance(user_info, dict):
+            cached_username = user_info.get('username') or user_info.get('first_name') or cached_username
+            cached_user_id = user_info.get('user_id') or cached_user_id
+        await show_menu(
+            update,
+            f"👋 欢迎回来 {cached_username}！\n\n"
+            f"你的ID是\n`{cached_user_id}`\n\n请选择功能："
+        )
+        return
         # 检查user_info是字典还是字符串
         if isinstance(user_info, dict):
             token = user_info.get('token')
@@ -576,6 +623,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     last_name=update.effective_user.last_name
                 )
                 logger.info(f"用户 {user_id} 数据库操作结果: local_user_id={local_user_id}")
+                try:
+                    from app.config import save_token_to_db
+                    save_token_to_db(
+                        telegram_id=user_id,
+                        token=token,
+                        user_id=user_id_api,
+                        username=username,
+                        first_name=update.effective_user.first_name,
+                        last_name=update.effective_user.last_name
+                    )
+                except Exception as cache_error:
+                    logger.error(f"保存本地登录缓存失败: {cache_error}")
                 
                 await show_menu(update, f"👋 欢迎回来 {username}！\n\n你的ID是\n`{user_id_api}`\n\n请选择功能：")
             else:
@@ -587,11 +646,19 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 await show_login_options(update, context)
         except Exception as e:
             logger.error(f"获取用户信息失败: {e}")
-            # 移除可能无效的token
-            if user_id in user_tokens:
-                del user_tokens[user_id]
-            # 显示登录选项
-            await show_login_options(update, context)
+            cached_username = None
+            cached_user_id = None
+            if isinstance(user_info, dict):
+                cached_username = user_info.get('username')
+                cached_user_id = user_info.get('user_id')
+            cached_username = cached_username or update.effective_user.first_name or "用户"
+            cached_user_id = cached_user_id or "未知"
+            await show_menu(
+                update,
+                f"👋 欢迎回来 {cached_username}！\n\n"
+                f"当前网络暂时无法校验登录状态，已继续使用本地缓存。\n"
+                f"你的ID是\n`{cached_user_id}`\n\n请选择功能："
+            )
     else:
         # 显示登录选项，要求用户使用正式token登录
         await show_login_options(update, context)
@@ -1728,8 +1795,11 @@ async def show_redpacket_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
     """红包二级菜单"""
     keyboard = [
         [
-            InlineKeyboardButton("🧧 创建红包", callback_data="menu_redpocket"),
-            InlineKeyboardButton("📊 查询红包", callback_data="menu_check_redpacket")
+            InlineKeyboardButton("🧧 创建红包", callback_data="menu_redpocket")
+        ],
+        [
+            InlineKeyboardButton("📋 我发的红包", callback_data="my_redpackets"),
+            InlineKeyboardButton("🔎 ID 查询", callback_data="input_id")
         ],
         [
             InlineKeyboardButton("🔙 返回主菜单", callback_data="back_to_main")
@@ -1737,7 +1807,7 @@ async def show_redpacket_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.callback_query.edit_message_text(
-        "🧧 红包功能\n\n请选择操作：",
+        "🧧 红包\n\n请选择操作：",
         reply_markup=reply_markup
     )
 

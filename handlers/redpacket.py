@@ -1,6 +1,10 @@
 import logging
 import requests
 import random
+import html
+import textwrap
+import asyncio
+from io import BytesIO
 from datetime import datetime, timedelta, timezone
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes, ConversationHandler
@@ -24,10 +28,209 @@ proxies = {
 }
 
 # 对话状态 (从1开始，避免与 ConversationHandler.END=0 冲突)
-WAITING_TYPE, WAITING_RECEIVE, WAITING_CARROT, WAITING_NUMBER, WAITING_BLESSING, WAITING_PASSWORD, WAITING_MEDIA, WAITING_SCENE, WAITING_CUSTOM_BLESSING = range(1, 10)
+WAITING_TYPE, WAITING_RECEIVE, WAITING_CARROT, WAITING_NUMBER, WAITING_BLESSING, WAITING_PASSWORD, WAITING_MEDIA, WAITING_SCENE, WAITING_CUSTOM_BLESSING, WAITING_BUBBLE_TEXT = range(1, 11)
 
 # 步骤顺序，用于返回上一步
 STEP_ORDER = ['type', 'receive', 'carrot', 'number', 'blessing', 'password', 'media']
+
+def get_media_cache_entry(uploaded_files, file_id):
+    """兼容旧的 url 字符串缓存和新的结构化缓存。"""
+    cached = uploaded_files.get(file_id)
+    if isinstance(cached, dict):
+        return cached
+    if cached:
+        return {"url": cached}
+    return None
+
+def set_media_cache_entry(uploaded_files, file_id, url, file_type, api_file_id=None):
+    uploaded_files[file_id] = {
+        "url": url,
+        "file_type": file_type,
+        "api_file_id": api_file_id
+    }
+
+def update_media_cache_file_id(context, telegram_file_id, api_file_id):
+    if not telegram_file_id or not api_file_id:
+        return
+    uploaded_files = context.user_data.get('uploaded_files', {})
+    cached = get_media_cache_entry(uploaded_files, telegram_file_id)
+    if cached:
+        cached['api_file_id'] = api_file_id
+        uploaded_files[telegram_file_id] = cached
+
+def build_bubble_svg(text):
+    lines = []
+    for paragraph in text.splitlines() or [text]:
+        wrapped = textwrap.wrap(paragraph, width=14) or ['']
+        lines.extend(wrapped)
+    lines = lines[:6]
+    width = 760
+    line_height = 48
+    bubble_height = max(220, 120 + len(lines) * line_height)
+    height = bubble_height + 100
+    text_y = 92 + max(0, (bubble_height - 120 - len(lines) * line_height) // 2)
+    tspans = []
+    for index, line in enumerate(lines):
+        escaped = html.escape(line)
+        tspans.append(f'<tspan x="380" y="{text_y + index * line_height}">{escaped}</tspan>')
+    joined_tspans = ''.join(tspans)
+    return f'''<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+  <rect width="100%" height="100%" rx="38" fill="#f7f3eb"/>
+  <path d="M86 56 H674 Q714 56 714 96 V{bubble_height - 4} Q714 {bubble_height + 36} 674 {bubble_height + 36} H236 L160 {bubble_height + 84} L184 {bubble_height + 36} H86 Q46 {bubble_height + 36} 46 {bubble_height - 4} V96 Q46 56 86 56 Z" fill="#ffffff" filter="url(#shadow)"/>
+  <path d="M86 56 H674 Q714 56 714 96 V{bubble_height - 4} Q714 {bubble_height + 36} 674 {bubble_height + 36} H236 L160 {bubble_height + 84} L184 {bubble_height + 36} H86 Q46 {bubble_height + 36} 46 {bubble_height - 4} V96 Q46 56 86 56 Z" fill="none" stroke="#efcf79" stroke-width="4"/>
+  <text font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, Arial, sans-serif" font-size="34" font-weight="700" fill="#3d3122" text-anchor="middle">{joined_tspans}</text>
+  <text x="380" y="{height - 32}" font-family="Arial, sans-serif" font-size="20" fill="#b08b3f" text-anchor="middle">EMOS RED PACKET</text>
+</svg>'''
+
+async def create_bubble_cover(update, context, text):
+    user_id = update.effective_user.id
+    image_data = build_bubble_png(text)
+    file_name = f"redpacket_bubble_{user_id}_{datetime.now(beijing_tz).strftime('%Y%m%d%H%M%S')}.png"
+    return await upload_r2_async(image_data, file_name, "redpacket")
+
+async def upload_r2_async(file_data, file_name, folder):
+    return await asyncio.wait_for(
+        asyncio.to_thread(r2_client.upload_file, file_data, file_name, folder),
+        timeout=30
+    )
+
+def get_bubble_font(size):
+    from PIL import ImageFont
+    font_paths = [
+        "C:/Windows/Fonts/msyh.ttc",
+        "C:/Windows/Fonts/simhei.ttf",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    ]
+    for font_path in font_paths:
+        try:
+            return ImageFont.truetype(font_path, size)
+        except Exception:
+            continue
+    return ImageFont.load_default()
+
+def build_bubble_png(text):
+    from PIL import Image, ImageDraw
+
+    lines = []
+    for paragraph in text.splitlines() or [text]:
+        wrapped = textwrap.wrap(paragraph, width=14) or ['']
+        lines.extend(wrapped)
+    lines = lines[:6]
+
+    width = 760
+    line_height = 58
+    height = max(360, 150 + len(lines) * line_height)
+    image = Image.new("RGB", (width, height), (255, 255, 255))
+    draw = ImageDraw.Draw(image)
+
+    font = get_bubble_font(42)
+    total_text_height = len(lines) * line_height
+    y = max(48, (height - total_text_height) // 2)
+    for line in lines:
+        bbox = draw.textbbox((0, 0), line, font=font)
+        text_width = bbox[2] - bbox[0]
+        draw.text(((width - text_width) // 2, y), line, font=font, fill=(0, 0, 0))
+        y += line_height
+
+    output = BytesIO()
+    image.save(output, format="PNG", optimize=True)
+    return output.getvalue()
+
+async def delete_current_prompt_message(update, context):
+    prompt_message = context.user_data.pop('current_prompt_message', None)
+    if not prompt_message:
+        return
+    message_id = getattr(prompt_message, 'message_id', prompt_message)
+    try:
+        await context.bot.delete_message(
+            chat_id=update.effective_chat.id,
+            message_id=message_id
+        )
+    except Exception as e:
+        logger.error(f"删除提示消息失败: {e}")
+
+def get_redpacket_type_keyboard():
+    keyboard = [
+        [
+            InlineKeyboardButton("🧧 普通", callback_data="type_random"),
+            InlineKeyboardButton("🔐 口令", callback_data="type_password")
+        ],
+        [
+            InlineKeyboardButton("🖼️ 图片", callback_data="type_image"),
+            InlineKeyboardButton("🎵 语音", callback_data="type_audio")
+        ],
+        [
+            InlineKeyboardButton("💬 气泡", callback_data="type_bubble"),
+            InlineKeyboardButton("💝 私包", callback_data="type_private")
+        ],
+        [
+            InlineKeyboardButton("🔙 返回红包菜单", callback_data="menu_redpacket_main")
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+async def show_receive_choice(query, title="请选择领取方式："):
+    keyboard = [
+        [
+            InlineKeyboardButton("⚖️ 均分", callback_data="receive_average"),
+            InlineKeyboardButton("🎲 随机", callback_data="receive_random")
+        ],
+        [InlineKeyboardButton("⬅️ 返回类型", callback_data="back_type")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.edit_message_text(title, reply_markup=reply_markup)
+    return WAITING_RECEIVE
+
+async def show_exclusive_choice(query, media_name):
+    keyboard = [
+        [
+            InlineKeyboardButton("✅ 独占", callback_data="exclusive_yes"),
+            InlineKeyboardButton("🚫 普通", callback_data="exclusive_no")
+        ],
+        [InlineKeyboardButton("⬅️ 返回类型", callback_data="back_type")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.edit_message_text(
+        f"{media_name}红包\n\n请选择展示方式：\n"
+        "独占模式开启后，bot 只展示文件内容。",
+        reply_markup=reply_markup
+    )
+    return WAITING_TYPE
+
+async def show_attachment_choice(query, title):
+    keyboard = [
+        [InlineKeyboardButton("🚫 不加文件", callback_data="attach_none")],
+        [
+            InlineKeyboardButton("🖼️ 独占图片", callback_data="attach_image_exclusive"),
+            InlineKeyboardButton("🎵 独占语音", callback_data="attach_audio_exclusive")
+        ],
+        [InlineKeyboardButton("⬅️ 返回类型", callback_data="back_type")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.edit_message_text(
+        f"{title}\n\n请选择展示内容：\n独占模式会让 bot 只显示你上传的文件内容。",
+        reply_markup=reply_markup
+    )
+    return WAITING_TYPE
+
+async def continue_after_attachment_choice(query, context):
+    redpacket_data = context.user_data['redpacket']
+    if redpacket_data.get('private'):
+        redpacket_data['current_step'] = 'carrot'
+        message = await query.edit_message_text("💝 私包\n\n💰 请输入红包金额（萝卜）：\n（1 - 60000 之间）", reply_markup=get_step_keyboard('carrot'))
+        context.user_data['current_prompt_message'] = message.message_id
+        return WAITING_CARROT
+    if redpacket_data.get('type') == 'password':
+        return await show_receive_choice(query, "🔐 口令红包\n\n请选择领取方式：")
+    return await show_receive_choice(query, "🧧 普通红包\n\n请选择领取方式：")
 
 def get_step_keyboard(current_step):
     """获取当前步骤的键盘，包含返回上一步按钮"""
@@ -83,18 +286,9 @@ async def redpocket_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if 'uploaded_files' not in context.user_data:
         context.user_data['uploaded_files'] = {}
     
-    # 显示红包类型选择菜单
-    keyboard = [
-        [InlineKeyboardButton("🎲 普通红包　　　　　　", callback_data="type_random")],
-        [InlineKeyboardButton("🔐 口令红包　　　　　　", callback_data="type_password")],
-        [InlineKeyboardButton("💝 私包　　　　　　　　", callback_data="type_private")],
-        [InlineKeyboardButton("🖼️ 图片红包　　　　　　", callback_data="type_image")],
-        [InlineKeyboardButton("🎵 语音红包　　　　　　", callback_data="type_audio")],
-        [InlineKeyboardButton("⬅️ 返回上一步", callback_data="back_prev")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    reply_markup = get_redpacket_type_keyboard()
     
-    message_text = "🧧 创建红包\n\n请选择红包类型："
+    message_text = "🧧 创建红包\n\n请选择类型："
     
     if update.message:
         await update.message.reply_text(message_text, reply_markup=reply_markup)
@@ -127,35 +321,25 @@ async def handle_type(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if data == 'type_random':
         redpacket_data['type'] = 'random'
-        redpacket_data['current_step'] = 'receive'
-        keyboard = [
-            [InlineKeyboardButton("⚖️ 均分模式　　　　　　", callback_data="receive_average")],
-            [InlineKeyboardButton("🎲 随机模式　　　　　　", callback_data="receive_random")],
-            [InlineKeyboardButton("⬅️ 返回上一步", callback_data="back_type")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text("🧧 普通红包\n\n请选择领取方式：", reply_markup=reply_markup)
-        return WAITING_RECEIVE
+        redpacket_data['has_password'] = False
+        redpacket_data['current_step'] = 'attachment_choice'
+        return await show_attachment_choice(query, "🧧 普通红包")
     elif data == 'type_password':
         redpacket_data['type'] = 'password'
-        redpacket_data['current_step'] = 'receive'
-        keyboard = [
-            [InlineKeyboardButton("⚖️ 均分模式　　　　　　", callback_data="receive_average")],
-            [InlineKeyboardButton("🎲 随机模式　　　　　　", callback_data="receive_random")],
-            [InlineKeyboardButton("⬅️ 返回上一步", callback_data="back_type")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text("🔐 口令红包\n\n请选择领取方式：", reply_markup=reply_markup)
-        return WAITING_RECEIVE
+        redpacket_data['has_password'] = True
+        redpacket_data['current_step'] = 'attachment_choice'
+        return await show_attachment_choice(query, "🔐 口令红包")
     elif data == 'type_image':
         redpacket_data['type'] = 'image'
         redpacket_data['current_step'] = 'password_choice'
         # 显示口令选择菜单
         keyboard = [
-            [InlineKeyboardButton("🚫 无口令 (手气红包)　　", callback_data="image_no_password")],
-            [InlineKeyboardButton("🔐 有口令　　　　　　　", callback_data="image_with_password")]
+            [
+                InlineKeyboardButton("🚫 无口令", callback_data="image_no_password"),
+                InlineKeyboardButton("🔐 有口令", callback_data="image_with_password")
+            ],
+            [InlineKeyboardButton("⬅️ 返回类型", callback_data="back_type")]
         ]
-        keyboard = add_cancel_button(keyboard)
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text("🖼️ 图片红包\n\n请选择是否需要口令：", reply_markup=reply_markup)
         return WAITING_TYPE
@@ -164,65 +348,81 @@ async def handle_type(update: Update, context: ContextTypes.DEFAULT_TYPE):
         redpacket_data['current_step'] = 'password_choice'
         # 显示口令选择菜单
         keyboard = [
-            [InlineKeyboardButton("🚫 无口令 (手气红包)　　", callback_data="audio_no_password")],
-            [InlineKeyboardButton("🔐 有口令　　　　　　　", callback_data="audio_with_password")]
+            [
+                InlineKeyboardButton("🚫 无口令", callback_data="audio_no_password"),
+                InlineKeyboardButton("🔐 有口令", callback_data="audio_with_password")
+            ],
+            [InlineKeyboardButton("⬅️ 返回类型", callback_data="back_type")]
         ]
-        keyboard = add_cancel_button(keyboard)
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text("🎵 语音红包\n\n请选择是否需要口令：", reply_markup=reply_markup)
+        return WAITING_TYPE
+    elif data == 'type_bubble':
+        redpacket_data['type'] = 'image'
+        redpacket_data['file_type'] = 'image'
+        redpacket_data['bubble_mode'] = True
+        redpacket_data['is_exclusive'] = True
+        redpacket_data['current_step'] = 'password_choice'
+        keyboard = [
+            [
+                InlineKeyboardButton("🚫 无口令", callback_data="bubble_no_password"),
+                InlineKeyboardButton("🔐 有口令", callback_data="bubble_with_password")
+            ],
+            [InlineKeyboardButton("⬅️ 返回类型", callback_data="back_type")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text("💬 气泡红包\n\n请选择是否需要口令：", reply_markup=reply_markup)
         return WAITING_TYPE
     elif data == 'type_private':
         redpacket_data['type'] = 'password'
         redpacket_data['has_password'] = True
         redpacket_data['private'] = True
-        redpacket_data['current_step'] = 'carrot'
-        message = await query.edit_message_text("💝 私包\n\n💰 请输入红包金额（萝卜）：\n（1 - 60000 之间）", reply_markup=get_step_keyboard('carrot'))
-        context.user_data['current_prompt_message'] = message.message_id
-        return WAITING_CARROT
+        redpacket_data['current_step'] = 'attachment_choice'
+        return await show_attachment_choice(query, "💝 私包")
+    elif data == 'attach_none':
+        redpacket_data['attachment_required'] = False
+        redpacket_data.pop('expected_file_type', None)
+        redpacket_data.pop('is_exclusive', None)
+        return await continue_after_attachment_choice(query, context)
+    elif data in ('attach_image_exclusive', 'attach_audio_exclusive'):
+        expected_file_type = 'image' if data == 'attach_image_exclusive' else 'audio'
+        redpacket_data['attachment_required'] = True
+        redpacket_data['expected_file_type'] = expected_file_type
+        redpacket_data['file_type'] = expected_file_type
+        redpacket_data['is_exclusive'] = True
+        return await continue_after_attachment_choice(query, context)
     elif data == 'image_no_password':
         redpacket_data['has_password'] = False
-        redpacket_data['current_step'] = 'receive'
-        keyboard = [
-            [InlineKeyboardButton("⚖️ 均分模式　　　　　　", callback_data="receive_average")],
-            [InlineKeyboardButton("🎲 随机模式　　　　　　", callback_data="receive_random")],
-            [InlineKeyboardButton("⬅️ 返回上一步", callback_data="back_type")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text("🖼️ 图片红包 - 无口令\n\n请选择领取方式：", reply_markup=reply_markup)
-        return WAITING_RECEIVE
+        redpacket_data['current_step'] = 'exclusive'
+        return await show_exclusive_choice(query, "🖼️ 图片")
     elif data == 'image_with_password':
         redpacket_data['has_password'] = True
-        redpacket_data['current_step'] = 'receive'
-        keyboard = [
-            [InlineKeyboardButton("⚖️ 均分模式　　　　　　", callback_data="receive_average")],
-            [InlineKeyboardButton("🎲 随机模式　　　　　　", callback_data="receive_random")],
-            [InlineKeyboardButton("⬅️ 返回上一步", callback_data="back_type")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text("🖼️ 图片红包 - 有口令\n\n请选择领取方式：", reply_markup=reply_markup)
-        return WAITING_RECEIVE
+        redpacket_data['current_step'] = 'exclusive'
+        return await show_exclusive_choice(query, "🖼️ 图片")
     elif data == 'audio_no_password':
         redpacket_data['has_password'] = False
-        redpacket_data['current_step'] = 'receive'
-        keyboard = [
-            [InlineKeyboardButton("⚖️ 均分模式　　　　　　", callback_data="receive_average")],
-            [InlineKeyboardButton("🎲 随机模式　　　　　　", callback_data="receive_random")],
-            [InlineKeyboardButton("⬅️ 返回上一步", callback_data="back_type")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text("🎵 语音红包 - 无口令\n\n请选择领取方式：", reply_markup=reply_markup)
-        return WAITING_RECEIVE
+        redpacket_data['current_step'] = 'exclusive'
+        return await show_exclusive_choice(query, "🎵 语音")
     elif data == 'audio_with_password':
         redpacket_data['has_password'] = True
+        redpacket_data['current_step'] = 'exclusive'
+        return await show_exclusive_choice(query, "🎵 语音")
+    elif data == 'bubble_no_password':
+        redpacket_data['has_password'] = False
+        redpacket_data['is_exclusive'] = True
         redpacket_data['current_step'] = 'receive'
-        keyboard = [
-            [InlineKeyboardButton("⚖️ 均分模式　　　　　　", callback_data="receive_average")],
-            [InlineKeyboardButton("🎲 随机模式　　　　　　", callback_data="receive_random")],
-            [InlineKeyboardButton("⬅️ 返回上一步", callback_data="back_type")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text("🎵 语音红包 - 有口令\n\n请选择领取方式：", reply_markup=reply_markup)
-        return WAITING_RECEIVE
+        return await show_receive_choice(query, "💬 气泡红包 - 无口令\n\n请选择领取方式：")
+    elif data == 'bubble_with_password':
+        redpacket_data['has_password'] = True
+        redpacket_data['is_exclusive'] = True
+        redpacket_data['current_step'] = 'receive'
+        return await show_receive_choice(query, "💬 气泡红包 - 有口令\n\n请选择领取方式：")
+    elif data in ('exclusive_yes', 'exclusive_no'):
+        redpacket_data['is_exclusive'] = data == 'exclusive_yes'
+        redpacket_data['current_step'] = 'receive'
+        media_name = "图片" if redpacket_data.get('type') == 'image' else "语音"
+        mode_name = "独占模式" if redpacket_data['is_exclusive'] else "普通展示"
+        return await show_receive_choice(query, f"{media_name}红包 - {mode_name}\n\n请选择领取方式：")
     elif data == 'receive_average':
         redpacket_data['receive'] = 'average'
         redpacket_data['current_step'] = 'carrot'
@@ -284,8 +484,11 @@ async def handle_back(update: Update, context: ContextTypes.DEFAULT_TYPE, data: 
         # 返回到红包功能菜单
         keyboard = [
             [
-                InlineKeyboardButton("🧧 创建红包", callback_data="menu_redpocket"),
-                InlineKeyboardButton("📊 查询红包", callback_data="menu_check_redpacket")
+                InlineKeyboardButton("🧧 创建红包", callback_data="menu_redpocket")
+            ],
+            [
+                InlineKeyboardButton("📋 我发的红包", callback_data="my_redpackets"),
+                InlineKeyboardButton("🔎 ID 查询", callback_data="input_id")
             ],
             [
                 InlineKeyboardButton("🔙 返回主菜单", callback_data="back_to_main")
@@ -296,27 +499,11 @@ async def handle_back(update: Update, context: ContextTypes.DEFAULT_TYPE, data: 
         return ConversationHandler.END
     elif prev_step == 'type':
         redpacket_data['current_step'] = 'type'
-        keyboard = [
-            [InlineKeyboardButton("🎲 普通红包　　　　　　", callback_data="type_random")],
-            [InlineKeyboardButton("🔐 口令红包　　　　　　", callback_data="type_password")],
-            [InlineKeyboardButton("💝 私包　　　　　　　　", callback_data="type_private")],
-            [InlineKeyboardButton("🖼️ 图片红包　　　　　　", callback_data="type_image")],
-            [InlineKeyboardButton("🎵 语音红包　　　　　　", callback_data="type_audio")],
-            [InlineKeyboardButton("⬅️ 返回上一步", callback_data="back_prev")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text("🧧 创建红包\n\n请选择红包类型：", reply_markup=reply_markup)
+        await query.edit_message_text("🧧 创建红包\n\n请选择类型：", reply_markup=get_redpacket_type_keyboard())
         return WAITING_TYPE
     elif prev_step == 'receive':
         redpacket_data['current_step'] = 'receive'
-        keyboard = [
-            [InlineKeyboardButton("⚖️ 均分模式　　　　　　", callback_data="receive_average")],
-            [InlineKeyboardButton("🎲 随机模式　　　　　　", callback_data="receive_random")],
-            [InlineKeyboardButton("⬅️ 返回上一步", callback_data="back_type")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text("请选择领取方式：", reply_markup=reply_markup)
-        return WAITING_RECEIVE
+        return await show_receive_choice(query)
     elif prev_step == 'carrot':
         redpacket_data['current_step'] = 'carrot'
         message = await query.edit_message_text("💰 请输入红包总金额（萝卜）：\n（1 - 60000 之间）", reply_markup=get_step_keyboard('carrot'))
@@ -353,17 +540,6 @@ async def handle_carrot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     logger.info(f"用户 {user_id} 输入金额: {text}")
     
-    # 删除之前的提示消息
-    if 'current_prompt_message' in context.user_data:
-        try:
-            await context.bot.delete_message(
-                chat_id=update.effective_chat.id,
-                message_id=context.user_data['current_prompt_message']
-            )
-            del context.user_data['current_prompt_message']
-        except Exception as e:
-            logger.error(f"删除提示消息失败: {e}")
-    
     if 'redpacket' not in context.user_data:
         await update.message.reply_text("⚠️ 会话已过期，请重新开始")
         return ConversationHandler.END
@@ -377,6 +553,7 @@ async def handle_carrot(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data['current_prompt_message'] = message.message_id
             return WAITING_CARROT
         
+        await delete_current_prompt_message(update, context)
         redpacket_data['carrot'] = carrot
         
         # 处理私包逻辑
@@ -399,7 +576,7 @@ async def handle_carrot(update: Update, context: ContextTypes.DEFAULT_TYPE):
         redpacket_data['current_step'] = 'number'
         
         # 图片/语音红包提示可以上传媒体
-        if redpacket_data['type'] in ['image', 'audio']:
+        if redpacket_data['type'] in ['image', 'audio'] and not redpacket_data.get('bubble_mode'):
             media_type = "图片" if redpacket_data['type'] == 'image' else "语音"
             message = await update.message.reply_text(f"👥 请输入可领人数：\n（1 - 10000 之间）\n\n📎 你也可以随时发送{media_type}作为红包封面", reply_markup=get_step_keyboard('number'))
             context.user_data['current_prompt_message'] = message.message_id
@@ -419,17 +596,6 @@ async def handle_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     logger.info(f"用户 {user_id} 输入人数: {text}")
     
-    # 删除之前的提示消息
-    if 'current_prompt_message' in context.user_data:
-        try:
-            await context.bot.delete_message(
-                chat_id=update.effective_chat.id,
-                message_id=context.user_data['current_prompt_message']
-            )
-            del context.user_data['current_prompt_message']
-        except Exception as e:
-            logger.error(f"删除提示消息失败: {e}")
-    
     if 'redpacket' not in context.user_data:
         await update.message.reply_text("⚠️ 会话已过期，请重新开始")
         return ConversationHandler.END
@@ -443,11 +609,12 @@ async def handle_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data['current_prompt_message'] = message.message_id
             return WAITING_NUMBER
         
+        await delete_current_prompt_message(update, context)
         redpacket_data['number'] = number
         redpacket_data['current_step'] = 'blessing'
         
         # 图片/语音红包提示可以上传媒体
-        if redpacket_data['type'] in ['image', 'audio']:
+        if redpacket_data['type'] in ['image', 'audio'] and not redpacket_data.get('bubble_mode'):
             media_type = "图片" if redpacket_data['type'] == 'image' else "语音"
             message = await update.message.reply_text(f"💬 请输入祝福语（最多50字）：\n\n📎 你也可以随时发送{media_type}作为红包封面", reply_markup=get_step_keyboard('blessing'))
             context.user_data['current_prompt_message'] = message.message_id
@@ -467,17 +634,6 @@ async def handle_blessing(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     logger.info(f"用户 {user_id} 输入祝福语")
     
-    # 删除之前的提示消息
-    if 'current_prompt_message' in context.user_data:
-        try:
-            await context.bot.delete_message(
-                chat_id=update.effective_chat.id,
-                message_id=context.user_data['current_prompt_message']
-            )
-            del context.user_data['current_prompt_message']
-        except Exception as e:
-            logger.error(f"删除提示消息失败: {e}")
-    
     if 'redpacket' not in context.user_data:
         await update.message.reply_text("⚠️ 会话已过期，请重新开始")
         return ConversationHandler.END
@@ -489,10 +645,18 @@ async def handle_blessing(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data['current_prompt_message'] = message.message_id
         return WAITING_BLESSING
     
+    await delete_current_prompt_message(update, context)
     redpacket_data['blessing'] = text
-    redpacket_data['current_step'] = 'password' if redpacket_data.get('has_password') or redpacket_data['type'] == 'password' else 'media' if redpacket_data['type'] in ['image', 'audio'] else 'complete'
+    if redpacket_data.get('bubble_mode'):
+        redpacket_data['current_step'] = 'password' if redpacket_data.get('has_password') else 'bubble_text'
+    else:
+        redpacket_data['current_step'] = 'password' if redpacket_data.get('has_password') or redpacket_data['type'] == 'password' else 'media' if redpacket_data['type'] in ['image', 'audio'] else 'complete'
     
-    if redpacket_data['type'] == 'password':
+    if redpacket_data.get('bubble_mode') and not redpacket_data.get('has_password'):
+        message = await update.message.reply_text("💬 请输入要生成气泡图片的文字（最多80字）：", reply_markup=get_step_keyboard('media'))
+        context.user_data['current_prompt_message'] = message.message_id
+        return WAITING_BUBBLE_TEXT
+    elif redpacket_data['type'] == 'password':
         message = await update.message.reply_text("🔑 请输入红包口令：", reply_markup=get_step_keyboard('password'))
         context.user_data['current_prompt_message'] = message.message_id
         return WAITING_PASSWORD
@@ -520,26 +684,20 @@ async def handle_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     logger.info(f"用户 {user_id} 输入口令")
     
-    # 删除之前的提示消息
-    if 'current_prompt_message' in context.user_data:
-        try:
-            await context.bot.delete_message(
-                chat_id=update.effective_chat.id,
-                message_id=context.user_data['current_prompt_message']
-            )
-            del context.user_data['current_prompt_message']
-        except Exception as e:
-            logger.error(f"删除提示消息失败: {e}")
-    
     if 'redpacket' not in context.user_data:
         await update.message.reply_text("⚠️ 会话已过期，请重新开始")
         return ConversationHandler.END
     
     redpacket_data = context.user_data['redpacket']
+    await delete_current_prompt_message(update, context)
     redpacket_data['password'] = text
-    redpacket_data['current_step'] = 'media' if redpacket_data['type'] in ['image', 'audio'] else 'complete'
+    redpacket_data['current_step'] = 'bubble_text' if redpacket_data.get('bubble_mode') else 'media' if redpacket_data['type'] in ['image', 'audio'] else 'complete'
     
-    if redpacket_data['type'] in ['image', 'audio']:
+    if redpacket_data.get('bubble_mode'):
+        message = await update.message.reply_text("💬 请输入要生成气泡图片的文字（最多80字）：", reply_markup=get_step_keyboard('media'))
+        context.user_data['current_prompt_message'] = message.message_id
+        return WAITING_BUBBLE_TEXT
+    elif redpacket_data['type'] in ['image', 'audio']:
         # 检查是否已经上传了媒体
         if redpacket_data.get('cover_url'):
             return await create_redpacket(update, context)
@@ -557,31 +715,26 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     logger.info(f"用户 {user_id} 上传媒体")
     
-    # 删除之前的提示消息
-    if 'current_prompt_message' in context.user_data:
-        try:
-            await context.bot.delete_message(
-                chat_id=update.effective_chat.id,
-                message_id=context.user_data['current_prompt_message']
-            )
-            del context.user_data['current_prompt_message']
-        except Exception as e:
-            logger.error(f"删除提示消息失败: {e}")
-    
     if 'redpacket' not in context.user_data:
         await update.message.reply_text("⚠️ 会话已过期，请重新开始")
         return ConversationHandler.END
     
     redpacket_data = context.user_data['redpacket']
+    expected_file_type = redpacket_data.get('expected_file_type')
     
     # 检查文件类型
     if update.message.photo:
+        if expected_file_type == 'audio':
+            await update.message.reply_text("❌ 当前选择的是独占语音，请发送语音或音频文件")
+            return WAITING_MEDIA
         # 处理图片
         photo = update.message.photo[-1]
         file_id = photo.file_id
         
-        if file_id in context.user_data['uploaded_files']:
-            cover_url = context.user_data['uploaded_files'][file_id]
+        cached_file = get_media_cache_entry(context.user_data['uploaded_files'], file_id)
+        if cached_file:
+            cover_url = cached_file.get('url')
+            redpacket_data['file_id'] = cached_file.get('api_file_id')
             await update.message.reply_text("✅ 使用已上传的图片！")
         else:
             loading = await update.message.reply_text("🔄 正在上传图片到云端...")
@@ -591,10 +744,10 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 file_name = f"redpacket_{user_id}_{file_id}.jpg"
                 
                 logger.info(f"开始上传图片: {file_name}, 大小: {len(file_data)} bytes")
-                cover_url = r2_client.upload_file(bytes(file_data), file_name, "redpacket")
+                cover_url = await upload_r2_async(bytes(file_data), file_name, "redpacket")
                 logger.info(f"图片上传成功: {cover_url}")
                 
-                context.user_data['uploaded_files'][file_id] = cover_url
+                set_media_cache_entry(context.user_data['uploaded_files'], file_id, cover_url, 'image')
                 await loading.edit_text("✅ 图片上传成功！")
             except Exception as e:
                 logger.error(f"上传图片失败: {e}")
@@ -603,12 +756,17 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         redpacket_data['cover_url'] = cover_url
         redpacket_data['file_type'] = 'image'
+        redpacket_data['telegram_file_id'] = file_id
         redpacket_data['current_step'] = 'complete'
+        await delete_current_prompt_message(update, context)
         
         # 根据当前步骤继续
         return await continue_after_media(update, context)
     
     elif update.message.voice or update.message.audio or update.message.document:
+        if expected_file_type == 'image':
+            await update.message.reply_text("❌ 当前选择的是独占图片，请发送图片")
+            return WAITING_MEDIA
         # 处理音频
         file_id = None
         file_extension = 'ogg'
@@ -651,8 +809,10 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"❌ 文件大小超过限制（{max_file_size // 1024 // 1024}MB），请上传更小的文件")
             return WAITING_MEDIA
         
-        if file_id in context.user_data['uploaded_files']:
-            audio_url = context.user_data['uploaded_files'][file_id]
+        cached_file = get_media_cache_entry(context.user_data['uploaded_files'], file_id)
+        if cached_file:
+            audio_url = cached_file.get('url')
+            redpacket_data['file_id'] = cached_file.get('api_file_id')
             await update.message.reply_text("✅ 使用已上传的音频！")
         else:
             loading = await update.message.reply_text("🔄 正在上传音频到云端...")
@@ -662,10 +822,10 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 file_name = f"redpacket_{user_id}_{file_id}.{file_extension}"
                 
                 logger.info(f"开始上传音频: {file_name}, 大小: {len(file_data)} bytes")
-                audio_url = r2_client.upload_file(bytes(file_data), file_name, "redpacket")
+                audio_url = await upload_r2_async(bytes(file_data), file_name, "redpacket")
                 logger.info(f"音频上传成功: {audio_url}")
                 
-                context.user_data['uploaded_files'][file_id] = audio_url
+                set_media_cache_entry(context.user_data['uploaded_files'], file_id, audio_url, 'audio')
                 await loading.edit_text("✅ 音频上传成功！")
             except Exception as e:
                 logger.error(f"上传音频失败: {e}")
@@ -674,7 +834,9 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         redpacket_data['cover_url'] = audio_url
         redpacket_data['file_type'] = 'audio'
+        redpacket_data['telegram_file_id'] = file_id
         redpacket_data['current_step'] = 'complete'
+        await delete_current_prompt_message(update, context)
         
         # 根据当前步骤继续
         return await continue_after_media(update, context)
@@ -733,6 +895,46 @@ async def continue_after_media(update: Update, context: ContextTypes.DEFAULT_TYP
             else:
                 return await create_redpacket(update, context)
 
+async def handle_bubble_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """处理气泡红包文字并生成图片封面"""
+    user_id = update.effective_user.id
+    text = update.message.text.strip()
+    
+    logger.info(f"用户 {user_id} 输入气泡文字")
+    
+    if 'redpacket' not in context.user_data:
+        await update.message.reply_text("⚠️ 会话已过期，请重新开始")
+        return ConversationHandler.END
+    
+    redpacket_data = context.user_data['redpacket']
+    
+    if not text:
+        message = await update.message.reply_text("⚠️ 气泡文字不能为空，请重新输入：", reply_markup=get_step_keyboard('media'))
+        context.user_data['current_prompt_message'] = message.message_id
+        return WAITING_BUBBLE_TEXT
+    if len(text) > 80:
+        message = await update.message.reply_text("⚠️ 气泡文字不能超过80字，请重新输入：", reply_markup=get_step_keyboard('media'))
+        context.user_data['current_prompt_message'] = message.message_id
+        return WAITING_BUBBLE_TEXT
+    
+    await delete_current_prompt_message(update, context)
+    loading = await update.message.reply_text("🔄 正在生成气泡图片...")
+    try:
+        cover_url = await create_bubble_cover(update, context, text)
+        redpacket_data['bubble_text'] = text
+        redpacket_data['cover_url'] = cover_url
+        redpacket_data['file_type'] = 'image'
+        redpacket_data['is_exclusive'] = True
+        redpacket_data['current_step'] = 'complete'
+        await loading.edit_text("✅ 气泡图片生成成功！")
+        return await create_redpacket(update, context)
+    except Exception as e:
+        logger.error(f"生成气泡图片失败: {e}")
+        await loading.edit_text("❌ 气泡图片生成失败，请稍后重试")
+        message = await update.message.reply_text("💬 请重新输入气泡文字：", reply_markup=get_step_keyboard('media'))
+        context.user_data['current_prompt_message'] = message.message_id
+        return WAITING_BUBBLE_TEXT
+
 async def create_redpacket(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """创建红包API调用"""
     user_id = update.effective_user.id
@@ -762,6 +964,17 @@ async def create_redpacket(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await update.callback_query.message.reply_text(f"❌ 数据不完整，缺少: {missing}，请重新开始")
         return ConversationHandler.END
+
+    if data.get('attachment_required') and not (data.get('cover_url') or data.get('file_id')):
+        data['current_step'] = 'media'
+        media_type = "图片" if data.get('expected_file_type') == 'image' else "语音"
+        prompt_text = f"👁️ 独占模式已开启\n\n请发送{media_type}内容："
+        if update.message:
+            message = await update.message.reply_text(prompt_text, reply_markup=get_step_keyboard('media'))
+        else:
+            message = await update.callback_query.message.reply_text(prompt_text, reply_markup=get_step_keyboard('media'))
+        context.user_data['current_prompt_message'] = message.message_id
+        return WAITING_MEDIA
     
     # 处理回调查询的情况
     if update.message:
@@ -775,21 +988,11 @@ async def create_redpacket(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Content-Type": "application/json"
         }
         
-        if data.get('type') == 'random':
-            redpacket_type = "random"
-            redpacket_text = None
-        elif data.get('type') == 'password':
+        if data.get('type') == 'password' or data.get('has_password') or data.get('private'):
             redpacket_type = "password"
             redpacket_text = data.get('password', None)
-        elif data.get('type') in ['image', 'audio']:
-            if data.get('has_password'):
-                redpacket_type = "password"
-                redpacket_text = data.get('password', None)
-            else:
-                redpacket_type = "fixed"
-                redpacket_text = None
         else:
-            redpacket_type = "random"
+            redpacket_type = "default"
             redpacket_text = None
         
         receive_type = data.get('receive', 'average') if not data.get('private') else 'average'
@@ -800,12 +1003,24 @@ async def create_redpacket(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "carrot": data['carrot'],
             "number": data['number'],
             "blessing": data['blessing'],
-            "text": redpacket_text,
-            "file_url": data.get('cover_url', None),
-            "file_type": data.get('file_type', None)
+            "text": redpacket_text
         }
+
+        if data.get('file_id'):
+            payload["file_id"] = data['file_id']
+            payload["file_type"] = data.get('file_type')
+        elif data.get('cover_url'):
+            payload["file_url"] = data['cover_url']
+            payload["file_type"] = data.get('file_type')
+
+        if data.get('cover_url') or data.get('file_id'):
+            payload["is_exclusive"] = bool(data.get('is_exclusive', False))
         
-        logger.info(f"创建红包: type={redpacket_type}, carrot={data['carrot']}, number={data['number']}")
+        logger.info(
+            f"创建红包: type={redpacket_type}, receive={receive_type}, "
+            f"file_type={data.get('file_type')}, exclusive={data.get('is_exclusive', False)}, "
+            f"carrot={data['carrot']}, number={data['number']}"
+        )
         
         response = requests.post(
             Config.REDPACKET_CREATE_URL,
@@ -819,16 +1034,43 @@ async def create_redpacket(update: Update, context: ContextTypes.DEFAULT_TYPE):
             result = response.json()
             logger.info(f"API返回结果: {result}")
             
-            if redpacket_type == "random":
-                redpacket_type_display = "🎲 普通红包"
-            elif redpacket_type == "password":
-                redpacket_type_display = "🔐 口令红包"
+            file_info = result.get('file')
+            api_file_id = result.get('file_id') or result.get('fileId')
+            if not api_file_id and isinstance(file_info, dict):
+                api_file_id = file_info.get('id') or file_info.get('file_id')
+            update_media_cache_file_id(context, data.get('telegram_file_id'), api_file_id)
+
+            red_packet_id = result.get('red_packet_id')
+            if red_packet_id:
+                try:
+                    from app.database import add_redpacket_record
+                    add_redpacket_record(
+                        telegram_id=user_id,
+                        user_id=(user_info or {}).get('user_id') if isinstance(user_info, dict) else None,
+                        username=(user_info or {}).get('username') if isinstance(user_info, dict) else None,
+                        red_packet_id=red_packet_id,
+                        redpacket_type='bubble' if data.get('bubble_mode') else redpacket_type,
+                        receive_type=receive_type,
+                        carrot=data.get('carrot', 0),
+                        number=data.get('number', 0),
+                        blessing=data.get('blessing'),
+                        password_text=redpacket_text,
+                        file_type=data.get('file_type'),
+                        is_exclusive=bool(data.get('is_exclusive', False)),
+                    )
+                except Exception as e:
+                    logger.error(f"保存红包记录失败: {e}")
+            
+            if data.get('bubble_mode'):
+                redpacket_type_display = "💬 气泡红包"
             elif data.get('file_type') == 'image':
                 redpacket_type_display = "🖼️ 图片红包"
             elif data.get('file_type') == 'audio':
                 redpacket_type_display = "🎵 语音红包"
+            elif redpacket_type == "password":
+                redpacket_type_display = "🔐 口令红包"
             else:
-                redpacket_type_display = "🧧 红包"
+                redpacket_type_display = "🎲 普通红包"
             
             # 获取用户余额 - 使用user接口获取
             balance = 0
@@ -859,11 +1101,15 @@ async def create_redpacket(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             if redpacket_text:
                 message += f"🔑 口令: `{redpacket_text}`\n"
-            if data.get('cover_url'):
+            if data.get('cover_url') or data.get('file_id'):
                 if data.get('file_type') == 'image':
                     message += f"🖼️ 封面: 已上传 ✓\n"
                 elif data.get('file_type') == 'audio':
                     message += f"🎵 语音: 已上传 ✓\n"
+                if data.get('bubble_mode'):
+                    message += f"💬 气泡: 已生成 ✓\n"
+                if data.get('is_exclusive'):
+                    message += f"👁️ 展示: 独占模式\n"
             if result.get('red_packet_id'):
                 message += f"🆔 红包ID: `{result['red_packet_id']}`\n"
             
@@ -876,16 +1122,21 @@ async def create_redpacket(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
-            # 尝试编辑消息显示红包凭证
+            action_text = "请选择后续操作："
+            
+            # 凭证和操作按钮分开发，返回/再创建不会把凭证一起改没。
             try:
-                await loading.edit_text(message, parse_mode="Markdown", reply_markup=reply_markup)
+                await loading.edit_text(message, parse_mode="Markdown")
+                await loading.reply_text(action_text, reply_markup=reply_markup)
             except Exception as edit_error:
                 logger.error(f"编辑消息失败: {edit_error}")
                 # 尝试发送新消息
                 if update.message:
-                    await update.message.reply_text(message, parse_mode="Markdown", reply_markup=reply_markup)
+                    await update.message.reply_text(message, parse_mode="Markdown")
+                    await update.message.reply_text(action_text, reply_markup=reply_markup)
                 else:
-                    await update.callback_query.message.reply_text(message, parse_mode="Markdown", reply_markup=reply_markup)
+                    await update.callback_query.message.reply_text(message, parse_mode="Markdown")
+                    await update.callback_query.message.reply_text(action_text, reply_markup=reply_markup)
         else:
             # 尝试编辑消息显示失败信息
             error_message = f"❌ 创建失败，状态码：{response.status_code}"
@@ -1163,17 +1414,6 @@ async def handle_custom_blessing(update: Update, context: ContextTypes.DEFAULT_T
     user_id = update.effective_user.id
     text = update.message.text.strip()
     
-    # 删除之前的提示消息
-    if 'current_prompt_message' in context.user_data:
-        try:
-            await context.bot.delete_message(
-                chat_id=update.effective_chat.id,
-                message_id=context.user_data['current_prompt_message']
-            )
-            del context.user_data['current_prompt_message']
-        except Exception as e:
-            logger.error(f"删除提示消息失败: {e}")
-    
     if 'redpacket' not in context.user_data:
         await update.message.reply_text("⚠️ 会话已过期，请重新开始")
         return ConversationHandler.END
@@ -1186,6 +1426,7 @@ async def handle_custom_blessing(update: Update, context: ContextTypes.DEFAULT_T
         context.user_data['current_prompt_message'] = message.message_id
         return WAITING_CUSTOM_BLESSING
     
+    await delete_current_prompt_message(update, context)
     # 存储祝福语
     redpacket_data['blessing'] = text
     

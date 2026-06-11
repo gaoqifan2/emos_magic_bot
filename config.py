@@ -68,6 +68,8 @@ BOT_COMMANDS = [
 # 空列表表示群聊中不允许任何命令
 GROUP_ALLOWED_COMMANDS = [
     "balance",     # 查看余额
+    "redpocket",   # 创建红包
+    "check_redpacket",  # 查询红包
     "gameshoot",   # 猜拳游戏
     "createguess",   # 创建猜大小游戏
     "guess_bet",         # 群聊下注
@@ -126,6 +128,9 @@ DB_CONFIG = {
     "password": "H_fans200109~",
     "database": "game_db_test",
     "charset": "utf8mb4",
+    "connect_timeout": 3,
+    "read_timeout": 3,
+    "write_timeout": 3,
 
     # #正式数据库
     # "host": "66.235.105.125",

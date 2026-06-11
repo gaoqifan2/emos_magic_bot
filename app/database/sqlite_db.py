@@ -144,6 +144,25 @@ def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
+
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS redpacket_records (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                telegram_id INTEGER NOT NULL,
+                user_id TEXT,
+                username TEXT,
+                red_packet_id TEXT UNIQUE NOT NULL,
+                redpacket_type TEXT,
+                receive_type TEXT,
+                carrot INTEGER DEFAULT 0,
+                number INTEGER DEFAULT 0,
+                blessing TEXT,
+                password_text TEXT,
+                file_type TEXT,
+                is_exclusive INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
         
         connection.commit()
         print("SQLite数据库表初始化成功")
@@ -234,6 +253,92 @@ def add_user(user_id, telegram_id=None, username=None, first_name=None, last_nam
 
 def ensure_user_exists(user_id, telegram_id=None, username=None, first_name=None, last_name=None, token=None):
     return add_user(user_id, telegram_id, username, first_name, last_name, token)
+
+def add_redpacket_record(
+    telegram_id,
+    red_packet_id,
+    user_id=None,
+    username=None,
+    redpacket_type=None,
+    receive_type=None,
+    carrot=0,
+    number=0,
+    blessing=None,
+    password_text=None,
+    file_type=None,
+    is_exclusive=False,
+):
+    connection = get_db_connection()
+    if not connection:
+        return False
+
+    try:
+        cursor = connection.cursor()
+        cursor.execute('''
+            INSERT OR REPLACE INTO redpacket_records (
+                telegram_id, user_id, username, red_packet_id, redpacket_type,
+                receive_type, carrot, number, blessing, password_text,
+                file_type, is_exclusive, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(
+                (SELECT created_at FROM redpacket_records WHERE red_packet_id = ?),
+                CURRENT_TIMESTAMP
+            ))
+        ''', (
+            telegram_id, user_id, username, red_packet_id, redpacket_type,
+            receive_type, carrot, number, blessing, password_text,
+            file_type, 1 if is_exclusive else 0, red_packet_id,
+        ))
+        connection.commit()
+        return True
+    except Exception as e:
+        print(f"保存红包记录失败: {e}")
+        connection.rollback()
+        return False
+    finally:
+        connection.close()
+
+def get_redpacket_records_by_telegram_id(telegram_id, limit=10, offset=0):
+    connection = get_db_connection()
+    if not connection:
+        return []
+
+    try:
+        cursor = connection.cursor()
+        cursor.execute('''
+            SELECT *
+            FROM redpacket_records
+            WHERE telegram_id = ?
+            ORDER BY created_at DESC, id DESC
+            LIMIT ?
+            OFFSET ?
+        ''', (telegram_id, limit, offset))
+        return [dict(row) for row in cursor.fetchall()]
+    except Exception as e:
+        print(f"查询红包记录失败: {e}")
+        return []
+    finally:
+        connection.close()
+
+def count_redpacket_records_by_telegram_id(telegram_id):
+    connection = get_db_connection()
+    if not connection:
+        return 0
+
+    try:
+        cursor = connection.cursor()
+        cursor.execute('''
+            SELECT COUNT(*) AS total
+            FROM redpacket_records
+            WHERE telegram_id = ?
+        ''', (telegram_id,))
+        result = cursor.fetchone()
+        return int(result['total']) if result else 0
+    except Exception as e:
+        print(f"统计红包记录失败: {e}")
+        return 0
+    finally:
+        connection.close()
 
 def get_balance(user_id):
     connection = get_db_connection()

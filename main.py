@@ -21,6 +21,9 @@ os.environ['PYTHONIOENCODING'] = 'utf-8'
 os.environ['LANG'] = 'zh_CN.UTF-8'
 os.environ['LC_ALL'] = 'zh_CN.UTF-8'
 os.environ['LC_CTYPE'] = 'zh_CN.UTF-8'
+for proxy_env in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"):
+    os.environ.pop(proxy_env, None)
+os.environ['NO_PROXY'] = 'api.telegram.org,telegram.org,localhost,127.0.0.1'
 
 # Windows平台特殊处理
 if sys.platform == 'win32':
@@ -173,8 +176,8 @@ def group_command_filter(func):
 
 from handlers.redpacket import (
     redpocket_command, handle_type, handle_carrot, handle_number, handle_blessing, 
-    handle_password, handle_media, create_redpacket, cancel_redpacket, handle_scene, handle_custom_blessing,
-    WAITING_TYPE, WAITING_RECEIVE, WAITING_CARROT, WAITING_NUMBER, WAITING_BLESSING, WAITING_PASSWORD, WAITING_MEDIA, WAITING_SCENE, WAITING_CUSTOM_BLESSING
+    handle_password, handle_media, create_redpacket, cancel_redpacket, handle_scene, handle_custom_blessing, handle_bubble_text,
+    WAITING_TYPE, WAITING_RECEIVE, WAITING_CARROT, WAITING_NUMBER, WAITING_BLESSING, WAITING_PASSWORD, WAITING_MEDIA, WAITING_SCENE, WAITING_CUSTOM_BLESSING, WAITING_BUBBLE_TEXT
 )
 from app.handlers.command_handlers import (
     start_handler, balance_handler, slot_handler, daily_handler, help_handler, 
@@ -4619,6 +4622,11 @@ def main() -> None:
     application = Application.builder() \
         .token(Config.BOT_TOKEN) \
         .post_init(post_init_wrapper) \
+        .proxy("http://127.0.0.1:7890") \
+        .get_updates_proxy("http://127.0.0.1:7890") \
+        .connect_timeout(20) \
+        .read_timeout(30) \
+        .write_timeout(20) \
         .concurrent_updates(True) \
         .build()
     print("[DEBUG] Application创建完成")
@@ -4666,7 +4674,8 @@ def main() -> None:
         ],
         states={
             WAITING_TYPE: [
-                CallbackQueryHandler(handle_type, pattern="^(type_|image_no_password|image_with_password|audio_no_password|audio_with_password|back_)"),
+                CallbackQueryHandler(handle_type, pattern="^(type_|attach_|image_no_password|image_with_password|audio_no_password|audio_with_password|bubble_no_password|bubble_with_password|exclusive_|back_)"),
+                CallbackQueryHandler(button_callback, pattern="^menu_redpacket_main$"),
                 CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
             ],
             WAITING_RECEIVE: [
@@ -4719,6 +4728,11 @@ def main() -> None:
                 CallbackQueryHandler(handle_type, pattern="^back_"),
                 CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
             ],
+            WAITING_BUBBLE_TEXT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_bubble_text),
+                CallbackQueryHandler(handle_type, pattern="^back_"),
+                CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
+            ],
             WAITING_MEDIA: [
                 MessageHandler(filters.PHOTO, handle_media),
                 MessageHandler(filters.VOICE, handle_media),
@@ -4743,11 +4757,13 @@ def main() -> None:
         redpocket_query_conv = ConversationHandler(
             entry_points=[
                 CommandHandler("check_redpacket", group_command_filter(check_redpacket_command)),
-                CallbackQueryHandler(check_redpacket_command, pattern="^menu_check_redpacket$")
+                CallbackQueryHandler(check_redpacket_command, pattern="^menu_check_redpacket$"),
+                CallbackQueryHandler(handle_query_type, pattern="^(my_redpackets|input_id)$")
             ],
             states={
                 WAITING_QUERY_TYPE: [
                     CallbackQueryHandler(handle_query_type, pattern="^(my_redpackets|input_id)$"),
+                    CallbackQueryHandler(button_callback, pattern="^menu_redpacket_main$"),
                     CallbackQueryHandler(button_callback, pattern="^cancel_operation$")
                 ],
                 WAITING_REDPACKET_ID: [
@@ -4972,7 +4988,7 @@ def main() -> None:
         logger.info("开始运行机器人...")
         # 使用较短的轮询间隔和超时时间，确保机器人保持运行状态
         # drop_pending_updates=True 表示在启动时丢弃所有未处理的更新
-        application.run_polling(allowed_updates=Update.ALL_TYPES, poll_interval=0.5, timeout=30, drop_pending_updates=True)
+        application.run_polling(allowed_updates=Update.ALL_TYPES, poll_interval=0.5, timeout=30, drop_pending_updates=False)
         logger.info("机器人运行结束")
     except Exception as e:
         logger.error(f"运行机器人出错: {e}")
