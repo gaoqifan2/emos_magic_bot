@@ -122,17 +122,17 @@ _schedule_cache = {"loaded_at": None, "matches": []}
 PREDICTION_RULES_TEXT = (
     "⚽ 世界杯预测规则\n\n"
     "玩法采用奖池制，萝卜只用于站内娱乐。\n\n"
-    f"1. 单场总奖池 = 用户投入萝卜 + 你补贴的 {PLATFORM_SUBSIDY} 萝卜。\n"
+    f"1. 单场总奖池 = 用户投入萝卜 + f1bb补贴的 {PLATFORM_SUBSIDY} 萝卜。\n"
     "2. 猜中胜平负的用户瓜分 40% 奖池。\n"
     "3. 猜中准确比分的用户瓜分 60% 奖池。\n"
     "4. 每个池子内部按下注占比分配。\n"
     "5. 比赛开赛前 10 分钟停止预测。\n"
     "6. 比赛取消或延期时，已投入萝卜退回。\n\n"
-    "例：本场用户共下 3000，你补 500，总奖池 3500。\n"
-    "胜平负池 1400，比分池 2100。\n"
+    f"例：本场用户共下 3000，f1bb补贴 {PLATFORM_SUBSIDY}，总奖池 {3000 + PLATFORM_SUBSIDY}。\n"
+    f"胜平负池 {int((3000 + PLATFORM_SUBSIDY) * 0.4)}，比分池 {int((3000 + PLATFORM_SUBSIDY) * 0.6)}。\n"
     "如果猜中比分的人总共下了 300，某用户下 100 且比分命中，"
-    "他拿比分池 2100 * 100 / 300 = 700 萝卜。\n\n"
-    f"当前控赔：每场补贴 {PLATFORM_SUBSIDY} 萝卜，每人单场最高投入 {MAX_STAKE} 萝卜。"
+    f"他拿比分池 {int((3000 + PLATFORM_SUBSIDY) * 0.6)} * 100 / 300 = {int((3000 + PLATFORM_SUBSIDY) * 0.6 * 100 / 300)} 萝卜。\n\n"
+    f"当前控赔：f1bb每场补贴 {PLATFORM_SUBSIDY} 萝卜，每人单场最高投入 {MAX_STAKE} 萝卜。"
 )
 
 
@@ -1060,13 +1060,22 @@ def is_platform_order_paid(order_info):
     return status in {"success", "paid", "payed"} or bool(order_info.get("time_payed"))
 
 
-def find_ticket_font():
+def find_ticket_font(bold=False):
     candidates = [
         os.getenv("PREDICTION_TICKET_FONT", ""),
+        "C:/Windows/Fonts/msyhbd.ttc" if bold else "",
         "C:/Windows/Fonts/msyh.ttc",
         "C:/Windows/Fonts/simhei.ttf",
         "C:/Windows/Fonts/simsun.ttc",
-        "C:/Windows/Fonts/arial.ttf",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc" if bold else "",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.otf",
+        "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+        "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
+        "/usr/share/fonts/opentype/source-han-sans/SourceHanSansCN-Regular.otf",
+        "/System/Library/Fonts/PingFang.ttc",
+        "/Library/Fonts/Arial Unicode.ttf",
     ]
     for path in candidates:
         if path and os.path.exists(path):
@@ -1075,7 +1084,7 @@ def find_ticket_font():
 
 
 def load_ticket_font(size, bold=False):
-    font_path = find_ticket_font()
+    font_path = find_ticket_font(bold=bold)
     if font_path:
         try:
             return ImageFont.truetype(font_path, size=size)
@@ -1100,6 +1109,43 @@ def draw_centered(draw, xy, text, font, fill):
 def truncate_text(text, max_chars):
     text = str(text or "")
     return text if len(text) <= max_chars else text[: max_chars - 1] + "…"
+
+
+def text_size(draw, text, font):
+    bbox = draw.textbbox((0, 0), str(text), font=font)
+    return bbox[2] - bbox[0], bbox[3] - bbox[1]
+
+
+def fit_font(text, max_width, start_size, min_size=24, bold=False):
+    probe = Image.new("RGB", (10, 10))
+    probe_draw = ImageDraw.Draw(probe)
+    for size in range(start_size, min_size - 1, -2):
+        font = load_ticket_font(size, bold=bold)
+        if text_size(probe_draw, text, font)[0] <= max_width:
+            return font
+    return load_ticket_font(min_size, bold=bold)
+
+
+def draw_text_center(draw, box, text, font, fill):
+    x1, y1, x2, y2 = box
+    width, height = text_size(draw, text, font)
+    draw.text(
+        (x1 + (x2 - x1 - width) / 2, y1 + (y2 - y1 - height) / 2),
+        str(text),
+        font=font,
+        fill=fill,
+    )
+
+
+def draw_text_right(draw, x, y, text, font, fill):
+    width, _ = text_size(draw, text, font)
+    draw.text((x - width, y), str(text), font=font, fill=fill)
+
+
+def draw_label_value(draw, x, y, label, value, label_font, value_font, max_width):
+    draw.text((x, y), str(label), font=label_font, fill="#64748b")
+    value_font = fit_font(str(value), max_width, getattr(value_font, "size", 38), 26, bold=True)
+    draw.text((x, y + 42), str(value), font=value_font, fill="#0f172a")
 
 
 def is_ticket_card_admin(user_id):
@@ -1241,74 +1287,85 @@ def create_prediction_ticket_image(prediction):
     card = select_ticket_card(prediction)
     background = load_ticket_background(width, height, card)
     if background:
-        image = background.filter(ImageFilter.GaussianBlur(1.1)).convert("RGBA")
-        image = Image.alpha_composite(image, Image.new("RGBA", (width, height), (3, 7, 18, 116)))
+        image = background.convert("RGBA")
     else:
-        image = Image.new("RGBA", (width, height), "#0f172a")
-    # Frosted ticket frame, keeping the collectible player image visible.
-    panel = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-    panel_draw = ImageDraw.Draw(panel)
-    panel_draw.rounded_rectangle((44, 44, width - 44, height - 44), radius=36, fill=(2, 6, 23, 76))
-    panel_draw.rounded_rectangle((44, 44, width - 44, 290), radius=36, fill=(20, 83, 45, 226))
-    panel_draw.rectangle((44, 210, width - 44, 330), fill=(20, 83, 45, 198))
-    panel_draw.rounded_rectangle(
-        (86, 250, width - 86, height - 92),
-        radius=28,
-        fill=(255, 255, 255, 148),
-        outline=(255, 255, 255, 210),
-        width=2,
-    )
-    image = Image.alpha_composite(image, panel)
+        image = Image.new("RGBA", (width, height), "#102a43")
+
+    overlay = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    overlay_draw = ImageDraw.Draw(overlay)
+    for y in range(height):
+        if y < 260:
+            alpha = int(96 * (1 - y / 260))
+        elif y > 650:
+            alpha = min(202, int((y - 650) / 850 * 230))
+        else:
+            alpha = 24
+        overlay_draw.line((0, y, width, y), fill=(2, 6, 23, alpha))
+    image = Image.alpha_composite(image, overlay)
     draw = ImageDraw.Draw(image)
 
-    title_font = load_ticket_font(58)
-    sub_font = load_ticket_font(30)
-    big_font = load_ticket_font(64)
-    label_font = load_ticket_font(28)
-    value_font = load_ticket_font(36)
-    small_font = load_ticket_font(24)
-
-    draw.text((92, 82), "预测票根", font=title_font, fill="#ffffff")
-    draw.text((94, 164), "萝卜世界杯预测 · 支付成功", font=sub_font, fill="#dcfce7")
-    draw.text((width - 420, 124), f"背景图库 {card['number']}", font=small_font, fill="#bbf7d0")
-    draw.text((width - 420, 164), truncate_text(card.get("name", "自定义背景"), 14), font=small_font, fill="#dcfce7")
+    title_font = load_ticket_font(52, bold=True)
+    sub_font = load_ticket_font(28)
+    meta_font = load_ticket_font(25)
+    match_font = fit_font(truncate_text(prediction.get("match_label"), 30), 820, 46, 30, bold=True)
+    label_font = load_ticket_font(27)
+    value_font = load_ticket_font(36, bold=True)
+    pick_font = load_ticket_font(50, bold=True)
+    tiny_font = load_ticket_font(22)
 
     paid_at = prediction.get("paid_at") or datetime.now(BEIJING_TZ).isoformat(timespec="seconds")
     try:
         paid_text = datetime.fromisoformat(str(paid_at).replace(" ", "T")).strftime("%Y-%m-%d %H:%M")
     except Exception:
         paid_text = str(paid_at)[:16]
-    draw.text((width - 392, 98), paid_text, font=small_font, fill="#bbf7d0")
 
-    match = truncate_text(prediction.get("match_label"), 24)
-    draw_centered(draw, (120, 320, width - 120, 430), match, big_font, "#111827")
+    draw.rounded_rectangle((48, 44, width - 48, height - 44), radius=42, outline=(134, 239, 172, 218), width=3)
 
-    draw.line((148, 470, width - 148, 470), fill=(226, 232, 240, 190), width=3)
+    info_top = 700
+    draw.rounded_rectangle(
+        (66, info_top, width - 66, height - 70),
+        radius=34,
+        fill=(15, 23, 42, 226),
+        outline=(255, 255, 255, 110),
+        width=1,
+    )
+    draw.text((106, info_top + 28), "萝卜预测票根", font=title_font, fill="#ffffff")
+    draw.text((110, info_top + 84), "World Cup Prediction", font=sub_font, fill="#dcfce7")
+    draw_text_right(draw, width - 106, info_top + 36, paid_text, meta_font, "#f8fafc")
+    draw_text_right(draw, width - 106, info_top + 76, f"背景 {card['number']} · {truncate_text(card.get('name', '自定义背景'), 10)}", meta_font, "#bbf7d0")
+
+    draw.text((106, info_top + 128), "本场比赛", font=label_font, fill="#86efac")
+    match = truncate_text(prediction.get("match_label"), 30)
+    draw_text_center(draw, (104, info_top + 166, width - 104, info_top + 230), match, match_font, "#ffffff")
 
     result = prediction.get("result_pick", "-")
     score = prediction.get("score_pick", "-")
     stake = prediction.get("stake", 0)
-    fields = [
-        ("胜平负", result),
-        ("比分", score),
+
+    draw.rounded_rectangle((106, info_top + 254, width - 106, info_top + 408), radius=28, fill=(4, 120, 87, 236))
+    draw.text((146, info_top + 284), "你的选择", font=label_font, fill="#bbf7d0")
+    draw.text((146, info_top + 326), str(result), font=pick_font, fill="#ffffff")
+    draw_text_right(draw, width - 146, info_top + 284, "预测比分", label_font, "#bbf7d0")
+    score_font = fit_font(str(score), 300, 72, 42, bold=True)
+    draw_text_right(draw, width - 146, info_top + 318, str(score), score_font, "#ffffff")
+
+    cards = [
         ("下注萝卜", f"{stake} 萝卜"),
-        ("平台订单", truncate_text(prediction.get("platform_order_no"), 28)),
-        ("本地订单", truncate_text(prediction.get("order_no"), 28)),
-        ("奖池规则", "胜平负40% · 比分60%"),
+        ("f1bb补贴", f"{PLATFORM_SUBSIDY} 萝卜"),
+        ("平台订单", truncate_text(prediction.get("platform_order_no"), 26)),
+        ("本地订单", truncate_text(prediction.get("order_no"), 26)),
     ]
+    card_positions = [
+        (106, info_top + 408, 520, info_top + 530),
+        (560, info_top + 408, width - 106, info_top + 530),
+        (106, info_top + 558, 520, info_top + 680),
+        (560, info_top + 558, width - 106, info_top + 680),
+    ]
+    for (label, value), (x1, y1, x2, y2) in zip(cards, card_positions):
+        draw.rounded_rectangle((x1, y1, x2, y2), radius=22, fill=(248, 250, 252, 238))
+        draw_label_value(draw, x1 + 30, y1 + 22, label, value, label_font, value_font, x2 - x1 - 60)
 
-    y = 520
-    for label, value in fields:
-        draw.text((150, y), label, font=label_font, fill="#475569")
-        draw.text((150, y + 42), str(value), font=value_font, fill="#111827")
-        y += 138
-
-    draw.rounded_rectangle((148, 1180, width - 148, 1310), radius=24, fill=(236, 253, 245, 206), outline="#86efac", width=2)
-    draw.text((180, 1212), "这张票根只代表站内萝卜预测记录", font=label_font, fill="#166534")
-    draw.text((180, 1255), "最终奖励以赛后奖池结算为准", font=label_font, fill="#166534")
-
-    draw.line((90, 1328, width - 90, 1328), fill=(203, 213, 225, 210), width=2)
-    draw.text((126, 1354), "保存这张票根，等比赛结束开奖。", font=sub_font, fill="#334155")
+    draw_text_right(draw, width - 106, height - 98, "EMOS MAGIC BOX", tiny_font, "#94a3b8")
 
     file_name = f"{prediction.get('platform_order_no') or prediction.get('order_no')}.png"
     path = PREDICTION_TICKET_DIR / re.sub(r"[^A-Za-z0-9_.-]", "_", file_name)
@@ -1688,7 +1745,7 @@ async def send_prediction_panel(update: Update, context: ContextTypes.DEFAULT_TY
     message = (
         "⚽ 世界杯预测\n\n"
         "先选比赛，再点胜平负、比分和萝卜数，最后确认提交。\n"
-        "玩法采用奖池制，平台只补贴固定奖池，不承诺固定高倍率赔付。"
+        "玩法采用奖池制，f1bb只补贴固定奖池，不承诺固定高倍率赔付。"
     )
     reply_markup = build_prediction_keyboard(update.effective_user.id if update.effective_user else None)
 
@@ -2118,7 +2175,7 @@ async def show_result_options(query, context, match_id):
         "下注说明：\n"
         f"• 单注范围：1 - {MAX_STAKE} 萝卜\n"
         f"• 当前总下注：{stats['total_stake']} 萝卜\n"
-        f"• 平台补贴：{PLATFORM_SUBSIDY} 萝卜\n"
+        f"• f1bb补贴：{PLATFORM_SUBSIDY} 萝卜\n"
         f"• 当前总奖池：{stats['total_pool']} 萝卜\n"
         "• 胜平负命中分 40%，比分命中分 60%\n\n"
         "请选择你要预测的胜平负："
@@ -2167,7 +2224,7 @@ async def show_pool_stats(query, context, match_id):
         "",
         f"比赛：{match_label(match)}",
         f"用户下注：{total_stake} 萝卜",
-        f"平台补贴：{PLATFORM_SUBSIDY} 萝卜",
+        f"f1bb补贴：{PLATFORM_SUBSIDY} 萝卜",
         f"当前总奖池：{total_pool} 萝卜",
         "",
         f"胜平负池：{result_pool} 萝卜",
