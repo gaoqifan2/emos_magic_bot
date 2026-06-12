@@ -9,6 +9,8 @@ bot.lock
 bot_runtime.log
 bot_runtime.err.log
 local_database.db
+prediction.db
+prediction_tickets/
 
 # Secrets
 .env

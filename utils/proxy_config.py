@@ -1,2 +1,2 @@
-# 代理配置 - 已禁用
+# Proxy support is intentionally disabled for VPS deployment.
 proxies = None

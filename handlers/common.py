@@ -296,6 +296,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         tg_id = callback_parts[2] if len(callback_parts) > 2 else ''
         
         logger.info(f"收到支付成功回调 - 订单号: {order_no}, 参数: {param}, TgId: {tg_id}")
+
+        try:
+            from handlers.prediction import get_prediction_by_platform_order, handle_prediction_payment_start
+            if get_prediction_by_platform_order(order_no):
+                await handle_prediction_payment_start(update, context, order_no, param, tg_id, agreed=True)
+                return
+        except Exception as prediction_pay_error:
+            logger.error(f"处理预测支付回调失败: {prediction_pay_error}")
         
         loading = await update.message.reply_text("🔄 正在核实订单...")
         
@@ -505,8 +513,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         # 解析回调参数：emosPayRefuse-订单号-参数-TgId
         callback_parts = text.split('/start emosPayRefuse-', 1)[1].strip().split('-')
         order_no = callback_parts[0] if len(callback_parts) > 0 else ''
+        param = callback_parts[1] if len(callback_parts) > 1 else ''
+        tg_id = callback_parts[2] if len(callback_parts) > 2 else ''
         
         logger.info(f"收到支付失败回调 - 订单号: {order_no}")
+
+        try:
+            from handlers.prediction import get_prediction_by_platform_order, handle_prediction_payment_start
+            if get_prediction_by_platform_order(order_no):
+                await handle_prediction_payment_start(update, context, order_no, param, tg_id, agreed=False)
+                return
+        except Exception as prediction_pay_error:
+            logger.error(f"处理预测支付取消回调失败: {prediction_pay_error}")
         
         await update.message.reply_text(f"⚠️ 支付已取消\n订单号：`{order_no}`\n", parse_mode="Markdown")
         return
@@ -698,26 +716,27 @@ async def show_menu(update, message_text: str):
     """显示主菜单"""
     keyboard = [
         [
+            InlineKeyboardButton("⚽ 预测", callback_data="menu_prediction_main"),
             InlineKeyboardButton("👤 我的信息", callback_data="menu_user_main"),
-            InlineKeyboardButton("💸 转账", callback_data="menu_transfer_main"),
             InlineKeyboardButton("📝 签到", callback_data="menu_user_sign")
         ],
         [
+            InlineKeyboardButton("💸 转账", callback_data="menu_transfer_main"),
             InlineKeyboardButton("🧧 红包", callback_data="menu_redpacket_main"),
-            InlineKeyboardButton("🎲 抽奖", callback_data="menu_lottery_main"),
-            InlineKeyboardButton("🏆 排行榜", callback_data="menu_rank_main")
+            InlineKeyboardButton("🎲 抽奖", callback_data="menu_lottery_main")
         ],
         [
+            InlineKeyboardButton("🏆 排行榜", callback_data="menu_rank_main"),
             InlineKeyboardButton("🎮 游戏厅", callback_data="games"),
-            InlineKeyboardButton("🛠️ 服务商", callback_data="menu_service"),
-            InlineKeyboardButton("🛒 商城", callback_data="menu_shop")
+            InlineKeyboardButton("🛠️ 服务商", callback_data="menu_service")
         ],
         [
+            InlineKeyboardButton("🛒 商城", callback_data="menu_shop"),
             InlineKeyboardButton("📨 邀请", callback_data="menu_invite"),
-            InlineKeyboardButton("👀 视奸", callback_data="admin_check_playing"),
-            InlineKeyboardButton("🔍 大调查", callback_data="admin_user_info")
+            InlineKeyboardButton("👀 视奸", callback_data="admin_check_playing")
         ],
         [
+            InlineKeyboardButton("🔍 大调查", callback_data="admin_user_info"),
             InlineKeyboardButton("❓ 帮助", callback_data="help")
         ]
     ]

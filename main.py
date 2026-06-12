@@ -195,6 +195,13 @@ from games.lottery import (
     handle_bodys_choice, get_lottery_bodys, handle_prize_choice, handle_end_time_choice
 )
 from games.lottery_cancel import lottery_cancel_command, get_lottery_cancel_id
+from handlers.prediction import (
+    prediction_command,
+    prediction_callback,
+    handle_prediction_text,
+    handle_prediction_media,
+    prediction_settlement_task,
+)
 from ranks.carrot_rank import rank_carrot_command
 from ranks.upload_rank import rank_upload_command
 from ranks.playing_rank import playing_command
@@ -292,6 +299,10 @@ async def post_init_wrapper(application):
     logger.info("启动游戏状态清理任务..")
     asyncio.create_task(cleanup_game_states_task())
     logger.info("游戏状态清理任务已启动")
+
+    logger.info("启动世界杯预测自动结算确认任务..")
+    asyncio.create_task(prediction_settlement_task(application))
+    logger.info("世界杯预测自动结算确认任务已启动")
 
 
 # 游戏状态清理任务
@@ -2222,6 +2233,13 @@ async def join_shoot_game(update: Update, context: ContextTypes.DEFAULT_TYPE, us
 async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     input_text = update.message.text.strip()
+
+    if await handle_prediction_text(update, context):
+        return
+
+    if input_text in ("预测", "世界杯预测"):
+        await prediction_command(update, context)
+        return
     
     # 检查是否是群聊，如果是群聊，不处理私聊操作
     if update.message and update.message.chat.type in ['group', 'supergroup']:
@@ -4627,10 +4645,6 @@ def main() -> None:
         .write_timeout(20) \
         .concurrent_updates(True)
 
-#     from config import TELEGRAM_PROXY
-#     if TELEGRAM_PROXY:
-#         builder = builder.proxy(TELEGRAM_PROXY).get_updates_proxy(TELEGRAM_PROXY)
-
     application = builder.build()
     print("[DEBUG] Application创建完成")
     
@@ -4647,6 +4661,7 @@ def main() -> None:
         application.add_handler(CommandHandler("help", group_command_filter(help_command)))
         print("[DEBUG] 添加cancel handler...")
         application.add_handler(CommandHandler("cancel", group_command_filter(cancel_command)))
+        application.add_handler(CommandHandler("prediction", group_command_filter(prediction_command)))
         
         # ===== 游戏命令 =====
         print("[DEBUG] 添加游戏命令 handlers...")
@@ -4950,6 +4965,8 @@ def main() -> None:
     # 添加21点游戏按钮回调处理器
     application.add_handler(CallbackQueryHandler(hit_handler, pattern="^hit_"))
     application.add_handler(CallbackQueryHandler(stand_handler, pattern="^stand_"))
+    application.add_handler(CallbackQueryHandler(prediction_callback, pattern="^(menu_prediction_main|prediction_)"))
+    application.add_handler(MessageHandler(filters.PHOTO | filters.Document.IMAGE, handle_prediction_media), group=1)
     
     # 添加用户输入处理器(包含游戏消息处理器
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_user_input))

@@ -58,6 +58,7 @@ class Config:
 
 
 BOT_COMMANDS = [
+    ("prediction", "世界杯预测"),
     ("start", "开始登录"),
     ("playing", "正在播放"),
     ("rank_carrot", "萝卜榜"),
@@ -81,6 +82,7 @@ BOT_COMMANDS = [
 
 
 GROUP_ALLOWED_COMMANDS = [
+    "prediction",
     "balance",
     "redpocket",
     "check_redpacket",
@@ -126,11 +128,6 @@ DB_CONFIG = {
     "read_timeout": env_int("DB_READ_TIMEOUT", 3),
     "write_timeout": env_int("DB_WRITE_TIMEOUT", 3),
 }
-
-
-TELEGRAM_PROXY = os.getenv("TELEGRAM_PROXY", "")
-HTTP_PROXY_URL = os.getenv("HTTP_PROXY_URL", TELEGRAM_PROXY)
-
 
 def init_r2_client():
     if not (Config.R2_ENDPOINT and Config.R2_ACCESS_KEY and Config.R2_SECRET_KEY):
