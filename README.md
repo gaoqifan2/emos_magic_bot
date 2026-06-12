@@ -38,7 +38,6 @@ DB_NAME=game_db_test
 
 PREDICTION_TICKET_ADMIN_IDS=管理员 Telegram ID，多个用英文逗号隔开
 PREDICTION_PLATFORM_SUBSIDY=100
-PREDICTION_MAX_STAKE=1000
 PREDICTION_CUSTOM_MATCH_CREATE_FEE=50
 ```
 
@@ -77,7 +76,7 @@ PREDICTION_TICKET_DIR=prediction_tickets
 - 用户登录后才能下注，下注会创建服务商支付订单。
 - 比赛开始前 10 分钟停止下注。
 - 每场 f1bb 补贴默认 100 萝卜。
-- 单个用户单场下注上限默认 1000 萝卜。
+- 下注金额不设上限，奖池按下注占比分配。
 - 结算前会通知管理员确认，管理员也可以手动输入比分结算。
 - 奖池按胜平负 40%、准确比分 60% 分配；如果没人中准确比分，全部给胜平负命中者按下注比例分。
 

@@ -110,13 +110,41 @@ PREDICTION_TICKET_CARDS = [
     },
 ]
 PLATFORM_SUBSIDY = int(os.getenv("PREDICTION_PLATFORM_SUBSIDY", "100"))
-MAX_STAKE = int(os.getenv("PREDICTION_MAX_STAKE", "1000"))
 STAKE_OPTIONS = [10, 50, 100, 500, 1000]
 CUSTOM_MATCH_CREATE_FEE = int(os.getenv("PREDICTION_CUSTOM_MATCH_CREATE_FEE", "50"))
 CUSTOM_MATCH_FEE_RECEIVER_USER_ID = os.getenv("PREDICTION_FEE_RECEIVER_USER_ID", "")
 BEIJING_TZ = timezone(timedelta(hours=8))
 
 _schedule_cache = {"loaded_at": None, "matches": []}
+
+
+PREDICTION_TABLE_COLUMNS = [
+    "id",
+    "telegram_user_id",
+    "username",
+    "match_id",
+    "match_label",
+    "match_time",
+    "result_pick",
+    "score_pick",
+    "stake",
+    "status",
+    "created_at",
+    "emos_user_id",
+    "order_no",
+    "platform_order_no",
+    "payment_param",
+    "pay_url",
+    "paid_at",
+    "stake_transfer_status",
+    "pool_receiver_user_id",
+    "settled_result",
+    "settled_score",
+    "settled_at",
+    "payout_amount",
+    "payout_status",
+    "payout_error",
+]
 
 
 PREDICTION_RULES_TEXT = (
@@ -132,7 +160,7 @@ PREDICTION_RULES_TEXT = (
     f"胜平负池 {int((3000 + PLATFORM_SUBSIDY) * 0.4)}，比分池 {int((3000 + PLATFORM_SUBSIDY) * 0.6)}。\n"
     "如果猜中比分的人总共下了 300，某用户下 100 且比分命中，"
     f"他拿比分池 {int((3000 + PLATFORM_SUBSIDY) * 0.6)} * 100 / 300 = {int((3000 + PLATFORM_SUBSIDY) * 0.6 * 100 / 300)} 萝卜。\n\n"
-    f"当前控赔：f1bb每场补贴 {PLATFORM_SUBSIDY} 萝卜，每人单场最高投入 {MAX_STAKE} 萝卜。"
+    f"当前控赔：f1bb每场补贴 {PLATFORM_SUBSIDY} 萝卜，下注金额不设上限。"
 )
 
 
@@ -186,26 +214,76 @@ TEAM_NAMES = {
 }
 
 
+def create_worldcup_predictions_table(conn, table_name="worldcup_predictions"):
+    conn.execute(
+        f"""
+        CREATE TABLE IF NOT EXISTS {table_name} (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            telegram_user_id INTEGER NOT NULL,
+            username TEXT,
+            match_id TEXT NOT NULL,
+            match_label TEXT NOT NULL,
+            match_time TEXT NOT NULL,
+            result_pick TEXT NOT NULL,
+            score_pick TEXT NOT NULL,
+            stake INTEGER NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            created_at TEXT NOT NULL,
+            emos_user_id TEXT,
+            order_no TEXT,
+            platform_order_no TEXT,
+            payment_param TEXT,
+            pay_url TEXT,
+            paid_at TEXT,
+            stake_transfer_status TEXT DEFAULT 'not_charged',
+            pool_receiver_user_id TEXT,
+            settled_result TEXT,
+            settled_score TEXT,
+            settled_at TEXT,
+            payout_amount INTEGER DEFAULT 0,
+            payout_status TEXT DEFAULT 'not_settled',
+            payout_error TEXT
+        )
+        """
+    )
+
+
+def migrate_prediction_table_remove_unique(conn):
+    row = conn.execute(
+        """
+        SELECT sql
+        FROM sqlite_master
+        WHERE type = 'table' AND name = 'worldcup_predictions'
+        """
+    ).fetchone()
+    table_sql = row[0] if row and row[0] else ""
+    normalized_sql = re.sub(r"\s+", "", table_sql).upper()
+    if "UNIQUE(TELEGRAM_USER_ID,MATCH_ID)" not in normalized_sql:
+        return
+
+    backup_table = f"worldcup_predictions_unique_backup_{datetime.now(BEIJING_TZ).strftime('%Y%m%d%H%M%S')}"
+    conn.execute(f"ALTER TABLE worldcup_predictions RENAME TO {backup_table}")
+    create_worldcup_predictions_table(conn)
+
+    old_columns = {
+        row[1]
+        for row in conn.execute(f"PRAGMA table_info({backup_table})").fetchall()
+    }
+    copied_columns = [column for column in PREDICTION_TABLE_COLUMNS if column in old_columns]
+    column_sql = ", ".join(copied_columns)
+    conn.execute(
+        f"""
+        INSERT INTO worldcup_predictions ({column_sql})
+        SELECT {column_sql}
+        FROM {backup_table}
+        """
+    )
+    conn.execute(f"DROP TABLE {backup_table}")
+
+
 def init_prediction_db():
     with sqlite3.connect(PREDICTION_DB) as conn:
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS worldcup_predictions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                telegram_user_id INTEGER NOT NULL,
-                username TEXT,
-                match_id TEXT NOT NULL,
-                match_label TEXT NOT NULL,
-                match_time TEXT NOT NULL,
-                result_pick TEXT NOT NULL,
-                score_pick TEXT NOT NULL,
-                stake INTEGER NOT NULL,
-                status TEXT NOT NULL DEFAULT 'pending',
-                created_at TEXT NOT NULL,
-                UNIQUE(telegram_user_id, match_id)
-            )
-            """
-        )
+        create_worldcup_predictions_table(conn)
         ensure_column(conn, "worldcup_predictions", "emos_user_id", "TEXT")
         ensure_column(conn, "worldcup_predictions", "order_no", "TEXT")
         ensure_column(conn, "worldcup_predictions", "platform_order_no", "TEXT")
@@ -220,6 +298,20 @@ def init_prediction_db():
         ensure_column(conn, "worldcup_predictions", "payout_amount", "INTEGER DEFAULT 0")
         ensure_column(conn, "worldcup_predictions", "payout_status", "TEXT DEFAULT 'not_settled'")
         ensure_column(conn, "worldcup_predictions", "payout_error", "TEXT")
+        migrate_prediction_table_remove_unique(conn)
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_worldcup_predictions_user_match
+            ON worldcup_predictions(telegram_user_id, match_id)
+            """
+        )
+        conn.execute(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_worldcup_predictions_platform_order
+            ON worldcup_predictions(platform_order_no)
+            WHERE platform_order_no IS NOT NULL
+            """
+        )
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS custom_prediction_matches (
@@ -379,20 +471,6 @@ def save_prediction(
                 emos_user_id, order_no, platform_order_no, payment_param, pay_url,
                 stake_transfer_status, pool_receiver_user_id
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(telegram_user_id, match_id) DO UPDATE SET
-                username = excluded.username,
-                emos_user_id = excluded.emos_user_id,
-                order_no = excluded.order_no,
-                platform_order_no = excluded.platform_order_no,
-                payment_param = excluded.payment_param,
-                pay_url = excluded.pay_url,
-                result_pick = excluded.result_pick,
-                score_pick = excluded.score_pick,
-                stake = excluded.stake,
-                status = excluded.status,
-                stake_transfer_status = excluded.stake_transfer_status,
-                pool_receiver_user_id = excluded.pool_receiver_user_id,
-                created_at = excluded.created_at
             """,
             (
                 user.id,
@@ -879,11 +957,11 @@ def format_settlement_preview(preview, title="🏁 请求结算"):
         f"{title}\n\n"
         f"比赛：{preview['match_label']}\n"
         f"赛果：{preview['actual_result']} {preview['actual_score']}\n"
-        f"下注人数：{preview['bets']}\n"
+        f"下注笔数：{preview['bets']}\n"
         f"用户下注：{preview['total_stake']} 萝卜\n"
         f"总奖池：{preview['total_pool']} 萝卜\n"
-        f"胜平负中奖：{preview['result_winner_count']} 人\n"
-        f"比分中奖：{preview['score_winner_count']} 人\n\n"
+        f"胜平负中奖票：{preview['result_winner_count']} 张\n"
+        f"比分中奖票：{preview['score_winner_count']} 张\n\n"
         "确认后会立即按奖池规则给中奖用户转萝卜，并逐个私聊结算结果。"
     )
 
@@ -1894,10 +1972,10 @@ def format_settlement_result_text(result):
         f"比赛：{result['match_id']}\n"
         f"赛果：{result['actual_result']} {result['actual_score']}\n"
         f"总奖池：{result['total_pool']} 萝卜\n"
-        f"胜平负中奖：{result['result_winner_count']} 人\n"
-        f"比分中奖：{result['score_winner_count']} 人\n"
-        f"转账成功：{result['paid_count']} 人\n"
-        f"转账失败：{result['failed_count']} 人"
+        f"胜平负中奖票：{result['result_winner_count']} 张\n"
+        f"比分中奖票：{result['score_winner_count']} 张\n"
+        f"转账成功：{result['paid_count']} 笔\n"
+        f"转账失败：{result['failed_count']} 笔"
     )
 
 
@@ -1956,11 +2034,11 @@ async def send_demo_settlement_after_delay(bot, admin_id):
         "🧪 模拟比赛结算确认\n\n"
         "比赛：蓝方 vs 红方\n"
         "FIFA 模拟赛果：主胜 2:1\n"
-        "下注人数：5\n"
+        "下注笔数：5\n"
         "用户下注：1500 萝卜\n"
         "总奖池：2000 萝卜\n"
-        "胜平负中奖：3 人\n"
-        "比分中奖：2 人\n\n"
+        "胜平负中奖票：3 张\n"
+        "比分中奖票：2 张\n\n"
         "这是演示流程，点按钮不会真实转账。"
     )
     keyboard = InlineKeyboardMarkup([
@@ -2173,7 +2251,7 @@ async def show_result_options(query, context, match_id):
         f"🏟️ {match_label(match)}\n"
         f"开赛/截止：{match['beijing_time'].strftime('%m-%d %H:%M')} / {deadline}\n\n"
         "下注说明：\n"
-        f"• 单注范围：1 - {MAX_STAKE} 萝卜\n"
+        "• 单注范围：1 萝卜起，不设上限\n"
         f"• 当前总下注：{stats['total_stake']} 萝卜\n"
         f"• f1bb补贴：{PLATFORM_SUBSIDY} 萝卜\n"
         f"• 当前总奖池：{stats['total_pool']} 萝卜\n"
@@ -2235,7 +2313,7 @@ async def show_pool_stats(query, context, match_id):
         users = stats["result_users"].get(result, 0)
         percent = (stake / total_stake * 100) if total_stake else 0
         lines.append(
-            f"• {result}: {stake} 萝卜 / {users} 人 / {percent:.1f}% / {format_estimated_return(result_pool, stake)}"
+            f"• {result}: {stake} 萝卜 / {users} 笔 / {percent:.1f}% / {format_estimated_return(result_pool, stake)}"
         )
 
     lines.extend(["", f"比分池：{score_pool} 萝卜"])
@@ -2248,7 +2326,7 @@ async def show_pool_stats(query, context, match_id):
         for score, stake in score_items[:8]:
             users = stats["score_users"].get(score, 0)
             lines.append(
-                f"• {score}: {stake} 萝卜 / {users} 人 / {format_estimated_return(score_pool, stake)}"
+                f"• {score}: {stake} 萝卜 / {users} 笔 / {format_estimated_return(score_pool, stake)}"
             )
     else:
         lines.append("• 暂无比分下注")
@@ -2328,19 +2406,18 @@ async def show_stake_options(query, context, score):
         return
 
     pick["score"] = score
-    valid_stakes = [stake for stake in STAKE_OPTIONS if stake <= MAX_STAKE]
     keyboard = []
-    for idx in range(0, len(valid_stakes), 3):
+    for idx in range(0, len(STAKE_OPTIONS), 3):
         keyboard.append([
             InlineKeyboardButton(f"{stake} 萝卜", callback_data=f"prediction_stake:{stake}")
-            for stake in valid_stakes[idx:idx + 3]
+            for stake in STAKE_OPTIONS[idx:idx + 3]
         ])
     keyboard.append([InlineKeyboardButton("✏️ 自定义萝卜", callback_data="prediction_custom_stake")])
     keyboard.append([InlineKeyboardButton("🔙 重选比分", callback_data=f"prediction_result:{pick['result']}")])
     await query.edit_message_text(
         f"🏟️ {match_label(pick['match'])}\n"
         f"选择：{pick['result']} | 比分 {score}\n\n"
-        f"请选择投入萝卜数，也可以自定义。单场最高 {MAX_STAKE} 萝卜：",
+        "请选择投入萝卜数，也可以自定义。下注金额不设上限：",
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
 
@@ -2373,7 +2450,7 @@ async def ask_custom_stake(query, context):
     await query.edit_message_text(
         f"🏟️ {match_label(pick['match'])}\n"
         f"选择：{pick['result']} | 比分 {pick['score']}\n\n"
-        f"请输入自定义萝卜数，1 - {MAX_STAKE} 之间：",
+        "请输入自定义萝卜数，1 萝卜起，不设上限：",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("🔙 返回萝卜选择", callback_data=f"prediction_score:{pick['score']}")]
         ]),
@@ -2520,11 +2597,11 @@ async def handle_prediction_text(update: Update, context: ContextTypes.DEFAULT_T
         try:
             stake = int(text)
         except ValueError:
-            await update.message.reply_text(f"请输入数字，范围是 1 - {MAX_STAKE}。")
+            await update.message.reply_text("请输入正整数，例如：100。")
             return True
 
-        if stake < 1 or stake > MAX_STAKE:
-            await update.message.reply_text(f"超过上限了，请重新输入 1 - {MAX_STAKE} 之间的萝卜数。")
+        if stake < 1:
+            await update.message.reply_text("下注金额至少 1 萝卜，请重新输入。")
             return True
 
         context.user_data.pop("prediction_waiting_input", None)
@@ -2541,12 +2618,11 @@ async def show_stake_options_from_message(update, context, score):
         return
 
     pick["score"] = score
-    valid_stakes = [stake for stake in STAKE_OPTIONS if stake <= MAX_STAKE]
     keyboard = []
-    for idx in range(0, len(valid_stakes), 3):
+    for idx in range(0, len(STAKE_OPTIONS), 3):
         keyboard.append([
             InlineKeyboardButton(f"{stake} 萝卜", callback_data=f"prediction_stake:{stake}")
-            for stake in valid_stakes[idx:idx + 3]
+            for stake in STAKE_OPTIONS[idx:idx + 3]
         ])
     keyboard.append([InlineKeyboardButton("✏️ 自定义萝卜", callback_data="prediction_custom_stake")])
     keyboard.append([InlineKeyboardButton("🔙 重选比分", callback_data=f"prediction_result:{pick['result']}")])
@@ -2554,7 +2630,7 @@ async def show_stake_options_from_message(update, context, score):
     await update.message.reply_text(
         f"🏟️ {match_label(pick['match'])}\n"
         f"选择：{pick['result']} | 比分 {score}\n\n"
-        f"请选择投入萝卜数，也可以自定义。单场最高 {MAX_STAKE} 萝卜：",
+        "请选择投入萝卜数，也可以自定义。下注金额不设上限：",
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
 
