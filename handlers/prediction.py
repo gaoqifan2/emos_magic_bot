@@ -1058,6 +1058,7 @@ async def create_prediction_payment_order(user, pick, emos_user_id):
     order_no = pick.get("order_no") or build_prediction_order_no()
     payment_param = build_payment_param()
     data = {
+        "no": order_no,
         "pay_way": "telegram_bot",
         "price": pick["stake"],
         "name": f"预测下注{pick['stake']}萝卜",
@@ -1083,24 +1084,35 @@ async def create_prediction_payment_order(user, pick, emos_user_id):
         error_text = response.text[:180] if response.text else "未知错误"
         return {"success": False, "error": f"创建支付订单失败，状态码 {response.status_code}：{error_text}"}
 
-    result = response.json()
-    platform_order_no = result.get("no") or result.get("order_no")
-    pay_url = result.get("pay_url")
-    if not platform_order_no or not pay_url:
-        return {"success": False, "error": "创建支付订单失败：平台未返回订单号或支付链接。"}
+    try:
+        result = response.json()
+    except Exception as exc:
+        logger.error("创建预测支付订单返回非 JSON: %s body=%s", exc, response.text[:300])
+        return {"success": False, "error": "创建支付订单失败：服务商返回格式异常。"}
 
-    pick["order_no"] = order_no
-    save_prediction(
-        user,
-        pick,
-        status="payment_pending",
-        emos_user_id=emos_user_id,
-        transfer_status="payment_pending",
-        order_no=order_no,
-        platform_order_no=platform_order_no,
-        payment_param=payment_param,
-        pay_url=pay_url,
-    )
+    platform_order_no = result.get("no") or result.get("order_no") or order_no
+    pay_url = result.get("pay_url")
+    if not pay_url:
+        logger.error("创建预测支付订单缺少 pay_url: %s", result)
+        return {"success": False, "error": "创建支付订单失败：平台未返回支付链接。"}
+
+    try:
+        pick["order_no"] = order_no
+        save_prediction(
+            user,
+            pick,
+            status="payment_pending",
+            emos_user_id=emos_user_id,
+            transfer_status="payment_pending",
+            order_no=order_no,
+            platform_order_no=platform_order_no,
+            payment_param=payment_param,
+            pay_url=pay_url,
+        )
+    except Exception as exc:
+        logger.exception("保存预测下注订单失败: %s", exc)
+        return {"success": False, "error": "支付订单已创建，但本地保存失败，请联系管理员核对订单。"}
+
     return {
         "success": True,
         "order_no": order_no,
@@ -2481,7 +2493,11 @@ async def show_confirm(query, context, stake):
 
     pick["stake"] = stake
     loading = await query.edit_message_text("🔄 正在创建下注支付订单...")
-    payment = await create_prediction_payment_order(query.from_user, pick, emos_user_id)
+    try:
+        payment = await create_prediction_payment_order(query.from_user, pick, emos_user_id)
+    except Exception as exc:
+        logger.exception("创建预测下注订单未捕获异常: %s", exc)
+        payment = {"success": False, "error": "创建下注订单异常，请稍后重试。"}
     if not payment["success"]:
         await loading.edit_text(
             f"❌ 创建下注订单失败\n\n{payment['error']}",
@@ -2656,7 +2672,11 @@ async def show_confirm_from_message(update, context, stake):
 
     pick["stake"] = stake
     loading = await update.message.reply_text("🔄 正在创建下注支付订单...")
-    payment = await create_prediction_payment_order(update.effective_user, pick, emos_user_id)
+    try:
+        payment = await create_prediction_payment_order(update.effective_user, pick, emos_user_id)
+    except Exception as exc:
+        logger.exception("创建预测下注订单未捕获异常: %s", exc)
+        payment = {"success": False, "error": "创建下注订单异常，请稍后重试。"}
     if not payment["success"]:
         await loading.edit_text(
             f"❌ 创建下注订单失败\n\n{payment['error']}",
