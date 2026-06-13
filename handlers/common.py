@@ -115,7 +115,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 return
             # 确保token被完整存储
             # 存储为字典类型，以匹配游戏模块的期望格式
-            user_tokens[user_id] = {'token': token, 'user_id': str(user_id), 'username': update.effective_user.username, 'first_name': update.effective_user.first_name, 'last_name': update.effective_user.last_name}
+            user_tokens[user_id] = {'token': token, 'user_id': None, 'username': update.effective_user.username, 'first_name': update.effective_user.first_name, 'last_name': update.effective_user.last_name}
             try:
                 logger.info(f"Token已存储到user_tokens: {user_tokens[user_id]}")
             except UnicodeEncodeError:
@@ -210,7 +210,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             return
         # 确保token被完整存储
         # 存储为字典类型，以匹配游戏模块的期望格式
-        user_tokens[user_id] = {'token': token, 'user_id': str(user_id), 'username': update.effective_user.username, 'first_name': update.effective_user.first_name, 'last_name': update.effective_user.last_name}
+        user_tokens[user_id] = {'token': token, 'user_id': None, 'username': update.effective_user.username, 'first_name': update.effective_user.first_name, 'last_name': update.effective_user.last_name}
         try:
             logger.info(f"Token已存储到user_tokens: {user_tokens[user_id]}")
         except UnicodeEncodeError:
@@ -438,20 +438,32 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     conn = get_db_connection()
                     user_token = None
                     actual_user_id = None
-                    try:
-                        with conn.cursor() as cursor:
-                            # local_user_id 是 EMOS user_id（字符串格式），应该查询 user_id 字段
-                            cursor.execute(
-                                "SELECT id, token, telegram_id FROM users WHERE user_id = %s",
-                                (local_user_id,)
-                            )
-                            user_result = cursor.fetchone()
+                    user_telegram_id = None
+                    if conn:
+                        try:
+                            with conn.cursor() as cursor:
+                                # local_user_id 是 EMOS user_id（字符串格式），应该查询 user_id 字段
+                                cursor.execute(
+                                    "SELECT id, token, telegram_id FROM users WHERE user_id = %s",
+                                    (local_user_id,)
+                                )
+                                user_result = cursor.fetchone()
+                                if user_result:
+                                    actual_user_id = user_result[0]
+                                    user_token = user_result[1]
+                                    user_telegram_id = user_result[2]
+                        finally:
+                            conn.close()
+                    else:
+                        try:
+                            from app.database import get_user_by_user_id
+                            user_result = get_user_by_user_id(local_user_id)
                             if user_result:
-                                actual_user_id = user_result[0]
-                                user_token = user_result[1]
-                                user_telegram_id = user_result[2]
-                    finally:
-                        conn.close()
+                                actual_user_id = user_result.get("id") or local_user_id
+                                user_token = user_result.get("token")
+                                user_telegram_id = user_result.get("telegram_id")
+                        except Exception as sqlite_user_error:
+                            logger.error(f"SQLite查询充值用户失败: {sqlite_user_error}")
                     
                     if not user_token:
                         await loading.edit_text("⚠️ 找不到用户token，请先登录")
@@ -474,18 +486,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     except Exception as db_error:
                         logger.error(f"更新本地订单失败: {db_error}")
                     
-                    # 计算剩余可充值额度
+                    # 查询累计充值记录
                     from app.database import get_user_total_recharge
                     total_recharge = get_user_total_recharge(local_user_id)
-                    max_recharge = 1000  # 充值上限1000萝卜
-                    remaining_recharge = max_recharge - total_recharge
                     
                     message = f"✅ {update.effective_user.first_name}，充值成功！\n\n"
                     message += f"📋 订单号：`{order_no}`\n"
                     message += f"🥕 充值萝卜：{price}\n"
                     message += f"🪙 获得游戏币：{game_coin}\n\n"
-                    message += f"📊 剩余可充值额度：{remaining_recharge} 🥕\n"
-                    message += f"（累计充值{total_recharge} 🥕，上限{max_recharge} 🥕）\n\n"
+                    message += f"📊 累计充值：{total_recharge} 🥕\n"
+                    message += "当前不限制单次充值上限。\n\n"
                     message += "🎮 您的游戏币已到账，可以开始游戏了！"
                     
                     logger.info(f"用户 {actual_user_id} 充值成功，订单号：{order_no}")
@@ -542,7 +552,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             return
         # 确保token被完整存储
         # 存储为字典类型，以匹配游戏模块的期望格式
-        user_tokens[user_id] = {'token': token, 'user_id': str(user_id), 'username': update.effective_user.username, 'first_name': update.effective_user.first_name, 'last_name': update.effective_user.last_name}
+        user_tokens[user_id] = {'token': token, 'user_id': None, 'username': update.effective_user.username, 'first_name': update.effective_user.first_name, 'last_name': update.effective_user.last_name}
         # 获取用户信息
         try:
             api_url = f"{Config.API_BASE_URL}/user"
@@ -1783,7 +1793,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # 提示用户输入充值金额
         logger.info(f"提示用户输入充值金额")
-        await update.callback_query.edit_message_text(f"🎮 选择游戏：{game_id}\n\n请输入充值金额（1-50000萝卜）：")
+        await update.callback_query.edit_message_text(f"🎮 选择游戏：{game_id}\n\n请输入充值金额（1 萝卜起，不设上限）：")
         
         # 存储当前状态，等待用户输入
         context.user_data['current_operation'] = 'service_game_recharge_amount'

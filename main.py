@@ -2539,18 +2539,7 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if token:
                 try:
                     amount = int(input_text)
-                    if 1 <= amount <= 50000:
-                        # 检查累计充值限?
-                        total_recharge = context.user_data.get('total_recharge', 0)
-                        remaining_recharge = context.user_data.get('remaining_recharge', 100)
-                        
-                        if total_recharge + amount > 1500:
-                            remaining = 1500 - total_recharge
-                            await update.message.reply_text(f"充值限额为1500萝卜, 您已累计充值{total_recharge}萝卜, 还可充值{remaining}萝卜")
-                            # 清理用户操作数据
-                            clear_operation_data(context)
-                            return
-                        
+                    if amount >= 1:
                         # 从context中获取用户信?
                         local_user_id = context.user_data.get('local_user_id')
                         emos_user_id = context.user_data.get('emos_user_id')
@@ -2694,7 +2683,7 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             logger.error(f"错误堆栈: {traceback.format_exc()}")
                             await loading.edit_text(f"?创建订单失败: {type(e).__name__}: {e}")
                     else:
-                        await update.message.reply_text("充值金额必须在1-50000之间, 请重新输入")
+                        await update.message.reply_text("充值金额必须大于等于1, 请重新输入")
                         return 104  # 继续等待金额输入
                 except ValueError:
                     await update.message.reply_text("请输入有效的数字, 请重新输入")
@@ -2880,7 +2869,7 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     game_id = context.user_data.get('game_id')
                     try:
                         amount = int(input_text)
-                        if 1 <= amount <= 50000:
+                        if amount >= 1:
                             loading = await update.message.reply_text("🔄 正在创建游戏充值订?..")
                             
                             try:
@@ -2910,7 +2899,7 @@ async def handle_user_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             reply_markup = InlineKeyboardMarkup(keyboard)
                             await update.message.reply_text("操作完成", reply_markup=reply_markup)
                         else:
-                            await update.message.reply_text("充值金额必须在1-50000之间, 请重新输入")
+                            await update.message.reply_text("充值金额必须大于等于1, 请重新输入")
                             return 106  # 继续等待金额输入
                     except ValueError:
                         await update.message.reply_text("请输入有效的数字, 请重新输入")

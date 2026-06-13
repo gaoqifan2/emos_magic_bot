@@ -673,7 +673,7 @@ async def transfer(transfer_data: TransferRequest, user_id: str = Depends(verify
 # 游戏充值API
 class GameRechargeRequest(BaseModel):
     game_id: str = Field(..., description="游戏ID")
-    carrot_amount: int = Field(..., ge=1, le=50000, description="萝卜数量")
+    carrot_amount: int = Field(..., ge=1, description="萝卜数量")
 
 @app.post("/api/game/recharge", tags=["游戏 - 充值"])
 async def game_recharge(recharge_data: GameRechargeRequest, user_id: str = Depends(verify_token)):

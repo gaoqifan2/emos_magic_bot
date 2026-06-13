@@ -2,6 +2,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import math
 import os
 import re
 import sqlite3
@@ -16,7 +17,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 
-from config import Config, SERVICE_PROVIDER_TOKEN, user_tokens
+from config import Config, DEFAULT_GROUP_CHAT_ID, SERVICE_PROVIDER_TOKEN, user_tokens
 from utils.http_client import http_client
 
 logger = logging.getLogger(__name__)
@@ -32,6 +33,10 @@ FIFA_MATCHES_URL = os.getenv(
 FIFA_COMPETITION_ID = os.getenv("FIFA_COMPETITION_ID", "17")
 FIFA_SEASON_ID = os.getenv("FIFA_SEASON_ID", "285023")
 PREDICTION_SETTLEMENT_INTERVAL_SECONDS = int(os.getenv("PREDICTION_SETTLEMENT_INTERVAL_SECONDS", "30"))
+PREDICTION_PAYOUT_TRANSFER_DELAY_SECONDS = max(
+    0,
+    int(os.getenv("PREDICTION_PAYOUT_TRANSFER_DELAY_SECONDS", "5")),
+)
 SCHEDULE_TTL_SECONDS = 60 * 60
 PREDICTION_DB = Path(os.getenv("PREDICTION_DB", "prediction.db"))
 PREDICTION_TICKET_DIR = Path(os.getenv("PREDICTION_TICKET_DIR", "prediction_tickets"))
@@ -110,6 +115,9 @@ PREDICTION_TICKET_CARDS = [
     },
 ]
 PLATFORM_SUBSIDY = int(os.getenv("PREDICTION_PLATFORM_SUBSIDY", "100"))
+POOL_RELEASE_BASE_STAKE = max(1, int(os.getenv("PREDICTION_POOL_RELEASE_BASE_STAKE", "500")))
+RESULT_POOL_STAKE_MULTIPLIER = float(os.getenv("PREDICTION_RESULT_POOL_STAKE_MULTIPLIER", "3"))
+SCORE_POOL_STAKE_MULTIPLIER = float(os.getenv("PREDICTION_SCORE_POOL_STAKE_MULTIPLIER", "5"))
 STAKE_OPTIONS = [10, 50, 100, 500, 1000]
 CUSTOM_MATCH_CREATE_FEE = int(os.getenv("PREDICTION_CUSTOM_MATCH_CREATE_FEE", "50"))
 CUSTOM_MATCH_FEE_RECEIVER_USER_ID = os.getenv("PREDICTION_FEE_RECEIVER_USER_ID", "")
@@ -151,15 +159,15 @@ PREDICTION_RULES_TEXT = (
     "⚽ 世界杯预测规则\n\n"
     "玩法采用奖池制，萝卜只用于站内娱乐。\n\n"
     f"1. 单场总奖池 = 用户投入萝卜 + f1bb补贴的 {PLATFORM_SUBSIDY} 萝卜。\n"
-    "2. 猜中胜平负的用户瓜分 40% 奖池。\n"
-    "3. 猜中准确比分的用户瓜分 60% 奖池。\n"
-    "4. 每个池子内部按下注占比分配。\n"
+    "2. 胜平负池占 40%，比分池占 60%，两个池子独立结算。\n"
+    "3. 中奖用户按自己投入占全场已支付投入的比例领取对应池子，剩余留在平台。\n"
+    "4. 全场参与越少，实际释放的奖池越少，避免 1 萝卜冷门票拿走整池。\n"
     "5. 比赛开赛前 10 分钟停止预测。\n"
     "6. 比赛取消或延期时，已投入萝卜退回。\n\n"
     f"例：本场用户共下 3000，f1bb补贴 {PLATFORM_SUBSIDY}，总奖池 {3000 + PLATFORM_SUBSIDY}。\n"
     f"胜平负池 {int((3000 + PLATFORM_SUBSIDY) * 0.4)}，比分池 {int((3000 + PLATFORM_SUBSIDY) * 0.6)}。\n"
-    "如果猜中比分的人总共下了 300，某用户下 100 且比分命中，"
-    f"他拿比分池 {int((3000 + PLATFORM_SUBSIDY) * 0.6)} * 100 / 300 = {int((3000 + PLATFORM_SUBSIDY) * 0.6 * 100 / 300)} 萝卜。\n\n"
+    "如果某用户下 100 且比分命中，会按 100 / 3000 的全场投入比例领取比分池的一部分。\n"
+    "如果无人猜中比分，比分池不发放，留在平台。\n\n"
     f"当前控赔：f1bb每场补贴 {PLATFORM_SUBSIDY} 萝卜，下注金额不设上限。"
 )
 
@@ -345,6 +353,51 @@ def init_prediction_db():
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS prediction_manual_payouts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                reason TEXT NOT NULL,
+                prediction_id INTEGER,
+                platform_order_no TEXT,
+                telegram_user_id INTEGER NOT NULL,
+                username TEXT,
+                emos_user_id TEXT NOT NULL,
+                match_id TEXT,
+                match_label TEXT,
+                result_pick TEXT,
+                score_pick TEXT,
+                stake INTEGER,
+                payout_amount INTEGER NOT NULL,
+                transfer_status TEXT NOT NULL,
+                transfer_response TEXT,
+                notified INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS prediction_public_announcements (
+                match_id TEXT PRIMARY KEY,
+                chat_id INTEGER,
+                message_id INTEGER,
+                sent_at TEXT NOT NULL,
+                status TEXT NOT NULL,
+                note TEXT
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS prediction_match_subsidies (
+                match_id TEXT PRIMARY KEY,
+                subsidy INTEGER NOT NULL,
+                updated_by INTEGER,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
         conn.commit()
 
 
@@ -441,8 +494,61 @@ def get_open_custom_matches():
             "is_demo": item["id"].startswith("demo-"),
             "create_fee": item["create_fee"],
             "fee_status": item["fee_status"],
+            "platform_subsidy": int(item.get("platform_subsidy") or PLATFORM_SUBSIDY),
         })
     return matches
+
+
+def get_match_subsidy(match_id, match=None):
+    init_prediction_db()
+    with sqlite3.connect(PREDICTION_DB) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT subsidy FROM prediction_match_subsidies WHERE match_id = ?",
+            (match_id,),
+        ).fetchone()
+        if row:
+            return int(row["subsidy"] or 0)
+        custom = conn.execute(
+            "SELECT platform_subsidy FROM custom_prediction_matches WHERE id = ?",
+            (match_id,),
+        ).fetchone()
+        if custom:
+            return int(custom["platform_subsidy"] or 0)
+    if match and "platform_subsidy" in match:
+        return int(match.get("platform_subsidy") or 0)
+    return PLATFORM_SUBSIDY
+
+
+def set_match_subsidy(match_id, subsidy, updated_by):
+    init_prediction_db()
+    subsidy = max(0, int(subsidy))
+    with sqlite3.connect(PREDICTION_DB) as conn:
+        conn.execute(
+            """
+            INSERT INTO prediction_match_subsidies (match_id, subsidy, updated_by, updated_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(match_id) DO UPDATE SET
+                subsidy = excluded.subsidy,
+                updated_by = excluded.updated_by,
+                updated_at = excluded.updated_at
+            """,
+            (
+                match_id,
+                subsidy,
+                int(updated_by or 0),
+                datetime.now(BEIJING_TZ).isoformat(timespec="seconds"),
+            ),
+        )
+        conn.commit()
+    return subsidy
+
+
+def clear_match_subsidy(match_id):
+    init_prediction_db()
+    with sqlite3.connect(PREDICTION_DB) as conn:
+        conn.execute("DELETE FROM prediction_match_subsidies WHERE match_id = ?", (match_id,))
+        conn.commit()
 
 
 def build_prediction_order_no():
@@ -537,6 +643,130 @@ def get_user_predictions(user_id, limit=8):
     return [dict(row) for row in rows]
 
 
+def get_payout_history_matches(limit=8, offset=0):
+    init_prediction_db()
+    with sqlite3.connect(PREDICTION_DB) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            """
+            SELECT
+                match_id,
+                match_label,
+                MAX(match_time) AS match_time,
+                MAX(settled_at) AS settled_at,
+                MAX(settled_result) AS settled_result,
+                MAX(settled_score) AS settled_score,
+                COUNT(*) AS bets,
+                SUM(stake) AS total_stake,
+                SUM(CASE WHEN payout_status = 'paid' THEN payout_amount ELSE 0 END) AS paid_amount,
+                SUM(CASE WHEN payout_status = 'failed' THEN payout_amount ELSE 0 END) AS failed_amount,
+                SUM(CASE WHEN payout_amount > 0 THEN 1 ELSE 0 END) AS winner_count
+            FROM worldcup_predictions
+            WHERE status = 'settled'
+            GROUP BY match_id, match_label
+            ORDER BY COALESCE(MAX(settled_at), MAX(match_time)) DESC
+            LIMIT ? OFFSET ?
+            """,
+            (limit, offset),
+        ).fetchall()
+        total = conn.execute(
+            """
+            SELECT COUNT(*) AS total
+            FROM (
+                SELECT match_id, match_label
+                FROM worldcup_predictions
+                WHERE status = 'settled'
+                GROUP BY match_id, match_label
+            )
+            """
+        ).fetchone()["total"]
+    return [dict(row) for row in rows], int(total or 0)
+
+
+def get_payout_history_for_match(match_id):
+    init_prediction_db()
+    with sqlite3.connect(PREDICTION_DB) as conn:
+        conn.row_factory = sqlite3.Row
+        predictions = conn.execute(
+            """
+            SELECT *
+            FROM worldcup_predictions
+            WHERE match_id = ? AND status = 'settled'
+            ORDER BY payout_amount DESC, stake DESC, id ASC
+            """,
+            (match_id,),
+        ).fetchall()
+        manual_rows = conn.execute(
+            """
+            SELECT *
+            FROM prediction_manual_payouts
+            WHERE match_id = ?
+            ORDER BY created_at DESC, id DESC
+            """,
+            (match_id,),
+        ).fetchall()
+        request = conn.execute(
+            """
+            SELECT *
+            FROM prediction_settlement_requests
+            WHERE match_id = ?
+            """,
+            (match_id,),
+        ).fetchone()
+    return {
+        "predictions": [dict(row) for row in predictions],
+        "manual_payouts": [dict(row) for row in manual_rows],
+        "settlement_request": dict(request) if request else None,
+    }
+
+
+def get_match_bet_details(match_id, limit=10, offset=0):
+    init_prediction_db()
+    with sqlite3.connect(PREDICTION_DB) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM worldcup_predictions
+            WHERE match_id = ?
+            ORDER BY
+                CASE WHEN stake_transfer_status = 'paid' THEN 0 ELSE 1 END,
+                created_at ASC,
+                id ASC
+            LIMIT ? OFFSET ?
+            """,
+            (match_id, limit, offset),
+        ).fetchall()
+        total = conn.execute(
+            """
+            SELECT COUNT(*) AS total
+            FROM worldcup_predictions
+            WHERE match_id = ?
+            """,
+            (match_id,),
+        ).fetchone()["total"]
+        summary = conn.execute(
+            """
+            SELECT
+                match_label,
+                MAX(match_time) AS match_time,
+                COUNT(*) AS bets,
+                SUM(stake) AS total_stake,
+                SUM(CASE WHEN stake_transfer_status = 'paid' THEN 1 ELSE 0 END) AS paid_bets,
+                SUM(CASE WHEN stake_transfer_status = 'paid' THEN stake ELSE 0 END) AS paid_stake
+            FROM worldcup_predictions
+            WHERE match_id = ?
+            GROUP BY match_id, match_label
+            """,
+            (match_id,),
+        ).fetchone()
+    return {
+        "rows": [dict(row) for row in rows],
+        "total": int(total or 0),
+        "summary": dict(summary) if summary else None,
+    }
+
+
 def get_match_pool_stats(match_id):
     init_prediction_db()
     with sqlite3.connect(PREDICTION_DB) as conn:
@@ -568,9 +798,11 @@ def get_match_pool_stats(match_id):
         score_stakes[score_pick] = score_stakes.get(score_pick, 0) + stake
         score_users[score_pick] = score_users.get(score_pick, 0) + users
 
-    total_pool = total_stake + PLATFORM_SUBSIDY
+    platform_subsidy = get_match_subsidy(match_id)
+    total_pool = total_stake + platform_subsidy
     return {
         "total_stake": total_stake,
+        "platform_subsidy": platform_subsidy,
         "total_pool": total_pool,
         "result_pool": int(total_pool * 0.4),
         "score_pool": total_pool - int(total_pool * 0.4),
@@ -724,41 +956,94 @@ def distribute_pool(pool_amount, winners):
     return payouts
 
 
-def calculate_settlement_payouts(predictions, actual_result, actual_score):
+def distribute_capped_pool(pool_amount, winners, total_stake, stake_multiplier):
+    if pool_amount <= 0 or not winners or total_stake <= 0:
+        return {}
+
+    total_winner_stake = sum(max(0, int(item["stake"])) for item in winners)
+    if total_winner_stake <= 0:
+        return {}
+
+    payouts = {}
+    assigned = 0
+    candidates = []
+    for item in winners:
+        stake = max(0, int(item["stake"]))
+        if stake <= 0:
+            continue
+        share_by_winners = pool_amount * stake / total_winner_stake
+        cap_by_full_pool = pool_amount * stake / total_stake * stake_multiplier
+        exact = min(share_by_winners, cap_by_full_pool)
+        amount = int(exact)
+        if exact > 0 and amount <= 0:
+            amount = 1
+        if amount <= 0:
+            continue
+        prediction_id = item["id"]
+        payouts[prediction_id] = payouts.get(prediction_id, 0) + amount
+        assigned += amount
+        candidates.append((exact, amount, prediction_id))
+
+    max_assignable = int(pool_amount)
+    if assigned <= max_assignable:
+        return payouts
+
+    overflow = assigned - max_assignable
+    for _, amount, prediction_id in sorted(candidates):
+        if overflow <= 0:
+            break
+        removable = min(amount, overflow)
+        payouts[prediction_id] -= removable
+        overflow -= removable
+        if payouts[prediction_id] <= 0:
+            payouts.pop(prediction_id, None)
+    return payouts
+
+
+def calculate_settlement_payouts(predictions, actual_result, actual_score, platform_subsidy=None):
     total_stake = sum(int(item["stake"]) for item in predictions)
-    total_pool = total_stake + PLATFORM_SUBSIDY if predictions else 0
+    if platform_subsidy is None and predictions:
+        platform_subsidy = get_match_subsidy(predictions[0]["match_id"])
+    platform_subsidy = int(platform_subsidy or 0)
+    total_pool = total_stake + platform_subsidy if predictions else 0
     result_winners = [item for item in predictions if item["result_pick"] == actual_result]
     score_winners = [item for item in predictions if item["score_pick"] == actual_score]
 
-    if not result_winners:
-        return {
-            "total_stake": total_stake,
-            "total_pool": total_pool,
-            "result_pool": 0,
-            "score_pool": 0,
-            "payouts": {item["id"]: 0 for item in predictions},
-            "result_winner_count": 0,
-            "score_winner_count": 0,
-        }
-
-    if score_winners:
-        result_pool = int(total_pool * 0.4)
-        score_pool = total_pool - result_pool
-    else:
-        result_pool = total_pool
-        score_pool = 0
+    result_pool = int(total_pool * 0.4)
+    score_pool = total_pool - result_pool
+    release_ratio = min(1.0, total_stake / POOL_RELEASE_BASE_STAKE) if total_stake > 0 else 0.0
+    result_released_pool = math.ceil(result_pool * release_ratio) if result_winners else 0
+    score_released_pool = math.ceil(score_pool * release_ratio) if score_winners else 0
 
     payouts = {item["id"]: 0 for item in predictions}
-    for prediction_id, amount in distribute_pool(result_pool, result_winners).items():
+    for prediction_id, amount in distribute_capped_pool(
+        result_released_pool,
+        result_winners,
+        total_stake,
+        RESULT_POOL_STAKE_MULTIPLIER,
+    ).items():
         payouts[prediction_id] = payouts.get(prediction_id, 0) + amount
-    for prediction_id, amount in distribute_pool(score_pool, score_winners).items():
+    for prediction_id, amount in distribute_capped_pool(
+        score_released_pool,
+        score_winners,
+        total_stake,
+        SCORE_POOL_STAKE_MULTIPLIER,
+    ).items():
         payouts[prediction_id] = payouts.get(prediction_id, 0) + amount
+    payout_total = sum(int(value or 0) for value in payouts.values())
 
     return {
         "total_stake": total_stake,
+        "platform_subsidy": platform_subsidy,
         "total_pool": total_pool,
         "result_pool": result_pool,
         "score_pool": score_pool,
+        "release_ratio": release_ratio,
+        "release_base_stake": POOL_RELEASE_BASE_STAKE,
+        "result_released_pool": result_released_pool,
+        "score_released_pool": score_released_pool,
+        "payout_total": payout_total,
+        "platform_retained": max(0, total_pool - payout_total),
         "payouts": payouts,
         "result_winner_count": len(result_winners),
         "score_winner_count": len(score_winners),
@@ -818,34 +1103,44 @@ async def transfer_prediction_payout(emos_user_id, amount):
         error_text = response.text[:160] if response.text else "未知错误"
         return {"success": False, "error": f"状态码 {response.status_code}: {error_text}"}
 
-    return {"success": True, "data": response.json() if response.text else {}}
+    try:
+        data = response.json() if response.text else {}
+    except Exception:
+        data = {}
+    if "deduct" in data or data.get("status") == "pass" or data.get("success") is True:
+        return {"success": True, "data": data}
+    msg = data.get("msg") or data.get("message") or data.get("detail") or response.text[:160] or "转账接口未返回成功标记"
+    logger.error("预测结算转账失败: user=%s amount=%s response=%s", emos_user_id, amount, data or response.text)
+    return {"success": False, "error": str(msg)}
 
 
 async def notify_prediction_settlement(bot, prediction, actual_result, actual_score, payout_amount, payout_status):
     hit_result = prediction["result_pick"] == actual_result
     hit_score = prediction["score_pick"] == actual_score
     if hit_score:
-        hit_text = "胜平负 + 比分全中"
+        hit_text = "🎯 比分全中"
     elif hit_result:
-        hit_text = "命中胜平负"
+        hit_text = "✅ 命中胜平负"
     else:
-        hit_text = "未命中"
+        hit_text = "❌ 未命中"
 
     if payout_status == "paid":
-        payout_text = f"已到账 {payout_amount} 萝卜"
+        payout_text = f"✅ 已到账 {payout_amount} 萝卜"
     elif payout_amount > 0:
-        payout_text = f"应得 {payout_amount} 萝卜，转账待处理"
+        payout_text = f"⏳ 应得 {payout_amount} 萝卜，转账待处理"
     else:
         payout_text = "本场没有奖励"
 
     text = (
-        "🏁 世界杯预测已结算\n\n"
-        f"比赛：{prediction['match_label']}\n"
-        f"赛果：{actual_result} {actual_score}\n"
-        f"你的预测：{prediction['result_pick']} {prediction['score_pick']}\n"
-        f"投入：{prediction['stake']} 萝卜\n"
-        f"命中：{hit_text}\n"
-        f"结算：{payout_text}"
+        "🏁 世界杯预测结算单\n"
+        "━━━━━━━━━━━━━━\n"
+        f"⚽ 比赛：{bold_alnum(prediction['match_label'])}\n"
+        f"📌 赛果：{actual_result} {bold_alnum(actual_score)}\n\n"
+        f"🎫 你的预测：{prediction['result_pick']} {bold_alnum(prediction['score_pick'])}\n"
+        f"🥕 投入：{bold_alnum(prediction['stake'])} 萝卜\n"
+        f"🏅 命中：{hit_text}\n"
+        f"💰 发奖：{bold_alnum(payout_text)}\n"
+        "━━━━━━━━━━━━━━"
     )
     try:
         await bot.send_message(chat_id=prediction["telegram_user_id"], text=text)
@@ -876,12 +1171,17 @@ async def settle_prediction_match_with_result(match_id, actual_result, actual_sc
     payouts = payout_plan["payouts"]
     paid_count = 0
     failed_count = 0
+    failed_payouts = []
+    attempted_transfer_count = 0
 
     for prediction in predictions:
         payout_amount = int(payouts.get(prediction["id"], 0))
         payout_status = "none"
         payout_error = None
         if payout_amount > 0:
+            if attempted_transfer_count > 0 and PREDICTION_PAYOUT_TRANSFER_DELAY_SECONDS > 0:
+                await asyncio.sleep(PREDICTION_PAYOUT_TRANSFER_DELAY_SECONDS)
+            attempted_transfer_count += 1
             transfer = await transfer_prediction_payout(prediction.get("emos_user_id"), payout_amount)
             if transfer["success"]:
                 payout_status = "paid"
@@ -890,6 +1190,19 @@ async def settle_prediction_match_with_result(match_id, actual_result, actual_sc
                 payout_status = "failed"
                 payout_error = transfer.get("error", "转账失败")
                 failed_count += 1
+                failed_payouts.append({
+                    "prediction_id": prediction.get("id"),
+                    "telegram_user_id": prediction.get("telegram_user_id"),
+                    "username": prediction.get("username") or str(prediction.get("telegram_user_id")),
+                    "emos_user_id": prediction.get("emos_user_id") or "",
+                    "match_label": prediction.get("match_label") or match_id,
+                    "result_pick": prediction.get("result_pick") or "",
+                    "score_pick": prediction.get("score_pick") or "",
+                    "stake": int(prediction.get("stake") or 0),
+                    "payout_amount": payout_amount,
+                    "platform_order_no": prediction.get("platform_order_no") or prediction.get("order_no") or "",
+                    "error": payout_error,
+                })
 
         mark_prediction_settled(
             prediction["id"],
@@ -924,8 +1237,11 @@ async def settle_prediction_match_with_result(match_id, actual_result, actual_sc
         "actual_result": actual_result,
         "actual_score": actual_score,
         "total_pool": payout_plan["total_pool"],
+        "payout_total": payout_plan.get("payout_total", 0),
+        "platform_retained": payout_plan.get("platform_retained", 0),
         "paid_count": paid_count,
         "failed_count": failed_count,
+        "failed_payouts": failed_payouts,
         "result_winner_count": payout_plan["result_winner_count"],
         "score_winner_count": payout_plan["score_winner_count"],
     }
@@ -960,6 +1276,8 @@ def format_settlement_preview(preview, title="🏁 请求结算"):
         f"下注笔数：{preview['bets']}\n"
         f"用户下注：{preview['total_stake']} 萝卜\n"
         f"总奖池：{preview['total_pool']} 萝卜\n"
+        f"本场释放：{preview.get('payout_total', 0)} 萝卜\n"
+        f"平台留存：{preview.get('platform_retained', 0)} 萝卜\n"
         f"胜平负中奖票：{preview['result_winner_count']} 张\n"
         f"比分中奖票：{preview['score_winner_count']} 张\n\n"
         "确认后会立即按奖池规则给中奖用户转萝卜，并逐个私聊结算结果。"
@@ -1043,8 +1361,26 @@ def get_logged_in_user_info(telegram_user_id):
     if not user_info:
         return None, None
     if isinstance(user_info, dict):
-        return user_info.get("token"), user_info.get("user_id")
+        token = user_info.get("token")
+        emos_user_id = user_info.get("user_id")
+        if not is_valid_emos_user_id(emos_user_id, telegram_user_id):
+            logger.warning(
+                "Prediction blocked invalid EMOS user id: tg=%s emos_user_id=%s",
+                telegram_user_id,
+                emos_user_id,
+            )
+            return token, None
+        return token, emos_user_id
     return user_info, None
+
+
+def is_valid_emos_user_id(emos_user_id, telegram_user_id=None):
+    value = str(emos_user_id or "").strip()
+    if not value:
+        return False
+    if telegram_user_id is not None and value == str(telegram_user_id):
+        return False
+    return not value.isdigit()
 
 
 def build_payment_param():
@@ -1199,6 +1535,22 @@ def draw_centered(draw, xy, text, font, fill):
 def truncate_text(text, max_chars):
     text = str(text or "")
     return text if len(text) <= max_chars else text[: max_chars - 1] + "…"
+
+
+def bold_alnum(text):
+    text = "" if text is None else str(text)
+    output = []
+    for char in text:
+        code = ord(char)
+        if 65 <= code <= 90:
+            output.append(chr(0x1D5D4 + code - 65))
+        elif 97 <= code <= 122:
+            output.append(chr(0x1D5EE + code - 97))
+        elif 48 <= code <= 57:
+            output.append(chr(0x1D7EC + code - 48))
+        else:
+            output.append(char)
+    return "".join(output)
 
 
 def text_size(draw, text, font):
@@ -1777,15 +2129,6 @@ async def get_match(match_id):
 
 async def get_today_matches():
     now = datetime.now(BEIJING_TZ)
-    today = datetime.now(BEIJING_TZ).date()
-    matches = [
-        match
-        for match in await get_schedule()
-        if match["beijing_time"].date() == today and prediction_deadline(match) > now
-    ]
-    if matches:
-        return sorted(matches + get_open_custom_matches(), key=prediction_deadline)[:8]
-
     upcoming = [
         match
         for match in await get_schedule()
@@ -1803,6 +2146,9 @@ def build_prediction_keyboard(user_id=None):
         [
             InlineKeyboardButton("📋 我的预测", callback_data="prediction_mine"),
             InlineKeyboardButton("📖 奖池规则", callback_data="prediction_rules"),
+        ],
+        [
+            InlineKeyboardButton("🏆 发奖历史", callback_data="prediction_payout_history"),
         ],
     ]
     if user_id and is_ticket_card_admin(user_id):
@@ -1979,16 +2325,36 @@ async def confirm_fifa_settlement(query, context, match_id):
 def format_settlement_result_text(result):
     if not result.get("settled"):
         return f"🏁 没有结算：{result.get('reason', '未知原因')}"
-    return (
-        "🏁 结算完成\n\n"
-        f"比赛：{result['match_id']}\n"
-        f"赛果：{result['actual_result']} {result['actual_score']}\n"
-        f"总奖池：{result['total_pool']} 萝卜\n"
-        f"胜平负中奖票：{result['result_winner_count']} 张\n"
-        f"比分中奖票：{result['score_winner_count']} 张\n"
-        f"转账成功：{result['paid_count']} 笔\n"
-        f"转账失败：{result['failed_count']} 笔"
-    )
+    lines = [
+        "🏁 结算完成",
+        "",
+        f"比赛：{bold_alnum(result['match_id'])}",
+        f"赛果：{result['actual_result']} {bold_alnum(result['actual_score'])}",
+        f"总奖池：{bold_alnum(result['total_pool'])} 萝卜",
+        f"本场应发：{bold_alnum(result.get('payout_total', 0))} 萝卜",
+        f"平台留存：{bold_alnum(result.get('platform_retained', 0))} 萝卜",
+        f"胜平负中奖票：{bold_alnum(result['result_winner_count'])} 张",
+        f"比分中奖票：{bold_alnum(result['score_winner_count'])} 张",
+        f"转账成功：{bold_alnum(result['paid_count'])} 笔",
+        f"转账失败：{bold_alnum(result['failed_count'])} 笔",
+    ]
+    failed_payouts = result.get("failed_payouts") or []
+    if failed_payouts:
+        lines.extend(["", "⚠️ 手动补发清单："])
+        for item in failed_payouts[:10]:
+            lines.append(
+                "------------------\n"
+                f"用户：{bold_alnum(item.get('username') or '-')}\n"
+                f"EMOS：{bold_alnum(item.get('emos_user_id') or '-')}\n"
+                f"应发：{bold_alnum(item.get('payout_amount') or 0)} 萝卜\n"
+                f"预测：{item.get('result_pick') or '-'} {bold_alnum(item.get('score_pick') or '-')}\n"
+                f"投入：{bold_alnum(item.get('stake') or 0)} 萝卜\n"
+                f"订单：{bold_alnum(item.get('platform_order_no') or '-')}\n"
+                f"原因：{bold_alnum(str(item.get('error') or '接口异常')[:80])}"
+            )
+        if len(failed_payouts) > 10:
+            lines.append(f"还有 {bold_alnum(len(failed_payouts) - 10)} 条失败记录，请进发奖历史查看。")
+    return "\n".join(lines)
 
 
 async def ask_manual_settlement_score(query, context, match_id):
@@ -2265,7 +2631,7 @@ async def show_result_options(query, context, match_id):
         "下注说明：\n"
         "• 单注范围：1 萝卜起，不设上限\n"
         f"• 当前总下注：{stats['total_stake']} 萝卜\n"
-        f"• f1bb补贴：{PLATFORM_SUBSIDY} 萝卜\n"
+        f"• f1bb补贴：{stats['platform_subsidy']} 萝卜\n"
         f"• 当前总奖池：{stats['total_pool']} 萝卜\n"
         "• 胜平负命中分 40%，比分命中分 60%\n\n"
         "请选择你要预测的胜平负："
@@ -2280,7 +2646,9 @@ async def show_result_options(query, context, match_id):
         [InlineKeyboardButton("📊 奖池比例", callback_data=f"prediction_pool:{match_id}")],
     ]
     if is_ticket_card_admin(query.from_user.id):
+        keyboard.append([InlineKeyboardButton("🥕 管理本场补贴", callback_data=f"prediction_subsidy:{match_id}")])
         keyboard.append([InlineKeyboardButton("✍️ 管理员手动结算", callback_data=f"prediction_settle_manual:{match_id}")])
+        keyboard.append([InlineKeyboardButton("📒 查看下注详情", callback_data=f"prediction_bets:{match_id}:1")])
     keyboard.append([InlineKeyboardButton("🔙 返回比赛列表", callback_data="prediction_today")])
     await query.edit_message_text(
         detail_text,
@@ -2314,7 +2682,7 @@ async def show_pool_stats(query, context, match_id):
         "",
         f"比赛：{match_label(match)}",
         f"用户下注：{total_stake} 萝卜",
-        f"f1bb补贴：{PLATFORM_SUBSIDY} 萝卜",
+        f"f1bb补贴：{stats['platform_subsidy']} 萝卜",
         f"当前总奖池：{total_pool} 萝卜",
         "",
         f"胜平负池：{result_pool} 萝卜",
@@ -2356,6 +2724,40 @@ async def show_pool_stats(query, context, match_id):
     await query.edit_message_text(
         "\n".join(lines),
         reply_markup=InlineKeyboardMarkup(keyboard),
+    )
+
+
+async def show_match_subsidy_manager(query, context, match_id):
+    if not is_ticket_card_admin(query.from_user.id):
+        await query.edit_message_text("这个入口只有管理员能用。")
+        return
+    match = await get_match(match_id)
+    if not match:
+        await query.edit_message_text(
+            "这场比赛暂时找不到了，请刷新赛程。",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔄 刷新赛程", callback_data="prediction_today")]]),
+        )
+        return
+    if is_match_settled(match_id):
+        await query.edit_message_text(
+            "🏁 这场比赛已经结算，不能再修改补贴。",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 返回比赛", callback_data=f"prediction_match:{match_id}")]]),
+        )
+        return
+
+    current_subsidy = get_match_subsidy(match_id, match)
+    context.user_data["prediction_waiting_input"] = "match_subsidy"
+    context.user_data["prediction_subsidy_match_id"] = match_id
+    await query.edit_message_text(
+        f"🥕 管理本场补贴\n\n"
+        f"比赛：{match_label(match)}\n"
+        f"当前补贴：{bold_alnum(current_subsidy)} 萝卜\n"
+        f"默认补贴：{bold_alnum(PLATFORM_SUBSIDY)} 萝卜\n\n"
+        "请输入新的本场补贴，0 或正整数都可以。\n"
+        "保存后会影响这场之后的实时奖池和结算。",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔙 返回比赛", callback_data=f"prediction_match:{match_id}")]
+        ]),
     )
 
 
@@ -2587,6 +2989,43 @@ async def handle_prediction_text(update: Update, context: ContextTypes.DEFAULT_T
         )
         return True
 
+    if waiting_input == "match_subsidy":
+        user = update.effective_user
+        if not user or not is_ticket_card_admin(user.id):
+            context.user_data.pop("prediction_waiting_input", None)
+            context.user_data.pop("prediction_subsidy_match_id", None)
+            await update.message.reply_text("这个入口只有管理员能用。")
+            return True
+        match_id = context.user_data.get("prediction_subsidy_match_id")
+        if not match_id:
+            context.user_data.pop("prediction_waiting_input", None)
+            await update.message.reply_text("补贴设置状态已失效，请重新打开比赛。")
+            return True
+        if is_match_settled(match_id):
+            context.user_data.pop("prediction_waiting_input", None)
+            context.user_data.pop("prediction_subsidy_match_id", None)
+            await update.message.reply_text("这场比赛已经结算，不能再修改补贴。")
+            return True
+        try:
+            subsidy = int(text)
+        except ValueError:
+            await update.message.reply_text("请输入 0 或正整数，例如：100。")
+            return True
+        if subsidy < 0:
+            await update.message.reply_text("补贴不能小于 0，请重新输入。")
+            return True
+        set_match_subsidy(match_id, subsidy, user.id)
+        context.user_data.pop("prediction_waiting_input", None)
+        context.user_data.pop("prediction_subsidy_match_id", None)
+        await update.message.reply_text(
+            f"✅ 本场补贴已更新为 {bold_alnum(subsidy)} 萝卜。",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔙 返回比赛", callback_data=f"prediction_match:{match_id}")],
+                [InlineKeyboardButton("📊 查看奖池", callback_data=f"prediction_pool:{match_id}")],
+            ]),
+        )
+        return True
+
     pick = context.user_data.get("prediction_pick")
     if not pick:
         context.user_data.pop("prediction_waiting_input", None)
@@ -2789,6 +3228,293 @@ async def show_my_predictions(query):
     )
 
 
+def format_history_time(value):
+    if not value:
+        return "未知时间"
+    try:
+        return datetime.fromisoformat(str(value)).strftime("%m-%d %H:%M")
+    except Exception:
+        return str(value)[:16]
+
+
+def payout_status_text(status):
+    return {
+        "paid": "已发",
+        "failed": "失败",
+        "none": "无奖励",
+        "not_settled": "未结算",
+        "payment_pending": "待支付",
+    }.get(str(status or ""), str(status or "未知"))
+
+
+def payment_status_text(status):
+    return {
+        "paid": "已支付",
+        "payment_pending": "待支付",
+        "cancelled": "已取消",
+        "not_charged": "未扣款",
+    }.get(str(status or ""), str(status or "未知"))
+
+
+async def show_match_bet_details(query, match_id, page=1):
+    if not is_ticket_card_admin(query.from_user.id):
+        await query.edit_message_text(
+            "这个入口只有管理员能看。",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 返回预测面板", callback_data="menu_prediction_main")]]),
+        )
+        return
+
+    page = max(1, int(page or 1))
+    page_size = 5
+    data = get_match_bet_details(match_id, limit=page_size, offset=(page - 1) * page_size)
+    rows = data["rows"]
+    total = data["total"]
+    total_pages = max(1, (total + page_size - 1) // page_size)
+    if page > total_pages:
+        page = total_pages
+        data = get_match_bet_details(match_id, limit=page_size, offset=(page - 1) * page_size)
+        rows = data["rows"]
+        total = data["total"]
+
+    summary = data.get("summary") or {}
+    keyboard = []
+    if not rows:
+        await query.edit_message_text(
+            "📒 下注详情\n\n这场比赛还没有下注记录。",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔙 返回预测面板", callback_data="menu_prediction_main")]
+            ]),
+        )
+        return
+
+    match_label_text = summary.get("match_label") or rows[0].get("match_label") or match_id
+    paid_bets = int(summary.get("paid_bets") or 0)
+    paid_stake = int(summary.get("paid_stake") or 0)
+    total_stake = int(summary.get("total_stake") or 0)
+
+    lines = [
+        "📒 管理员下注详情",
+        "━━━━━━━━━━━━━━",
+        f"比赛：{bold_alnum(match_label_text)}",
+        f"📄 第 {bold_alnum(f'{page}/{total_pages}')} 页    共 {bold_alnum(total)} 笔",
+        f"✅ 已支付：{bold_alnum(paid_bets)} 笔 / {bold_alnum(paid_stake)} 萝卜",
+        f"🧾 全部订单：{bold_alnum(total_stake)} 萝卜",
+    ]
+
+    for index, item in enumerate(rows, start=(page - 1) * page_size + 1):
+        username = item.get("username") or str(item.get("telegram_user_id"))
+        raw_pay_status = item.get("stake_transfer_status") or item.get("status")
+        pay_status = payment_status_text(raw_pay_status)
+        pay_icon = "✅" if raw_pay_status == "paid" else "⏳" if raw_pay_status == "payment_pending" else "⚪"
+        created_text = format_history_time(item.get("created_at"))
+        paid_text = format_history_time(item.get("paid_at")) if item.get("paid_at") else "-"
+        payout_amount = int(item.get("payout_amount") or 0)
+        payout = ""
+        if item.get("status") == "settled":
+            payout = f"\n💰 结算：{bold_alnum(payout_amount)} 萝卜 / {payout_status_text(item.get('payout_status'))}"
+        lines.append(
+            "------------------\n"
+            f"#{bold_alnum(index)}  {bold_alnum(username)}\n"
+            f"🆔 EMOS：{bold_alnum(item.get('emos_user_id') or '-')}\n"
+            f"🎯 预测：{item.get('result_pick')}  {bold_alnum(item.get('score_pick'))}\n"
+            f"🥕 投入：{bold_alnum(item.get('stake'))} 萝卜    {pay_icon} {pay_status}\n"
+            f"🕒 下单：{bold_alnum(created_text)}    支付：{bold_alnum(paid_text)}\n"
+            f"🧾 订单：{bold_alnum(item.get('platform_order_no') or item.get('order_no') or '-')}"
+            f"{payout}"
+        )
+
+    nav = []
+    if page > 1:
+        nav.append(InlineKeyboardButton("⬅️ 上一页", callback_data=f"prediction_bets:{match_id}:{page - 1}"))
+    if page < total_pages:
+        nav.append(InlineKeyboardButton("下一页 ➡️", callback_data=f"prediction_bets:{match_id}:{page + 1}"))
+    if nav:
+        keyboard.append(nav)
+    keyboard.append([
+        InlineKeyboardButton("🔄 刷新", callback_data=f"prediction_bets:{match_id}:{page}"),
+        InlineKeyboardButton("🏆 发奖历史", callback_data=f"prediction_payout_match:{match_id}"),
+    ])
+    keyboard.append([InlineKeyboardButton("🔙 返回预测面板", callback_data="menu_prediction_main")])
+
+    await query.edit_message_text(
+        "\n".join(lines),
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
+
+
+async def show_payout_history_matches(query, page=1):
+    page = max(1, int(page or 1))
+    page_size = 8
+    rows, total = get_payout_history_matches(limit=page_size, offset=(page - 1) * page_size)
+    total_pages = max(1, (total + page_size - 1) // page_size)
+    if page > total_pages:
+        page = total_pages
+        rows, total = get_payout_history_matches(limit=page_size, offset=(page - 1) * page_size)
+    keyboard = [[InlineKeyboardButton("🔙 返回预测面板", callback_data="menu_prediction_main")]]
+    if not rows:
+        await query.edit_message_text(
+            "🏆 发奖历史\n\n还没有已结算的比赛。",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+        return
+
+    lines = [
+        "🏆 世界杯预测发奖历史",
+        "━━━━━━━━━━━━━━",
+        f"📄 第 {bold_alnum(f'{page}/{total_pages}')} 页    共 {bold_alnum(total)} 场",
+        "🕒 最新结算排在最前面",
+    ]
+    keyboard = []
+    for item in rows:
+        settled_text = format_history_time(item.get("settled_at") or item.get("match_time"))
+        result_text = f"{item.get('settled_result') or '未记录'} {item.get('settled_score') or ''}".strip()
+        paid_amount = int(item.get("paid_amount") or 0)
+        failed_amount = int(item.get("failed_amount") or 0)
+        winner_count = int(item.get("winner_count") or 0)
+        failed_text = f"\n   ⚠️ 待补：{failed_amount} 萝卜" if failed_amount else ""
+        lines.append(
+            "------------------\n"
+            f"⚽ {bold_alnum(item['match_label'])}\n"
+            f"📌 赛果：{bold_alnum(result_text)}\n"
+            f"🕒 结算：{bold_alnum(settled_text)}\n"
+            f"🎯 中奖票：{bold_alnum(winner_count)}    💰 已发：{bold_alnum(paid_amount)} 萝卜"
+            f"{bold_alnum(failed_text)}"
+        )
+        keyboard.append([
+            InlineKeyboardButton(
+                item["match_label"][:32],
+                callback_data=f"prediction_payout_match:{item['match_id']}",
+            )
+        ])
+    nav = []
+    if page > 1:
+        nav.append(InlineKeyboardButton("⬅️ 上一页", callback_data=f"prediction_payout_history:{page - 1}"))
+    if page < total_pages:
+        nav.append(InlineKeyboardButton("下一页 ➡️", callback_data=f"prediction_payout_history:{page + 1}"))
+    if nav:
+        keyboard.append(nav)
+    keyboard.append([InlineKeyboardButton("🔙 返回预测面板", callback_data="menu_prediction_main")])
+    await query.edit_message_text(
+        "\n".join(lines),
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
+
+
+async def show_payout_history_detail(query, match_id, page=1):
+    data = get_payout_history_for_match(match_id)
+    rows = data["predictions"]
+    manual_rows = data["manual_payouts"]
+    page = max(1, int(page or 1))
+    page_size = 6
+    if not rows:
+        keyboard = [[InlineKeyboardButton("🔙 返回发奖历史", callback_data="prediction_payout_history")]]
+        await query.edit_message_text(
+            "🏆 发奖明细\n\n这场比赛没有找到已结算记录。",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+        return
+
+    first = rows[0]
+    total_stake = sum(int(item.get("stake") or 0) for item in rows)
+    platform_subsidy = get_match_subsidy(match_id)
+    total_pool = total_stake + platform_subsidy
+    paid_amount = sum(
+        int(item.get("payout_amount") or 0)
+        for item in rows
+        if item.get("payout_status") == "paid"
+    )
+    failed_amount = sum(
+        int(item.get("payout_amount") or 0)
+        for item in rows
+        if item.get("payout_status") == "failed"
+    )
+    winner_rows = [item for item in rows if int(item.get("payout_amount") or 0) > 0]
+    winner_pages = (len(winner_rows) + page_size - 1) // page_size
+    total_pages = max(1, 1 + winner_pages)
+    if page > total_pages:
+        page = total_pages
+    record_page = page - 1
+    page_start = (record_page - 1) * page_size if record_page > 0 else 0
+    visible_winners = winner_rows[page_start:page_start + page_size] if record_page > 0 else []
+    result_text = f"{first.get('settled_result') or '未记录'} {first.get('settled_score') or ''}".strip()
+    planned_amount = paid_amount + failed_amount
+    retained_amount = max(0, total_pool - planned_amount)
+
+    lines = [
+        "🏆 发奖明细",
+        "",
+        f"比赛：{bold_alnum(first['match_label'])}",
+        f"赛果：{bold_alnum(result_text)}",
+        f"结算时间：{bold_alnum(format_history_time(first.get('settled_at')))}",
+        f"下注笔数：{bold_alnum(len(rows))}",
+        f"用户下注：{bold_alnum(total_stake)} 萝卜",
+        f"f1bb补贴：{bold_alnum(platform_subsidy)} 萝卜",
+        f"总奖池：{bold_alnum(total_pool)} 萝卜",
+        f"本场应发：{bold_alnum(planned_amount)} 萝卜",
+        f"实际已发奖励：{bold_alnum(paid_amount)} 萝卜",
+        f"平台留存：{bold_alnum(retained_amount)} 萝卜",
+    ]
+    if failed_amount:
+        lines.append(f"失败待补：{bold_alnum(failed_amount)} 萝卜")
+
+    if page == 1:
+        lines.extend([
+            "",
+            f"中奖记录：共 {bold_alnum(len(winner_rows))} 条",
+            "点下一页查看具体发奖明细。",
+        ])
+    else:
+        lines.extend(["", f"中奖/发奖记录：第 {bold_alnum(f'{record_page}/{max(1, winner_pages)}')} 页，共 {bold_alnum(len(winner_rows))} 条"])
+
+    if page > 1 and winner_rows:
+        for item in visible_winners:
+            username = item.get("username") or str(item.get("telegram_user_id"))
+            actual_payout = int(item.get("payout_amount") or 0)
+            lines.append(
+                f"------------------\n"
+                f"• {bold_alnum(username)}\n"
+                f"  预测：{item['result_pick']} {bold_alnum(item['score_pick'])} | 投入：{bold_alnum(item['stake'])} 萝卜\n"
+                f"  发奖：{bold_alnum(actual_payout)} 萝卜 | 状态：{payout_status_text(item.get('payout_status'))}"
+            )
+            if item.get("payout_error"):
+                lines.append(f"  失败原因：{bold_alnum(str(item['payout_error'])[:80])}")
+    elif page > 1:
+        lines.append("• 这场没有中奖票。")
+
+    if page == 1 and manual_rows:
+        lines.extend(["", "手动补账记录："])
+        for item in manual_rows[:4]:
+            username = item.get("username") or str(item.get("telegram_user_id"))
+            notified = "已通知" if int(item.get("notified") or 0) else "未通知"
+            lines.append(
+                f"------------------\n"
+                f"• {bold_alnum(username)} | {bold_alnum(item.get('score_pick') or '-')} | "
+                f"{bold_alnum(item.get('payout_amount') or 0)} 萝卜 | "
+                f"{payout_status_text(item.get('transfer_status'))} | {notified}"
+            )
+        if len(manual_rows) > 4:
+            lines.append(f"• 还有 {bold_alnum(len(manual_rows) - 4)} 条补账记录未显示")
+
+    keyboard = []
+    nav = []
+    if page > 1:
+        nav.append(InlineKeyboardButton("⬅️ 上一页", callback_data=f"prediction_payout_match:{match_id}:{page - 1}"))
+    if page < total_pages:
+        nav.append(InlineKeyboardButton("下一页 ➡️", callback_data=f"prediction_payout_match:{match_id}:{page + 1}"))
+    if nav:
+        keyboard.append(nav)
+    actions = [InlineKeyboardButton("🔄 刷新", callback_data=f"prediction_payout_match:{match_id}:{page}")]
+    if is_ticket_card_admin(query.from_user.id):
+        actions.append(InlineKeyboardButton("📒 下注详情", callback_data=f"prediction_bets:{match_id}:1"))
+    keyboard.append(actions)
+    keyboard.append([InlineKeyboardButton("🔙 返回发奖历史", callback_data="prediction_payout_history")])
+
+    await query.edit_message_text(
+        "\n".join(lines),
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
+
+
 async def prediction_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("打开世界杯预测面板")
     await send_prediction_panel(update, context)
@@ -2810,6 +3536,26 @@ async def prediction_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     if data == "prediction_refresh":
         await get_schedule(force=True)
         await show_today_matches(query)
+        return
+
+    if data == "prediction_payout_history":
+        await show_payout_history_matches(query, page=1)
+        return
+
+    if data.startswith("prediction_payout_history:"):
+        await show_payout_history_matches(query, page=int(data.split(":", 1)[1]))
+        return
+
+    if data.startswith("prediction_payout_match:"):
+        parts = data.split(":")
+        match_id = parts[1]
+        page = int(parts[2]) if len(parts) > 2 and parts[2].isdigit() else 1
+        await show_payout_history_detail(query, match_id, page=page)
+        return
+
+    if data.startswith("prediction_bets:"):
+        _, match_id, page = data.split(":", 2)
+        await show_match_bet_details(query, match_id, page=int(page))
         return
 
     if data == "prediction_upload_bg":
@@ -2864,6 +3610,10 @@ async def prediction_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     if data.startswith("prediction_pool:"):
         await show_pool_stats(query, context, data.split(":", 1)[1])
+        return
+
+    if data.startswith("prediction_subsidy:"):
+        await show_match_subsidy_manager(query, context, data.split(":", 1)[1])
         return
 
     if data.startswith("prediction_pay:"):

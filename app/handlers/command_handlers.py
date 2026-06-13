@@ -1981,10 +1981,6 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     await update.message.reply_text("❌ 充值金额必须大于0，请重新输入：")
                     return
                 
-                # 检查充值限额
-                if carrot_amount > remaining_recharge:
-                    await update.message.reply_text(f"❌ 充值金额超过剩余可充值额度（{remaining_recharge}萝卜），请重新输入：")
-                    return
             except ValueError:
                 await update.message.reply_text("❌ 请输入有效的数字，请重新输入：")
                 return

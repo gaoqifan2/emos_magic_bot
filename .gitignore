@@ -11,6 +11,7 @@ bot_runtime.err.log
 local_database.db
 prediction.db
 prediction_tickets/
+migration_artifacts/
 
 # Secrets
 .env

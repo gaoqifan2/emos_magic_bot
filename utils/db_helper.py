@@ -26,6 +26,19 @@ def ensure_user_exists(emos_user_id: str, token: str, telegram_id: Optional[int]
     """
     conn = get_db_connection()
     if not conn:
+        try:
+            from app.database import ensure_user_exists as sqlite_ensure_user_exists
+            if sqlite_ensure_user_exists(
+                user_id=emos_user_id,
+                telegram_id=telegram_id,
+                username=username,
+                first_name=first_name,
+                last_name=last_name,
+                token=token,
+            ):
+                return 1
+        except Exception as sqlite_error:
+            logger.error(f"SQLite用户兜底保存失败: {sqlite_error}")
         return None
     
     try:
@@ -147,8 +160,23 @@ def create_recharge_order(order_no: str, emos_user_id: str, username: str, teleg
     logger.info(f"开始创建充值订单: order_no={order_no}, platform_order_no={platform_order_no}")
     conn = get_db_connection()
     if not conn:
-        logger.error("数据库连接失败")
-        return False
+        logger.error("数据库连接失败，改用SQLite保存充值订单")
+        try:
+            from app.database import add_recharge_order
+            return bool(add_recharge_order(
+                order_no=order_no,
+                user_id=emos_user_id,
+                username=username,
+                telegram_user_id=telegram_user_id,
+                carrot_amount=carrot_amount,
+                game_coin_amount=carrot_amount * 10,
+                platform_order_no=platform_order_no,
+                pay_url=pay_url,
+                expire_time=expire_time,
+            ))
+        except Exception as sqlite_error:
+            logger.error(f"SQLite充值订单兜底保存失败: {sqlite_error}")
+            return False
     
     try:
         with conn.cursor() as cursor:
@@ -182,7 +210,12 @@ def update_recharge_order_status(platform_order_no: str, status: str,
     """更新充值订单状态"""
     conn = get_db_connection()
     if not conn:
-        return False
+        try:
+            from app.database import update_recharge_order_status as sqlite_update_recharge_order_status
+            return bool(sqlite_update_recharge_order_status(platform_order_no, status, game_coin_amount))
+        except Exception as sqlite_error:
+            logger.error(f"SQLite充值订单状态兜底更新失败: {sqlite_error}")
+            return False
     
     try:
         with conn.cursor() as cursor:
@@ -242,6 +275,11 @@ def get_user_by_telegram_id(telegram_user_id: int) -> Optional[Dict[str, Any]]:
     """根据Telegram用户ID获取用户信息"""
     conn = get_db_connection()
     if not conn:
+        try:
+            from app.database import get_user_by_telegram_id as sqlite_get_user_by_telegram_id
+            return sqlite_get_user_by_telegram_id(telegram_user_id)
+        except Exception as sqlite_error:
+            logger.error(f"SQLite用户兜底查询失败: {sqlite_error}")
         return None
     
     try:
@@ -266,7 +304,12 @@ def get_order_by_platform_no(platform_order_no: str) -> Optional[Dict[str, Any]]
     logger.info(f"开始查询订单: platform_order_no={platform_order_no}")
     conn = get_db_connection()
     if not conn:
-        logger.error("数据库连接失败")
+        logger.error("数据库连接失败，改用SQLite查询充值订单")
+        try:
+            from app.database import get_recharge_order_by_platform_no
+            return get_recharge_order_by_platform_no(platform_order_no)
+        except Exception as sqlite_error:
+            logger.error(f"SQLite充值订单兜底查询失败: {sqlite_error}")
         return None
     
     try:

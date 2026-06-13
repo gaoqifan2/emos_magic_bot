@@ -476,20 +476,15 @@ async def service_recharge(update: Update, context: ContextTypes.DEFAULT_TYPE):
         from app.database import get_user_total_recharge
         total_recharge = get_user_total_recharge(emos_user_id)
         
-        # 计算剩余可充值萝卜数
-        max_recharge = 1000  # 累计充值限额为1000萝卜
-        remaining_recharge = max_recharge - total_recharge
-        
         # 记录日志，方便调试
-        print(f"Debug: emos_user_id={emos_user_id}, local_user_id={local_user_id}, total_recharge={total_recharge}, remaining_recharge={remaining_recharge}")
+        print(f"Debug: emos_user_id={emos_user_id}, local_user_id={local_user_id}, total_recharge={total_recharge}")
         
         # 提示用户输入充值金额
         message = f"💸 充值中心\n\n"
-        message += f"📊 充值限额：\n"
+        message += f"📊 充值记录：\n"
         message += f"• 累计充值：{total_recharge} 萝卜\n"
-        message += f"• 充值上限：{max_recharge} 萝卜\n"
-        message += f"• 剩余可充：{remaining_recharge} 萝卜\n\n"
-        message += "请输入充值金额（1-50000萝卜）："
+        message += f"• 当前不限制单次充值上限\n\n"
+        message += "请输入充值金额（1 萝卜起，不设上限）："
         
         # 创建按钮：返回上一步
         keyboard = [
@@ -508,11 +503,10 @@ async def service_recharge(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data['local_user_id'] = local_user_id
         context.user_data['emos_user_id'] = emos_user_id
         context.user_data['total_recharge'] = total_recharge
-        context.user_data['remaining_recharge'] = remaining_recharge
     except Exception as e:
         # 即使查询失败，也允许用户输入充值金额
         logger.error(f"充值中心查询失败: {e}")
-        error_message = "💸 请输入充值金额（1-50000萝卜）："
+        error_message = "💸 请输入充值金额（1 萝卜起，不设上限）："
         if hasattr(update, 'callback_query') and update.callback_query:
             await loading.edit_text(error_message)
         else:
