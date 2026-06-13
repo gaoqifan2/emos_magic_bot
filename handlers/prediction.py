@@ -123,10 +123,10 @@ RESULT_POOL_STAKE_MULTIPLIER = float(os.getenv("PREDICTION_RESULT_POOL_STAKE_MUL
 SCORE_POOL_STAKE_MULTIPLIER = float(os.getenv("PREDICTION_SCORE_POOL_STAKE_MULTIPLIER", "5"))
 STAKE_POOL_CAP_TIERS = [
     (200, 1.0),
-    (100, 0.5),
-    (50, 0.25),
-    (10, 0.05),
-    (1, 0.01),
+    (100, 0.7),
+    (50, 0.35),
+    (10, 0.10),
+    (1, 0.02),
 ]
 STAKE_OPTIONS = [10, 50, 100, 500, 1000]
 CUSTOM_MATCH_CREATE_FEE = int(os.getenv("PREDICTION_CUSTOM_MATCH_CREATE_FEE", "50"))
@@ -171,12 +171,12 @@ PREDICTION_RULES_TEXT = (
     f"1. 单场总奖池 = 用户投入萝卜 + f1bb补贴的 {PLATFORM_SUBSIDY} 萝卜。\n"
     "2. 胜平负池占 40%，比分池占 60%，两个池子独立结算。\n"
     "3. 中奖票先按中奖者内部投入比例分池子，再按单票金额档位封顶。\n"
-    "4. 单票封顶：1萝卜=1%，10萝卜=5%，50萝卜=25%，100萝卜=50%，200萝卜及以上=100%。\n"
+    "4. 单票封顶：1萝卜=2%，10萝卜=10%，50萝卜=35%，100萝卜=70%，200萝卜及以上=100%。\n"
     "5. 比赛开赛前 10 分钟停止预测。\n"
     "6. 比赛取消或延期时，已投入萝卜退回。\n\n"
     f"例：本场用户共下 3000，f1bb补贴 {PLATFORM_SUBSIDY}，总奖池 {3000 + PLATFORM_SUBSIDY}。\n"
     f"胜平负池 {int((3000 + PLATFORM_SUBSIDY) * 0.4)}，比分池 {int((3000 + PLATFORM_SUBSIDY) * 0.6)}。\n"
-    "如果某用户下 100 且比分命中，最多领取比分池的 50%。\n"
+    "如果某用户下 100 且比分命中，最多领取比分池的 70%。\n"
     "如果无人猜中比分，比分池不发放，留在平台。\n\n"
     f"当前控赔：f1bb每场补贴 {PLATFORM_SUBSIDY} 萝卜，下注金额不设上限。"
 )
