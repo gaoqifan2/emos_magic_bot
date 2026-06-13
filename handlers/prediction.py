@@ -3823,6 +3823,41 @@ def payment_status_text(status):
     }.get(str(status or ""), str(status or "未知"))
 
 
+def build_page_button_rows(callback_prefix, current_page, total_pages, window=5):
+    total_pages = max(1, int(total_pages or 1))
+    current_page = min(max(1, int(current_page or 1)), total_pages)
+    if total_pages <= 1:
+        return []
+
+    if total_pages <= window:
+        pages = list(range(1, total_pages + 1))
+    elif current_page <= 3:
+        pages = [1, 2, 3, 4, "...", total_pages]
+    elif current_page >= total_pages - 2:
+        pages = [1, "...", total_pages - 3, total_pages - 2, total_pages - 1, total_pages]
+    else:
+        pages = [1, "...", current_page - 1, current_page, current_page + 1, "...", total_pages]
+
+    page_row = []
+    for item in pages:
+        if item == "...":
+            page_row.append(InlineKeyboardButton("...", callback_data=f"{callback_prefix}:{current_page}"))
+            continue
+        label = f"·{item}·" if item == current_page else str(item)
+        page_row.append(InlineKeyboardButton(label, callback_data=f"{callback_prefix}:{item}"))
+
+    nav_row = []
+    if current_page > 1:
+        nav_row.append(InlineKeyboardButton("⬅️ 上一页", callback_data=f"{callback_prefix}:{current_page - 1}"))
+    if current_page < total_pages:
+        nav_row.append(InlineKeyboardButton("下一页 ➡️", callback_data=f"{callback_prefix}:{current_page + 1}"))
+
+    rows = [page_row]
+    if nav_row:
+        rows.append(nav_row)
+    return rows
+
+
 async def show_match_bet_details(query, match_id, page=1):
     if not is_ticket_card_admin(query.from_user.id):
         await query.edit_message_text(
@@ -3890,13 +3925,7 @@ async def show_match_bet_details(query, match_id, page=1):
             f"{payout}"
         )
 
-    nav = []
-    if page > 1:
-        nav.append(InlineKeyboardButton("⬅️ 上一页", callback_data=f"prediction_bets:{match_id}:{page - 1}"))
-    if page < total_pages:
-        nav.append(InlineKeyboardButton("下一页 ➡️", callback_data=f"prediction_bets:{match_id}:{page + 1}"))
-    if nav:
-        keyboard.append(nav)
+    keyboard.extend(build_page_button_rows(f"prediction_bets:{match_id}", page, total_pages))
     keyboard.append([
         InlineKeyboardButton("🔄 刷新", callback_data=f"prediction_bets:{match_id}:{page}"),
         InlineKeyboardButton("🏆 发奖历史", callback_data=f"prediction_payout_match:{match_id}"),
@@ -3953,13 +3982,7 @@ async def show_payout_history_matches(query, page=1):
                 callback_data=f"prediction_payout_match:{item['match_id']}",
             )
         ])
-    nav = []
-    if page > 1:
-        nav.append(InlineKeyboardButton("⬅️ 上一页", callback_data=f"prediction_payout_history:{page - 1}"))
-    if page < total_pages:
-        nav.append(InlineKeyboardButton("下一页 ➡️", callback_data=f"prediction_payout_history:{page + 1}"))
-    if nav:
-        keyboard.append(nav)
+    keyboard.extend(build_page_button_rows("prediction_payout_history", page, total_pages))
     keyboard.append([InlineKeyboardButton("🔙 返回预测面板", callback_data="menu_prediction_main")])
     await query.edit_message_text(
         "\n".join(lines),
@@ -4066,13 +4089,7 @@ async def show_payout_history_detail(query, match_id, page=1):
             lines.append(f"• 还有 {bold_alnum(len(manual_rows) - 4)} 条补账记录未显示")
 
     keyboard = []
-    nav = []
-    if page > 1:
-        nav.append(InlineKeyboardButton("⬅️ 上一页", callback_data=f"prediction_payout_match:{match_id}:{page - 1}"))
-    if page < total_pages:
-        nav.append(InlineKeyboardButton("下一页 ➡️", callback_data=f"prediction_payout_match:{match_id}:{page + 1}"))
-    if nav:
-        keyboard.append(nav)
+    keyboard.extend(build_page_button_rows(f"prediction_payout_match:{match_id}", page, total_pages))
     actions = [InlineKeyboardButton("🔄 刷新", callback_data=f"prediction_payout_match:{match_id}:{page}")]
     if is_ticket_card_admin(query.from_user.id):
         actions.append(InlineKeyboardButton("📒 下注详情", callback_data=f"prediction_bets:{match_id}:1"))
