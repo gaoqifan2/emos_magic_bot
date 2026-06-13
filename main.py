@@ -201,6 +201,7 @@ from handlers.prediction import (
     handle_prediction_text,
     handle_prediction_media,
     prediction_settlement_task,
+    prediction_payment_recheck_task,
 )
 from ranks.carrot_rank import rank_carrot_command
 from ranks.upload_rank import rank_upload_command
@@ -303,6 +304,10 @@ async def post_init_wrapper(application):
     logger.info("启动世界杯预测自动结算确认任务..")
     asyncio.create_task(prediction_settlement_task(application))
     logger.info("世界杯预测自动结算确认任务已启动")
+
+    logger.info("启动世界杯预测待支付自动补查任务..")
+    asyncio.create_task(prediction_payment_recheck_task(application))
+    logger.info("世界杯预测待支付自动补查任务已启动")
 
 
 # 游戏状态清理任务

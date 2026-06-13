@@ -33,6 +33,9 @@ FIFA_MATCHES_URL = os.getenv(
 FIFA_COMPETITION_ID = os.getenv("FIFA_COMPETITION_ID", "17")
 FIFA_SEASON_ID = os.getenv("FIFA_SEASON_ID", "285023")
 PREDICTION_SETTLEMENT_INTERVAL_SECONDS = int(os.getenv("PREDICTION_SETTLEMENT_INTERVAL_SECONDS", "30"))
+PREDICTION_PAYMENT_RECHECK_AFTER_SECONDS = int(os.getenv("PREDICTION_PAYMENT_RECHECK_AFTER_SECONDS", "600"))
+PREDICTION_PAYMENT_RECHECK_INTERVAL_SECONDS = int(os.getenv("PREDICTION_PAYMENT_RECHECK_INTERVAL_SECONDS", "60"))
+PREDICTION_PAYMENT_HISTORY_PAGE_SIZE = int(os.getenv("PREDICTION_PAYMENT_HISTORY_PAGE_SIZE", "100"))
 PREDICTION_PAYOUT_TRANSFER_DELAY_SECONDS = max(
     0,
     int(os.getenv("PREDICTION_PAYOUT_TRANSFER_DELAY_SECONDS", "5")),
@@ -614,6 +617,44 @@ def update_prediction_payment(platform_order_no, status, transfer_status, paid_a
             (status, transfer_status, paid_at, platform_order_no),
         )
         conn.commit()
+
+
+def get_stale_pending_prediction_payments(older_than_seconds=None, limit=50):
+    init_prediction_db()
+    older_than_seconds = (
+        PREDICTION_PAYMENT_RECHECK_AFTER_SECONDS
+        if older_than_seconds is None
+        else int(older_than_seconds)
+    )
+    cutoff = datetime.now(BEIJING_TZ) - timedelta(seconds=older_than_seconds)
+    with sqlite3.connect(PREDICTION_DB) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM worldcup_predictions
+            WHERE status = 'payment_pending'
+              AND stake_transfer_status = 'payment_pending'
+              AND platform_order_no IS NOT NULL
+            ORDER BY created_at ASC, id ASC
+            LIMIT ?
+            """,
+            (int(limit),),
+        ).fetchall()
+
+    stale_rows = []
+    for row in rows:
+        item = dict(row)
+        try:
+            created_at = datetime.fromisoformat(str(item.get("created_at")))
+            if created_at.tzinfo is None:
+                created_at = created_at.replace(tzinfo=BEIJING_TZ)
+        except Exception:
+            stale_rows.append(item)
+            continue
+        if created_at <= cutoff:
+            stale_rows.append(item)
+    return stale_rows
 
 
 def get_prediction_by_platform_order(platform_order_no):
@@ -1657,6 +1698,138 @@ def is_platform_order_paid(order_info):
     return status in {"success", "paid", "payed"} or bool(order_info.get("time_payed"))
 
 
+def is_platform_order_cancelled_status_text(status_text):
+    status = str(status_text or "").lower()
+    return any(
+        marker in status
+        for marker in ("cancel", "refuse", "closed", "close", "timeout", "expired", "fail")
+    )
+
+
+def parse_platform_amount(value):
+    try:
+        return float(str(value).strip())
+    except Exception:
+        return None
+
+
+def is_platform_payment_amount_match(order_info, expected_stake):
+    expected = int(expected_stake or 0)
+    if expected <= 0:
+        return True
+
+    price_order = parse_platform_amount(order_info.get("price_order") or order_info.get("price"))
+    if price_order is not None and abs(price_order - expected) < 0.01:
+        return True
+
+    price_settle = parse_platform_amount(order_info.get("price_settle"))
+    if price_settle is None:
+        return True
+
+    expected_settle = expected * 1.1
+    if abs(price_settle - expected_settle) <= 1.5:
+        return True
+
+    inferred_order = price_settle / 1.1
+    return abs(inferred_order - expected) <= 1.5
+
+
+def parse_platform_time(value):
+    if not value:
+        return None
+    raw = str(value).strip()
+    try:
+        if raw.endswith("Z"):
+            parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        else:
+            parsed = datetime.fromisoformat(raw)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=BEIJING_TZ)
+        return parsed.astimezone(BEIJING_TZ)
+    except Exception:
+        pass
+
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"):
+        try:
+            return datetime.strptime(raw, fmt).replace(tzinfo=BEIJING_TZ)
+        except Exception:
+            continue
+    return None
+
+
+def carrot_history_entry_key(item, index=0):
+    return "|".join(
+        str(item.get(key, ""))
+        for key in ("created_at", "point", "trigger_type", "trigger_type_string", "type")
+    ) + f"|{index}"
+
+
+async def query_service_carrot_history(page_size=None):
+    if not SERVICE_PROVIDER_TOKEN:
+        return {"success": False, "error": "服务商 token 未配置。"}
+    try:
+        response = await http_client.get(
+            f"{Config.API_BASE_URL}/carrot/history",
+            headers={"Authorization": f"Bearer {SERVICE_PROVIDER_TOKEN}"},
+            params={"page": 1, "page_size": int(page_size or PREDICTION_PAYMENT_HISTORY_PAGE_SIZE)},
+            timeout=10,
+        )
+    except Exception as exc:
+        logger.error(f"查询服务商萝卜流水异常: {exc}")
+        return {"success": False, "error": "查询服务商萝卜流水失败。"}
+
+    if response.status_code != 200:
+        return {"success": False, "error": f"查询服务商萝卜流水失败，状态码 {response.status_code}。"}
+
+    try:
+        data = response.json()
+    except Exception as exc:
+        logger.error("服务商萝卜流水返回非 JSON: %s body=%s", exc, response.text[:300])
+        return {"success": False, "error": "服务商萝卜流水返回格式异常。"}
+    return {"success": True, "data": data}
+
+
+def is_carrot_history_pay_entry(item):
+    trigger = str(item.get("trigger_type") or "").lower()
+    trigger_text = str(item.get("trigger_type_string") or "")
+    flow_type = str(item.get("type") or "").lower()
+    point = parse_platform_amount(item.get("point"))
+    return (
+        point is not None
+        and point > 0
+        and flow_type in {"earn", "income", "in", ""}
+        and (trigger == "pay" or trigger_text == "支付")
+    )
+
+
+def is_carrot_history_match_prediction(item, prediction):
+    if not is_carrot_history_pay_entry(item):
+        return False
+    point = parse_platform_amount(item.get("point"))
+    expected = int(prediction.get("stake") or 0)
+    if expected <= 0 or point is None:
+        return False
+    if abs(point - expected * 1.1) > 1.5 and abs((point / 1.1) - expected) > 1.5:
+        return False
+
+    paid_at = parse_platform_time(item.get("created_at"))
+    created_at = parse_platform_time(prediction.get("created_at"))
+    if paid_at and created_at and paid_at < created_at - timedelta(seconds=30):
+        return False
+    return True
+
+
+def find_matching_carrot_history_payment(prediction, history_items, used_keys):
+    for index, item in enumerate(history_items):
+        key = carrot_history_entry_key(item, index)
+        if key in used_keys:
+            continue
+        if is_carrot_history_match_prediction(item, prediction):
+            used_keys.add(key)
+            return item
+    return None
+
+
 def find_ticket_font(bold=False):
     candidates = [
         os.getenv("PREDICTION_TICKET_FONT", ""),
@@ -1756,9 +1929,22 @@ def draw_text_right(draw, x, y, text, font, fill):
 
 
 def draw_label_value(draw, x, y, label, value, label_font, value_font, max_width):
-    draw.text((x, y), str(label), font=label_font, fill="#64748b")
+    draw.text((x, y), str(label), font=label_font, fill="#475569")
     value_font = fit_font(str(value), max_width, getattr(value_font, "size", 38), 26, bold=True)
     draw.text((x, y + 42), str(value), font=value_font, fill="#0f172a")
+
+
+def composite_rounded_rectangle(image, xy, radius, fill=None, outline=None, width=1):
+    layer = Image.new("RGBA", image.size, (0, 0, 0, 0))
+    layer_draw = ImageDraw.Draw(layer)
+    layer_draw.rounded_rectangle(
+        xy,
+        radius=radius,
+        fill=fill,
+        outline=outline,
+        width=width,
+    )
+    image.alpha_composite(layer)
 
 
 def is_ticket_card_admin(user_id):
@@ -1908,11 +2094,11 @@ def create_prediction_ticket_image(prediction):
     overlay_draw = ImageDraw.Draw(overlay)
     for y in range(height):
         if y < 260:
-            alpha = int(96 * (1 - y / 260))
+            alpha = int(34 * (1 - y / 260))
         elif y > 650:
-            alpha = min(202, int((y - 650) / 850 * 230))
+            alpha = min(46, int((y - 650) / 850 * 58))
         else:
-            alpha = 24
+            alpha = 0
         overlay_draw.line((0, y, width, y), fill=(2, 6, 23, alpha))
     image = Image.alpha_composite(image, overlay)
     draw = ImageDraw.Draw(image)
@@ -1932,30 +2118,54 @@ def create_prediction_ticket_image(prediction):
     except Exception:
         paid_text = str(paid_at)[:16]
 
-    draw.rounded_rectangle((48, 44, width - 48, height - 44), radius=42, outline=(134, 239, 172, 218), width=3)
+    composite_rounded_rectangle(
+        image,
+        (48, 44, width - 48, height - 44),
+        radius=42,
+        outline=(134, 239, 172, 218),
+        width=3,
+    )
+    draw = ImageDraw.Draw(image)
 
-    info_top = 700
-    draw.rounded_rectangle(
+    info_top = 740
+    composite_rounded_rectangle(
+        image,
         (66, info_top, width - 66, height - 70),
         radius=34,
-        fill=(15, 23, 42, 226),
-        outline=(255, 255, 255, 110),
+        fill=None,
+        outline=(255, 255, 255, 150),
         width=1,
     )
-    draw.text((106, info_top + 28), "萝卜预测票根", font=title_font, fill="#ffffff")
-    draw.text((110, info_top + 84), "World Cup Prediction", font=sub_font, fill="#dcfce7")
-    draw_text_right(draw, width - 106, info_top + 36, paid_text, meta_font, "#f8fafc")
-    draw_text_right(draw, width - 106, info_top + 76, f"背景 {card['number']} · {truncate_text(card.get('name', '自定义背景'), 10)}", meta_font, "#bbf7d0")
+    draw = ImageDraw.Draw(image)
+    draw.text((106, info_top + 28), "萝卜预测票根", font=title_font, fill="#ffffff", stroke_width=2, stroke_fill="#0f172a")
+    draw.text((110, info_top + 84), "World Cup Prediction", font=sub_font, fill="#f8fafc", stroke_width=1, stroke_fill="#0f172a")
+    draw_text_right(draw, width - 106, info_top + 36, paid_text, meta_font, "#ffffff")
+    draw_text_right(draw, width - 106, info_top + 76, f"背景 {card['number']} · {truncate_text(card.get('name', '自定义背景'), 10)}", meta_font, "#dcfce7")
 
-    draw.text((106, info_top + 128), "本场比赛", font=label_font, fill="#86efac")
+    draw.text((106, info_top + 128), "本场比赛", font=label_font, fill="#bbf7d0", stroke_width=1, stroke_fill="#0f172a")
     match = truncate_text(prediction.get("match_label"), 30)
-    draw_text_center(draw, (104, info_top + 166, width - 104, info_top + 230), match, match_font, "#ffffff")
+    match_x1, match_y1, match_x2, match_y2 = 104, info_top + 166, width - 104, info_top + 230
+    match_w, match_h = text_size(draw, match, match_font)
+    draw.text(
+        (match_x1 + (match_x2 - match_x1 - match_w) / 2, match_y1 + (match_y2 - match_y1 - match_h) / 2),
+        match,
+        font=match_font,
+        fill="#ffffff",
+        stroke_width=2,
+        stroke_fill="#0f172a",
+    )
 
     result = prediction.get("result_pick", "-")
     score = prediction.get("score_pick", "-")
     stake = prediction.get("stake", 0)
 
-    draw.rounded_rectangle((106, info_top + 254, width - 106, info_top + 408), radius=28, fill=(4, 120, 87, 236))
+    composite_rounded_rectangle(
+        image,
+        (106, info_top + 254, width - 106, info_top + 408),
+        radius=28,
+        fill=(4, 120, 87, 138),
+    )
+    draw = ImageDraw.Draw(image)
     draw.text((146, info_top + 284), "你的选择", font=label_font, fill="#bbf7d0")
     draw.text((146, info_top + 326), str(result), font=pick_font, fill="#ffffff")
     draw_text_right(draw, width - 146, info_top + 284, "预测比分", label_font, "#bbf7d0")
@@ -1975,10 +2185,18 @@ def create_prediction_ticket_image(prediction):
         (560, info_top + 558, width - 106, info_top + 680),
     ]
     for (label, value), (x1, y1, x2, y2) in zip(cards, card_positions):
-        draw.rounded_rectangle((x1, y1, x2, y2), radius=22, fill=(248, 250, 252, 238))
+        composite_rounded_rectangle(
+            image,
+            (x1, y1, x2, y2),
+            radius=22,
+            fill=(255, 255, 255, 148),
+            outline=(255, 255, 255, 120),
+            width=1,
+        )
+        draw = ImageDraw.Draw(image)
         draw_label_value(draw, x1 + 30, y1 + 22, label, value, label_font, value_font, x2 - x1 - 60)
 
-    draw_text_right(draw, width - 106, height - 98, "EMOS MAGIC BOX", tiny_font, "#94a3b8")
+    draw_text_right(draw, width - 106, height - 98, "EMOS MAGIC BOX", tiny_font, "#e2e8f0")
 
     file_name = f"{prediction.get('platform_order_no') or prediction.get('order_no')}.png"
     path = PREDICTION_TICKET_DIR / re.sub(r"[^A-Za-z0-9_.-]", "_", file_name)
@@ -2023,6 +2241,15 @@ async def activate_paid_prediction(platform_order_no, param=None, telegram_user_
     if not is_platform_order_paid(order_info):
         status = order_info.get("pay_status") or order_info.get("status") or "未支付"
         return {"success": False, "error": f"订单还没有支付成功，当前状态：{status}"}
+    if not is_platform_payment_amount_match(order_info, prediction.get("stake")):
+        return {
+            "success": False,
+            "error": (
+                "订单已支付，但金额和本地下注不匹配："
+                f"本地 {prediction.get('stake')}，平台订单 {order_info.get('price_order')}，"
+                f"结算 {order_info.get('price_settle')}"
+            ),
+        }
 
     paid_at = order_info.get("time_payed") or datetime.now(BEIJING_TZ).isoformat(timespec="seconds")
     update_prediction_payment(platform_order_no, "pending", "paid", paid_at)
@@ -2091,6 +2318,127 @@ async def handle_prediction_payment_start(update, context, platform_order_no, pa
         ]),
     )
     return True
+
+
+async def recheck_pending_prediction_payments(bot=None, older_than_seconds=None, limit=50):
+    predictions = get_stale_pending_prediction_payments(
+        older_than_seconds=older_than_seconds,
+        limit=limit,
+    )
+    if not predictions:
+        return {"checked": 0, "activated": [], "ledger_activated": [], "failed": []}
+
+    activated = []
+    ledger_activated = []
+    failed = []
+    history_items = None
+    used_history_keys = set()
+
+    for prediction in predictions:
+        platform_order_no = prediction.get("platform_order_no")
+        if not platform_order_no:
+            continue
+
+        result = await activate_paid_prediction(platform_order_no)
+        if result.get("success"):
+            item = result["prediction"]
+            activated.append(item)
+            if bot and not result.get("already_paid"):
+                try:
+                    await bot.send_message(
+                        chat_id=item["telegram_user_id"],
+                        text=(
+                            "✅ 已自动确认预测支付\n\n"
+                            f"比赛：{item['match_label']}\n"
+                            f"选择：{item['result_pick']} {item['score_pick']}\n"
+                            f"投入：{item['stake']} 萝卜\n"
+                            "这笔下注已进入奖池。"
+                        ),
+                    )
+                    await send_prediction_ticket(bot, item["telegram_user_id"], item)
+                except Exception as exc:
+                    logger.warning(f"自动确认支付后通知用户失败: {exc}")
+            continue
+
+        if is_platform_order_cancelled_status_text(result.get("error")):
+            update_prediction_payment(platform_order_no, "cancelled", "cancelled")
+            failed.append({
+                "platform_order_no": platform_order_no,
+                "stake": int(prediction.get("stake") or 0),
+                "error": result.get("error", "平台订单已取消"),
+            })
+            continue
+
+        if history_items is None:
+            history = await query_service_carrot_history()
+            if history.get("success"):
+                history_items = history.get("data", {}).get("items", [])
+            else:
+                history_items = []
+                logger.warning("预测待支付补查无法读取萝卜流水: %s", history.get("error"))
+
+        matched_history = find_matching_carrot_history_payment(prediction, history_items, used_history_keys)
+        if not matched_history:
+            failed.append({
+                "platform_order_no": platform_order_no,
+                "stake": int(prediction.get("stake") or 0),
+                "error": result.get("error", "平台订单未确认且流水未匹配"),
+            })
+            continue
+
+        paid_at = matched_history.get("created_at") or datetime.now(BEIJING_TZ).isoformat(timespec="seconds")
+        update_prediction_payment(platform_order_no, "pending", "paid", paid_at)
+        item = get_prediction_by_platform_order(platform_order_no)
+        ledger_activated.append({
+            "prediction": item,
+            "history": matched_history,
+        })
+        logger.info(
+            "通过服务商萝卜流水自动确认预测支付: order=%s stake=%s point=%s paid_at=%s",
+            platform_order_no,
+            prediction.get("stake"),
+            matched_history.get("point"),
+            matched_history.get("created_at"),
+        )
+        if bot and item:
+            try:
+                await bot.send_message(
+                    chat_id=item["telegram_user_id"],
+                    text=(
+                        "✅ 已通过服务商萝卜流水确认预测支付\n\n"
+                        f"比赛：{item['match_label']}\n"
+                        f"选择：{item['result_pick']} {item['score_pick']}\n"
+                        f"投入：{item['stake']} 萝卜\n"
+                        "这笔下注已进入奖池。"
+                    ),
+                )
+                await send_prediction_ticket(bot, item["telegram_user_id"], item)
+            except Exception as exc:
+                logger.warning(f"流水确认支付后通知用户失败: {exc}")
+
+    return {
+        "checked": len(predictions),
+        "activated": activated,
+        "ledger_activated": ledger_activated,
+        "failed": failed,
+    }
+
+
+async def prediction_payment_recheck_task(application):
+    while True:
+        try:
+            result = await recheck_pending_prediction_payments(bot=application.bot)
+            if result.get("activated") or result.get("ledger_activated"):
+                logger.info(
+                    "预测待支付自动补查完成: checked=%s order_paid=%s ledger_paid=%s failed=%s",
+                    result.get("checked"),
+                    len(result.get("activated", [])),
+                    len(result.get("ledger_activated", [])),
+                    len(result.get("failed", [])),
+                )
+        except Exception as exc:
+            logger.error(f"预测待支付自动补查失败: {exc}", exc_info=True)
+        await asyncio.sleep(PREDICTION_PAYMENT_RECHECK_INTERVAL_SECONDS)
 
 
 def parse_match_datetime(match):
