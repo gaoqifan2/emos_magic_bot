@@ -2690,9 +2690,44 @@ def build_prediction_keyboard(user_id=None):
 def format_match_line(match, index=None):
     prefix = f"{index}. " if index is not None else ""
     time_text = match["beijing_time"].strftime("%m-%d %H:%M")
+    group_text = match.get("group") or "-"
+    venue_text = short_venue_name(match.get("ground"))
     return (
+        "------------------\n"
         f"{prefix}{match_label(match)}\n"
-        f"   北京时间 {time_text} | {match.get('group', '')} | {match.get('ground', '')}"
+        f"🕒 {time_text}  ·  {group_text}  ·  {venue_text}"
+    )
+
+
+def short_venue_name(venue):
+    text = str(venue or "").strip()
+    if not text:
+        return "-"
+    mapping = {
+        "San Francisco Bay Area Stadium": "旧金山湾区",
+        "New York/New Jersey Stadium": "纽约/新泽西",
+        "Boston Stadium": "波士顿",
+        "BC Place Vancouver": "温哥华",
+        "Houston Stadium": "休斯敦",
+        "Dallas Stadium": "达拉斯",
+        "Philadelphia Stadium": "费城",
+        "Monterrey Stadium": "蒙特雷",
+        "Los Angeles Stadium": "洛杉矶",
+        "Seattle Stadium": "西雅图",
+        "Miami Stadium": "迈阿密",
+        "Toronto Stadium": "多伦多",
+        "Kansas City Stadium": "堪萨斯城",
+        "Atlanta Stadium": "亚特兰大",
+        "Mexico City Stadium": "墨西哥城",
+        "Guadalajara Stadium": "瓜达拉哈拉",
+    }
+    if text in mapping:
+        return mapping[text]
+    return (
+        text.replace(" Stadium", "")
+        .replace("Bay Area", "湾区")
+        .replace("New York/New Jersey", "纽约/新泽西")
+        .replace("BC Place Vancouver", "温哥华")
     )
 
 
@@ -3117,10 +3152,10 @@ async def show_today_matches(query):
     keyboard.append([InlineKeyboardButton("🔄 刷新赛程", callback_data="prediction_refresh")])
     keyboard.append([InlineKeyboardButton("🔙 返回预测面板", callback_data="menu_prediction_main")])
     await query.edit_message_text(
-        "📅 可预测比赛\n\n"
-        "已自动跳过开赛前 10 分钟内和已经开赛的比赛。\n\n"
-        + "\n\n".join(lines)
-        + "\n\n请选择一场比赛：",
+        "📅 可预测比赛\n"
+        "已跳过开赛前10分钟内/已开赛\n"
+        + "\n".join(lines)
+        + "\n------------------\n请选择一场比赛：",
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
 
@@ -3732,17 +3767,30 @@ async def show_my_predictions(query):
         return
 
     lines = []
-    for item in rows:
-        match_time = datetime.fromisoformat(item["match_time"]).strftime("%m-%d %H:%M")
-        order_no = item.get("order_no") or "无订单号"
+    for index, item in enumerate(rows, start=1):
+        match_time = format_history_time(item.get("match_time"))
+        created_text = format_history_time(item.get("created_at"))
+        paid_text = format_history_time(item.get("paid_at")) if item.get("paid_at") else "-"
+        order_no = item.get("platform_order_no") or item.get("order_no") or "无订单号"
         transfer_status = item.get("stake_transfer_status") or "unknown"
+        pay_icon = "✅" if transfer_status == "paid" else "⏳" if transfer_status == "payment_pending" else "⚪"
+        settle_text = "未结算"
+        if item.get("status") == "settled":
+            settle_text = f"已结算 / {payout_status_text(item.get('payout_status'))} {bold_alnum(item.get('payout_amount') or 0)}萝卜"
+        elif item.get("status") == "cancelled":
+            settle_text = "已取消"
         lines.append(
-            f"{item['match_label']}\n"
-            f"   {match_time} | {item['result_pick']} {item['score_pick']} | {item['stake']} 萝卜\n"
-            f"   订单：{order_no} | 状态：{item['status']} / {transfer_status}"
+            "------------------\n"
+            f"#{bold_alnum(index)}  {bold_alnum(item['match_label'])}\n"
+            f"🕒 开赛：{bold_alnum(match_time)}\n"
+            f"🎯 预测：{item['result_pick']}  {bold_alnum(item['score_pick'])}\n"
+            f"🥕 投入：{bold_alnum(item['stake'])} 萝卜    {pay_icon} {payment_status_text(transfer_status)}\n"
+            f"📌 结算：{settle_text}\n"
+            f"🕒 下单：{bold_alnum(created_text)}    支付：{bold_alnum(paid_text)}\n"
+            f"🧾 订单：{bold_alnum(order_no)}"
         )
     await query.edit_message_text(
-        "📋 我的预测\n\n" + "\n\n".join(lines),
+        "📋 我的预测\n" + "\n".join(lines),
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
 
