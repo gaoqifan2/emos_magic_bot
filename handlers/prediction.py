@@ -3440,31 +3440,34 @@ async def show_payout_history_detail(query, match_id, page=1):
     planned_amount = paid_amount + failed_amount
     retained_amount = max(0, total_pool - planned_amount)
 
-    lines = [
-        "🏆 发奖明细",
-        "",
-        f"比赛：{bold_alnum(first['match_label'])}",
-        f"赛果：{bold_alnum(result_text)}",
-        f"结算时间：{bold_alnum(format_history_time(first.get('settled_at')))}",
-        f"下注笔数：{bold_alnum(len(rows))}",
-        f"用户下注：{bold_alnum(total_stake)} 萝卜",
-        f"f1bb补贴：{bold_alnum(platform_subsidy)} 萝卜",
-        f"总奖池：{bold_alnum(total_pool)} 萝卜",
-        f"本场应发：{bold_alnum(planned_amount)} 萝卜",
-        f"实际已发奖励：{bold_alnum(paid_amount)} 萝卜",
-        f"平台留存：{bold_alnum(retained_amount)} 萝卜",
-    ]
-    if failed_amount:
-        lines.append(f"失败待补：{bold_alnum(failed_amount)} 萝卜")
-
     if page == 1:
+        lines = [
+            "🏆 发奖明细",
+            "",
+            f"比赛：{bold_alnum(first['match_label'])}",
+            f"赛果：{bold_alnum(result_text)}",
+            f"结算时间：{bold_alnum(format_history_time(first.get('settled_at')))}",
+            f"下注笔数：{bold_alnum(len(rows))}",
+            f"用户下注：{bold_alnum(total_stake)} 萝卜",
+            f"f1bb补贴：{bold_alnum(platform_subsidy)} 萝卜",
+            f"总奖池：{bold_alnum(total_pool)} 萝卜",
+            f"本场应发：{bold_alnum(planned_amount)} 萝卜",
+            f"实际已发奖励：{bold_alnum(paid_amount)} 萝卜",
+            f"平台留存：{bold_alnum(retained_amount)} 萝卜",
+        ]
+        if failed_amount:
+            lines.append(f"失败待补：{bold_alnum(failed_amount)} 萝卜")
         lines.extend([
             "",
             f"中奖记录：共 {bold_alnum(len(winner_rows))} 条",
             "点下一页查看具体发奖明细。",
         ])
     else:
-        lines.extend(["", f"中奖/发奖记录：第 {bold_alnum(f'{record_page}/{max(1, winner_pages)}')} 页，共 {bold_alnum(len(winner_rows))} 条"])
+        lines = [
+            "🏆 发奖明细",
+            f"比赛：{bold_alnum(first['match_label'])}",
+            f"中奖/发奖记录：第 {bold_alnum(f'{record_page}/{max(1, winner_pages)}')} 页，共 {bold_alnum(len(winner_rows))} 条",
+        ]
 
     if page > 1 and winner_rows:
         for item in visible_winners:
