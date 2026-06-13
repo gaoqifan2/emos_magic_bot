@@ -720,6 +720,92 @@ def get_payout_history_for_match(match_id):
     }
 
 
+def get_failed_payout_predictions(match_id):
+    init_prediction_db()
+    with sqlite3.connect(PREDICTION_DB) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM worldcup_predictions
+            WHERE match_id = ?
+              AND status = 'settled'
+              AND payout_status = 'failed'
+              AND payout_amount > 0
+            ORDER BY payout_amount DESC, id ASC
+            """,
+            (match_id,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def has_paid_manual_payout(prediction_id, platform_order_no):
+    init_prediction_db()
+    with sqlite3.connect(PREDICTION_DB) as conn:
+        row = conn.execute(
+            """
+            SELECT 1
+            FROM prediction_manual_payouts
+            WHERE transfer_status = 'paid'
+              AND (
+                prediction_id = ?
+                OR (? IS NOT NULL AND platform_order_no = ?)
+              )
+            LIMIT 1
+            """,
+            (prediction_id, platform_order_no, platform_order_no),
+        ).fetchone()
+    return row is not None
+
+
+def record_prediction_manual_payout(prediction, reason, transfer_status, transfer_response=None, notified=0):
+    init_prediction_db()
+    with sqlite3.connect(PREDICTION_DB) as conn:
+        conn.execute(
+            """
+            INSERT INTO prediction_manual_payouts (
+                reason, prediction_id, platform_order_no, telegram_user_id, username,
+                emos_user_id, match_id, match_label, result_pick, score_pick, stake,
+                payout_amount, transfer_status, transfer_response, notified, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                reason,
+                prediction.get("id"),
+                prediction.get("platform_order_no") or prediction.get("order_no"),
+                prediction.get("telegram_user_id"),
+                prediction.get("username"),
+                prediction.get("emos_user_id") or "",
+                prediction.get("match_id"),
+                prediction.get("match_label"),
+                prediction.get("result_pick"),
+                prediction.get("score_pick"),
+                int(prediction.get("stake") or 0),
+                int(prediction.get("payout_amount") or 0),
+                transfer_status,
+                transfer_response,
+                1 if notified else 0,
+                datetime.now(BEIJING_TZ).isoformat(timespec="seconds"),
+            ),
+        )
+        conn.commit()
+
+
+def update_prediction_payout_retry(prediction_id, payout_status, payout_error=None):
+    init_prediction_db()
+    with sqlite3.connect(PREDICTION_DB) as conn:
+        conn.execute(
+            """
+            UPDATE worldcup_predictions
+            SET payout_status = ?,
+                payout_error = ?
+            WHERE id = ?
+            """,
+            (payout_status, payout_error, prediction_id),
+        )
+        conn.commit()
+
+
 def get_match_bet_details(match_id, limit=10, offset=0):
     init_prediction_db()
     with sqlite3.connect(PREDICTION_DB) as conn:
@@ -1146,6 +1232,91 @@ async def notify_prediction_settlement(bot, prediction, actual_result, actual_sc
         await bot.send_message(chat_id=prediction["telegram_user_id"], text=text)
     except Exception as exc:
         logger.warning(f"发送预测结算通知失败: {exc}")
+
+
+async def notify_prediction_repay(bot, prediction):
+    text = (
+        "💸 世界杯预测补发到账\n"
+        "━━━━━━━━━━━━━━\n"
+        f"⚽ 比赛：{bold_alnum(prediction.get('match_label') or '-')}\n"
+        f"🎫 你的预测：{prediction.get('result_pick') or '-'} {bold_alnum(prediction.get('score_pick') or '-')}\n"
+        f"🥕 补发：{bold_alnum(prediction.get('payout_amount') or 0)} 萝卜\n"
+        "✅ 上一笔发奖失败已重新处理，萝卜已到账。"
+    )
+    try:
+        await bot.send_message(chat_id=prediction["telegram_user_id"], text=text)
+        return True
+    except Exception as exc:
+        logger.warning(f"发送预测补发通知失败: {exc}")
+        return False
+
+
+async def retry_failed_prediction_payouts(match_id, bot=None):
+    failed_rows = get_failed_payout_predictions(match_id)
+    if not failed_rows:
+        return {
+            "success": True,
+            "match_id": match_id,
+            "paid": [],
+            "failed": [],
+            "skipped": [],
+            "message": "没有需要补发的失败奖励",
+        }
+
+    paid = []
+    failed = []
+    skipped = []
+    attempted_transfer_count = 0
+
+    for prediction in failed_rows:
+        prediction_id = prediction.get("id")
+        platform_order_no = prediction.get("platform_order_no") or prediction.get("order_no")
+        payout_amount = int(prediction.get("payout_amount") or 0)
+
+        if has_paid_manual_payout(prediction_id, platform_order_no):
+            update_prediction_payout_retry(prediction_id, "paid", None)
+            skipped.append(prediction)
+            continue
+
+        if attempted_transfer_count > 0 and PREDICTION_PAYOUT_TRANSFER_DELAY_SECONDS > 0:
+            await asyncio.sleep(PREDICTION_PAYOUT_TRANSFER_DELAY_SECONDS)
+        attempted_transfer_count += 1
+
+        transfer = await transfer_prediction_payout(prediction.get("emos_user_id"), payout_amount)
+        transfer_response = json.dumps(transfer.get("data") or transfer, ensure_ascii=False)[:500]
+
+        if transfer.get("success"):
+            notified = await notify_prediction_repay(bot, prediction) if bot else False
+            record_prediction_manual_payout(
+                prediction,
+                reason="admin_retry_failed_payout",
+                transfer_status="paid",
+                transfer_response=transfer_response,
+                notified=notified,
+            )
+            update_prediction_payout_retry(prediction_id, "paid", None)
+            paid.append(prediction)
+        else:
+            error = transfer.get("error", "转账失败")
+            retry_record = dict(prediction)
+            retry_record["payout_error"] = error
+            record_prediction_manual_payout(
+                retry_record,
+                reason="admin_retry_failed_payout",
+                transfer_status="failed",
+                transfer_response=transfer_response,
+                notified=0,
+            )
+            update_prediction_payout_retry(prediction_id, "failed", error)
+            failed.append(retry_record)
+
+    return {
+        "success": not failed,
+        "match_id": match_id,
+        "paid": paid,
+        "failed": failed,
+        "skipped": skipped,
+    }
 
 
 async def settle_prediction_match(match_id, bot=None):
@@ -3510,12 +3681,80 @@ async def show_payout_history_detail(query, match_id, page=1):
     if is_ticket_card_admin(query.from_user.id):
         actions.append(InlineKeyboardButton("📒 下注详情", callback_data=f"prediction_bets:{match_id}:1"))
     keyboard.append(actions)
+    if failed_amount and is_ticket_card_admin(query.from_user.id):
+        keyboard.append([
+            InlineKeyboardButton(
+                f"💸 补发失败奖励 {failed_amount} 萝卜",
+                callback_data=f"prediction_repay_failed:{match_id}:{page}",
+            )
+        ])
     keyboard.append([InlineKeyboardButton("🔙 返回发奖历史", callback_data="prediction_payout_history")])
 
     await query.edit_message_text(
         "\n".join(lines),
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
+
+
+async def handle_retry_failed_payouts(query, context, match_id, page=1):
+    if not is_ticket_card_admin(query.from_user.id):
+        await query.edit_message_text(
+            "这个入口只有管理员能操作。",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 返回发奖历史", callback_data="prediction_payout_history")]]),
+        )
+        return
+
+    failed_rows = get_failed_payout_predictions(match_id)
+    if not failed_rows:
+        await query.edit_message_text(
+            "💸 补发失败奖励\n\n这场没有需要补发的失败奖励。",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 返回发奖明细", callback_data=f"prediction_payout_match:{match_id}:{page}")]]),
+        )
+        return
+
+    pending_amount = sum(int(item.get("payout_amount") or 0) for item in failed_rows)
+    await query.edit_message_text(
+        "💸 正在补发失败奖励\n\n"
+        f"待补：{bold_alnum(len(failed_rows))} 笔 / {bold_alnum(pending_amount)} 萝卜\n"
+        f"每笔间隔 {bold_alnum(PREDICTION_PAYOUT_TRANSFER_DELAY_SECONDS)} 秒，补完会显示结果。",
+    )
+
+    result = await retry_failed_prediction_payouts(match_id, bot=context.bot)
+    paid = result.get("paid", [])
+    failed = result.get("failed", [])
+    skipped = result.get("skipped", [])
+    paid_amount = sum(int(item.get("payout_amount") or 0) for item in paid)
+    skipped_amount = sum(int(item.get("payout_amount") or 0) for item in skipped)
+    failed_amount = sum(int(item.get("payout_amount") or 0) for item in failed)
+
+    lines = [
+        "💸 补发完成",
+        "",
+        f"✅ 成功补发：{bold_alnum(len(paid))} 笔 / {bold_alnum(paid_amount)} 萝卜",
+    ]
+    if skipped:
+        lines.append(f"🔁 已有补发记录，已同步：{bold_alnum(len(skipped))} 笔 / {bold_alnum(skipped_amount)} 萝卜")
+    if failed:
+        lines.append(f"⚠️ 仍然失败：{bold_alnum(len(failed))} 笔 / {bold_alnum(failed_amount)} 萝卜")
+        lines.append("")
+        lines.append("失败待手动补：")
+        for item in failed[:8]:
+            lines.append(
+                "------------------\n"
+                f"• {bold_alnum(item.get('username') or item.get('telegram_user_id'))}\n"
+                f"  EMOS：{bold_alnum(item.get('emos_user_id') or '-')}\n"
+                f"  应发：{bold_alnum(item.get('payout_amount') or 0)} 萝卜\n"
+                f"  订单：{bold_alnum(item.get('platform_order_no') or item.get('order_no') or '-')}\n"
+                f"  原因：{bold_alnum(str(item.get('payout_error') or '-')[:80])}"
+            )
+        if len(failed) > 8:
+            lines.append(f"• 还有 {bold_alnum(len(failed) - 8)} 笔未显示")
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔄 查看最新发奖明细", callback_data=f"prediction_payout_match:{match_id}:{page}")],
+        [InlineKeyboardButton("🔙 返回发奖历史", callback_data="prediction_payout_history")],
+    ])
+    await query.edit_message_text("\n".join(lines), reply_markup=keyboard)
 
 
 async def prediction_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -3547,6 +3786,13 @@ async def prediction_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     if data.startswith("prediction_payout_history:"):
         await show_payout_history_matches(query, page=int(data.split(":", 1)[1]))
+        return
+
+    if data.startswith("prediction_repay_failed:"):
+        parts = data.split(":")
+        match_id = parts[1]
+        page = int(parts[2]) if len(parts) > 2 and parts[2].isdigit() else 1
+        await handle_retry_failed_payouts(query, context, match_id, page=page)
         return
 
     if data.startswith("prediction_payout_match:"):
