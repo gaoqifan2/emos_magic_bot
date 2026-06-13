@@ -7,6 +7,9 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from utils.http_client import http_client
 from utils.http_client import http_client
+from config import env_int
+
+PREDICTION_PLATFORM_SUBSIDY = env_int("PREDICTION_PLATFORM_SUBSIDY", 100)
 
 # 游戏规则字典
 game_rules = {
@@ -137,6 +140,40 @@ game_rules = {
   - 牛3-牛1：0.5倍
   - 无牛：0倍
 • 税收：赢家扣除5%服务费
+""",
+    'prediction': f"""
+⚽ 世界杯预测 /prediction
+• 玩法：站内萝卜奖池制，不是固定赔率。
+• 单场总奖池：用户已支付下注 + f1bb补贴 {PREDICTION_PLATFORM_SUBSIDY} 萝卜。
+• 奖池拆分：
+  - 胜平负池：总奖池 40%
+  - 比分池：总奖池 60%
+• 命中规则：
+  - 猜中胜平负，可参与胜平负池
+  - 猜中完整比分，可参与比分池
+  - 同时猜中胜平负和比分，两边都参与
+• 分配规则：
+  - 先按中奖票之间的下注比例分对应池子
+  - 再按单票金额档位封顶
+• 防投机档位：
+  - 1 萝卜：最多吃对应池子的 1%
+  - 10 萝卜：最多吃对应池子的 5%
+  - 50 萝卜：最多吃对应池子的 25%
+  - 100 萝卜：最多吃对应池子的 50%
+  - 200 萝卜及以上：最多吃对应池子的 100%
+• 无人命中：
+  - 无人中胜平负，胜平负池留存
+  - 无人中比分，比分池留存
+• 截止时间：开赛前 10 分钟停止下注。
+• 支付确认：支付后自动查订单，用户不点回跳也会补查。
+• 比赛结算：赛果出来后由管理员确认结算。
+
+例子：
+总奖池 735，胜平负池 294，比分池 441。
+某用户 50 萝卜猜中平 1:1，且只有他中奖：
+胜平负最多 294 × 25% = 73
+比分最多 441 × 25% = 110
+合计约 183 萝卜。
 """
 }
 
@@ -169,6 +206,7 @@ async def rules_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
          InlineKeyboardButton("👥 群聊庄家", callback_data='rules_createguess')],
         [InlineKeyboardButton("🃏 扑克牌比大小", callback_data='rules_cardduel'),
          InlineKeyboardButton("🐮 牛牛", callback_data='rules_niuniu')],
+        [InlineKeyboardButton("⚽ 世界杯预测", callback_data='rules_prediction')],
         [InlineKeyboardButton("📋 所有规则", callback_data='rules_all')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -204,6 +242,7 @@ async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
          InlineKeyboardButton("👥 群聊庄家", callback_data='game_createguess')],
         [InlineKeyboardButton("🃏 扑克牌比大小", callback_data='game_cardduel'),
          InlineKeyboardButton("🐮 牛牛", callback_data='game_niuniu')],
+        [InlineKeyboardButton("⚽ 世界杯预测", callback_data='game_prediction')],
         [InlineKeyboardButton("📋 游戏规则", callback_data='rules_menu')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -252,6 +291,7 @@ async def rules_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
              InlineKeyboardButton("👥 群聊庄家", callback_data='rules_createguess')],
             [InlineKeyboardButton("🃏 扑克牌比大小", callback_data='rules_cardduel'),
              InlineKeyboardButton("🐮 牛牛", callback_data='rules_niuniu')],
+            [InlineKeyboardButton("⚽ 世界杯预测", callback_data='rules_prediction')],
             [InlineKeyboardButton("📋 所有规则", callback_data='rules_all')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -267,7 +307,8 @@ async def rules_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             'rob': '/rob <金额>',
             'createguess': '/createguess <金额> <大/小>',
             'cardduel': '/cardduel <金额>',
-            'niuniu': '/niuniu <金额>'
+            'niuniu': '/niuniu <金额>',
+            'prediction': '/prediction'
         }
         
         if game in game_commands:

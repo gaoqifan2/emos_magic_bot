@@ -121,6 +121,13 @@ PLATFORM_SUBSIDY = int(os.getenv("PREDICTION_PLATFORM_SUBSIDY", "100"))
 POOL_RELEASE_BASE_STAKE = max(1, int(os.getenv("PREDICTION_POOL_RELEASE_BASE_STAKE", "500")))
 RESULT_POOL_STAKE_MULTIPLIER = float(os.getenv("PREDICTION_RESULT_POOL_STAKE_MULTIPLIER", "3"))
 SCORE_POOL_STAKE_MULTIPLIER = float(os.getenv("PREDICTION_SCORE_POOL_STAKE_MULTIPLIER", "5"))
+STAKE_POOL_CAP_TIERS = [
+    (200, 1.0),
+    (100, 0.5),
+    (50, 0.25),
+    (10, 0.05),
+    (1, 0.01),
+]
 STAKE_OPTIONS = [10, 50, 100, 500, 1000]
 CUSTOM_MATCH_CREATE_FEE = int(os.getenv("PREDICTION_CUSTOM_MATCH_CREATE_FEE", "50"))
 CUSTOM_MATCH_FEE_RECEIVER_USER_ID = os.getenv("PREDICTION_FEE_RECEIVER_USER_ID", "")
@@ -163,13 +170,13 @@ PREDICTION_RULES_TEXT = (
     "玩法采用奖池制，萝卜只用于站内娱乐。\n\n"
     f"1. 单场总奖池 = 用户投入萝卜 + f1bb补贴的 {PLATFORM_SUBSIDY} 萝卜。\n"
     "2. 胜平负池占 40%，比分池占 60%，两个池子独立结算。\n"
-    "3. 中奖用户按自己投入占全场已支付投入的比例领取对应池子，剩余留在平台。\n"
-    "4. 全场参与越少，实际释放的奖池越少，避免 1 萝卜冷门票拿走整池。\n"
+    "3. 中奖票先按中奖者内部投入比例分池子，再按单票金额档位封顶。\n"
+    "4. 单票封顶：1萝卜=1%，10萝卜=5%，50萝卜=25%，100萝卜=50%，200萝卜及以上=100%。\n"
     "5. 比赛开赛前 10 分钟停止预测。\n"
     "6. 比赛取消或延期时，已投入萝卜退回。\n\n"
     f"例：本场用户共下 3000，f1bb补贴 {PLATFORM_SUBSIDY}，总奖池 {3000 + PLATFORM_SUBSIDY}。\n"
     f"胜平负池 {int((3000 + PLATFORM_SUBSIDY) * 0.4)}，比分池 {int((3000 + PLATFORM_SUBSIDY) * 0.6)}。\n"
-    "如果某用户下 100 且比分命中，会按 100 / 3000 的全场投入比例领取比分池的一部分。\n"
+    "如果某用户下 100 且比分命中，最多领取比分池的 50%。\n"
     "如果无人猜中比分，比分池不发放，留在平台。\n\n"
     f"当前控赔：f1bb每场补贴 {PLATFORM_SUBSIDY} 萝卜，下注金额不设上限。"
 )
@@ -1083,8 +1090,16 @@ def distribute_pool(pool_amount, winners):
     return payouts
 
 
-def distribute_capped_pool(pool_amount, winners, total_stake, stake_multiplier):
-    if pool_amount <= 0 or not winners or total_stake <= 0:
+def stake_pool_cap_ratio(stake):
+    stake = max(0, int(stake or 0))
+    for threshold, ratio in STAKE_POOL_CAP_TIERS:
+        if stake >= threshold:
+            return ratio
+    return 0.0
+
+
+def distribute_capped_pool(pool_amount, winners):
+    if pool_amount <= 0 or not winners:
         return {}
 
     total_winner_stake = sum(max(0, int(item["stake"])) for item in winners)
@@ -1099,8 +1114,8 @@ def distribute_capped_pool(pool_amount, winners, total_stake, stake_multiplier):
         if stake <= 0:
             continue
         share_by_winners = pool_amount * stake / total_winner_stake
-        cap_by_full_pool = pool_amount * stake / total_stake * stake_multiplier
-        exact = min(share_by_winners, cap_by_full_pool)
+        cap_by_tier = pool_amount * stake_pool_cap_ratio(stake)
+        exact = min(share_by_winners, cap_by_tier)
         amount = int(exact)
         if exact > 0 and amount <= 0:
             amount = 1
@@ -1138,23 +1153,19 @@ def calculate_settlement_payouts(predictions, actual_result, actual_score, platf
 
     result_pool = int(total_pool * 0.4)
     score_pool = total_pool - result_pool
-    release_ratio = min(1.0, total_stake / POOL_RELEASE_BASE_STAKE) if total_stake > 0 else 0.0
-    result_released_pool = math.ceil(result_pool * release_ratio) if result_winners else 0
-    score_released_pool = math.ceil(score_pool * release_ratio) if score_winners else 0
+    release_ratio = 1.0 if total_stake > 0 else 0.0
+    result_released_pool = result_pool if result_winners else 0
+    score_released_pool = score_pool if score_winners else 0
 
     payouts = {item["id"]: 0 for item in predictions}
     for prediction_id, amount in distribute_capped_pool(
         result_released_pool,
         result_winners,
-        total_stake,
-        RESULT_POOL_STAKE_MULTIPLIER,
     ).items():
         payouts[prediction_id] = payouts.get(prediction_id, 0) + amount
     for prediction_id, amount in distribute_capped_pool(
         score_released_pool,
         score_winners,
-        total_stake,
-        SCORE_POOL_STAKE_MULTIPLIER,
     ).items():
         payouts[prediction_id] = payouts.get(prediction_id, 0) + amount
     payout_total = sum(int(value or 0) for value in payouts.values())
