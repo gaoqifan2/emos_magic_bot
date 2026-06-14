@@ -132,6 +132,7 @@ RESULT_HIT_MIN_PAYOUT_MULTIPLIER = float(os.getenv("PREDICTION_RESULT_HIT_MIN_PA
 SCORE_HIT_MIN_PAYOUT_MULTIPLIER = float(os.getenv("PREDICTION_SCORE_HIT_MIN_PAYOUT_MULTIPLIER", "1.5"))
 RESULT_RECYCLE_WEIGHT = float(os.getenv("PREDICTION_RESULT_RECYCLE_WEIGHT", "1"))
 SCORE_RECYCLE_WEIGHT = float(os.getenv("PREDICTION_SCORE_RECYCLE_WEIGHT", "3"))
+MAX_PAYOUT_MULTIPLIER = float(os.getenv("PREDICTION_MAX_PAYOUT_MULTIPLIER", "10"))
 STAKE_OPTIONS = [10, 50, 100, 500, 1000]
 CUSTOM_MATCH_CREATE_FEE = int(os.getenv("PREDICTION_CUSTOM_MATCH_CREATE_FEE", "50"))
 CUSTOM_MATCH_FEE_RECEIVER_USER_ID = os.getenv("PREDICTION_FEE_RECEIVER_USER_ID", "")
@@ -178,8 +179,9 @@ PREDICTION_RULES_TEXT = (
     "4. 单票封顶：1萝卜=2%，10萝卜=10%，50萝卜=35%，100萝卜=70%，200萝卜及以上=100%。\n"
     "5. 小奖池保护：只中胜平负最低按本张投入的 1.2 倍发，完整比分最低按本张投入的 1.5 倍发，优先用本场未释放留存补，完整比分优先。\n"
     "6. 用户回流奖励：如果结算后平台留存超过 f1bb 补贴，超出部分继续发给中奖票；完整比分按投入×3，胜平负按投入×1 分配。\n"
-    "7. 比赛开赛前 10 分钟停止预测。\n"
-    "8. 比赛取消或延期时，已投入萝卜退回。\n\n"
+    "7. 单票最终发奖最多为本张投入的 10 倍，超过部分滚存到下一场比赛奖池。\n"
+    "8. 比赛开赛前 10 分钟停止预测。\n"
+    "9. 比赛取消或延期时，已投入萝卜退回。\n\n"
     f"例：本场用户共下 3000，f1bb补贴 {PLATFORM_SUBSIDY}，总奖池 {3000 + PLATFORM_SUBSIDY}。\n"
     f"胜平负池 {int((3000 + PLATFORM_SUBSIDY) * 0.4)}，比分池 {int((3000 + PLATFORM_SUBSIDY) * 0.6)}。\n"
     "如果某用户下 100 且比分命中，最多领取比分池的 70%。\n"
@@ -414,6 +416,18 @@ def init_prediction_db():
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS prediction_pool_rollovers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                source_match_id TEXT NOT NULL,
+                target_match_id TEXT,
+                target_match_label TEXT,
+                amount INTEGER NOT NULL,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
         conn.commit()
 
 
@@ -565,6 +579,40 @@ def clear_match_subsidy(match_id):
     with sqlite3.connect(PREDICTION_DB) as conn:
         conn.execute("DELETE FROM prediction_match_subsidies WHERE match_id = ?", (match_id,))
         conn.commit()
+
+
+def record_pool_rollover(source_match_id, target_match_id, target_match_label, amount):
+    init_prediction_db()
+    with sqlite3.connect(PREDICTION_DB) as conn:
+        conn.execute(
+            """
+            INSERT INTO prediction_pool_rollovers (
+                source_match_id, target_match_id, target_match_label, amount, created_at
+            ) VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                source_match_id,
+                target_match_id,
+                target_match_label,
+                int(amount or 0),
+                datetime.now(BEIJING_TZ).isoformat(timespec="seconds"),
+            ),
+        )
+        conn.commit()
+
+
+def get_match_rollover_out(match_id):
+    init_prediction_db()
+    with sqlite3.connect(PREDICTION_DB) as conn:
+        row = conn.execute(
+            """
+            SELECT COALESCE(SUM(amount), 0) AS amount
+            FROM prediction_pool_rollovers
+            WHERE source_match_id = ?
+            """,
+            (match_id,),
+        ).fetchone()
+    return int((row[0] if row else 0) or 0)
 
 
 def build_prediction_order_no():
@@ -1263,6 +1311,21 @@ def apply_user_stake_recycle_payouts(payouts, predictions, actual_result, actual
     return payouts
 
 
+def apply_max_ticket_payout_cap(payouts, predictions):
+    if MAX_PAYOUT_MULTIPLIER <= 0:
+        return payouts
+    stake_by_prediction = {
+        item["id"]: max(0, int(item.get("stake") or 0))
+        for item in predictions
+    }
+    capped = {}
+    for prediction_id, amount in payouts.items():
+        stake = stake_by_prediction.get(prediction_id, 0)
+        cap = int(math.floor(stake * MAX_PAYOUT_MULTIPLIER))
+        capped[prediction_id] = min(int(amount or 0), max(0, cap))
+    return capped
+
+
 def calculate_settlement_payouts(predictions, actual_result, actual_score, platform_subsidy=None):
     total_stake = sum(int(item["stake"]) for item in predictions)
     if platform_subsidy is None and predictions:
@@ -1304,7 +1367,9 @@ def calculate_settlement_payouts(predictions, actual_result, actual_score, platf
         total_stake,
         total_pool,
     )
+    payouts = apply_max_ticket_payout_cap(payouts, predictions)
     payout_total = sum(int(value or 0) for value in payouts.values())
+    rollover_amount = max(0, total_pool - payout_total - platform_subsidy)
 
     return {
         "total_stake": total_stake,
@@ -1317,7 +1382,8 @@ def calculate_settlement_payouts(predictions, actual_result, actual_score, platf
         "result_released_pool": result_released_pool,
         "score_released_pool": score_released_pool,
         "payout_total": payout_total,
-        "platform_retained": max(0, total_pool - payout_total),
+        "rollover_amount": rollover_amount,
+        "platform_retained": max(0, total_pool - payout_total - rollover_amount),
         "payouts": payouts,
         "result_winner_count": len(result_winners),
         "score_winner_count": len(score_winners),
@@ -1521,6 +1587,59 @@ async def settle_prediction_match(match_id, bot=None):
     return await settle_prediction_match_with_result(match_id, actual_result, actual_score, bot=bot, source="fifa")
 
 
+async def apply_rollover_to_next_match(current_match_id, predictions, amount):
+    amount = int(amount or 0)
+    if amount <= 0:
+        return None
+
+    now = datetime.now(BEIJING_TZ)
+    current_time = None
+    if predictions:
+        try:
+            current_time = datetime.fromisoformat(str(predictions[0].get("match_time")))
+            if current_time.tzinfo is None:
+                current_time = current_time.replace(tzinfo=BEIJING_TZ)
+        except Exception:
+            current_time = None
+
+    candidates = []
+    for match in await get_schedule():
+        if match["id"] == current_match_id:
+            continue
+        deadline = prediction_deadline(match)
+        if deadline <= now:
+            continue
+        match_time = match.get("beijing_time")
+        if current_time and match_time <= current_time:
+            continue
+        candidates.append(match)
+    for match in get_open_custom_matches():
+        if match["id"] == current_match_id:
+            continue
+        deadline = prediction_deadline(match)
+        if deadline <= now:
+            continue
+        match_time = match.get("beijing_time")
+        if current_time and match_time <= current_time:
+            continue
+        candidates.append(match)
+
+    if not candidates:
+        return None
+
+    next_match = sorted(candidates, key=prediction_deadline)[0]
+    current_subsidy = get_match_subsidy(next_match["id"], next_match)
+    new_subsidy = set_match_subsidy(next_match["id"], current_subsidy + amount, updated_by=0)
+    target_label = match_label(next_match)
+    record_pool_rollover(current_match_id, next_match["id"], target_label, amount)
+    return {
+        "match_id": next_match["id"],
+        "match_label": target_label,
+        "amount": amount,
+        "new_subsidy": new_subsidy,
+    }
+
+
 async def settle_prediction_match_with_result(match_id, actual_result, actual_score, bot=None, admin_id=None, source="manual"):
     predictions = get_paid_predictions_for_match(match_id)
     if not predictions:
@@ -1528,6 +1647,11 @@ async def settle_prediction_match_with_result(match_id, actual_result, actual_sc
 
     payout_plan = calculate_settlement_payouts(predictions, actual_result, actual_score)
     payouts = payout_plan["payouts"]
+    rollover_info = await apply_rollover_to_next_match(
+        match_id,
+        predictions,
+        payout_plan.get("rollover_amount", 0),
+    )
     paid_count = 0
     failed_count = 0
     failed_payouts = []
@@ -1597,6 +1721,8 @@ async def settle_prediction_match_with_result(match_id, actual_result, actual_sc
         "actual_score": actual_score,
         "total_pool": payout_plan["total_pool"],
         "payout_total": payout_plan.get("payout_total", 0),
+        "rollover_amount": payout_plan.get("rollover_amount", 0),
+        "rollover_info": rollover_info,
         "platform_retained": payout_plan.get("platform_retained", 0),
         "paid_count": paid_count,
         "failed_count": failed_count,
@@ -1636,6 +1762,7 @@ def format_settlement_preview(preview, title="🏁 请求结算"):
         f"用户下注：{preview['total_stake']} 萝卜\n"
         f"总奖池：{preview['total_pool']} 萝卜\n"
         f"本场释放：{preview.get('payout_total', 0)} 萝卜\n"
+        f"预计滚存：{preview.get('rollover_amount', 0)} 萝卜\n"
         f"平台留存：{preview.get('platform_retained', 0)} 萝卜\n"
         f"胜平负中奖票：{preview['result_winner_count']} 张\n"
         f"比分中奖票：{preview['score_winner_count']} 张\n\n"
@@ -3033,12 +3160,16 @@ def format_settlement_result_text(result):
         f"赛果：{result['actual_result']} {bold_alnum(result['actual_score'])}",
         f"总奖池：{bold_alnum(result['total_pool'])} 萝卜",
         f"本场应发：{bold_alnum(result.get('payout_total', 0))} 萝卜",
+        f"滚存下场：{bold_alnum(result.get('rollover_amount', 0))} 萝卜",
         f"平台留存：{bold_alnum(result.get('platform_retained', 0))} 萝卜",
         f"胜平负中奖票：{bold_alnum(result['result_winner_count'])} 张",
         f"比分中奖票：{bold_alnum(result['score_winner_count'])} 张",
         f"转账成功：{bold_alnum(result['paid_count'])} 笔",
         f"转账失败：{bold_alnum(result['failed_count'])} 笔",
     ]
+    rollover_info = result.get("rollover_info")
+    if rollover_info:
+        lines.append(f"已叠加到：{bold_alnum(rollover_info.get('match_label') or rollover_info.get('match_id') or '-')}")
     failed_payouts = result.get("failed_payouts") or []
     if failed_payouts:
         lines.extend(["", "⚠️ 手动补发清单："])
@@ -4192,7 +4323,8 @@ async def show_payout_history_detail(query, match_id, page=1):
     visible_winners = winner_rows[page_start:page_start + page_size] if record_page > 0 else []
     result_text = f"{first.get('settled_result') or '未记录'} {first.get('settled_score') or ''}".strip()
     planned_amount = paid_amount + failed_amount
-    retained_amount = max(0, total_pool - planned_amount)
+    rollover_amount = get_match_rollover_out(match_id)
+    retained_amount = max(0, total_pool - planned_amount - rollover_amount)
 
     if page == 1:
         lines = [
@@ -4206,6 +4338,7 @@ async def show_payout_history_detail(query, match_id, page=1):
             f"f1bb补贴：{bold_alnum(platform_subsidy)} 萝卜",
             f"总奖池：{bold_alnum(total_pool)} 萝卜",
             f"本场应发：{bold_alnum(planned_amount)} 萝卜",
+            f"滚存下场：{bold_alnum(rollover_amount)} 萝卜",
             f"实际已发奖励：{bold_alnum(paid_amount)} 萝卜",
             f"平台留存：{bold_alnum(retained_amount)} 萝卜",
         ]
