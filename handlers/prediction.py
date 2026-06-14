@@ -133,6 +133,12 @@ SCORE_HIT_MIN_PAYOUT_MULTIPLIER = float(os.getenv("PREDICTION_SCORE_HIT_MIN_PAYO
 RESULT_RECYCLE_WEIGHT = float(os.getenv("PREDICTION_RESULT_RECYCLE_WEIGHT", "1"))
 SCORE_RECYCLE_WEIGHT = float(os.getenv("PREDICTION_SCORE_RECYCLE_WEIGHT", "3"))
 MAX_PAYOUT_MULTIPLIER = float(os.getenv("PREDICTION_MAX_PAYOUT_MULTIPLIER", "10"))
+SCORE_REWARD_CAP_TIERS = [
+    (100, 1.0),
+    (50, 0.5),
+    (10, 0.10),
+    (1, 0.05),
+]
 STAKE_OPTIONS = [10, 50, 100, 500, 1000]
 CUSTOM_MATCH_CREATE_FEE = int(os.getenv("PREDICTION_CUSTOM_MATCH_CREATE_FEE", "50"))
 CUSTOM_MATCH_FEE_RECEIVER_USER_ID = os.getenv("PREDICTION_FEE_RECEIVER_USER_ID", "")
@@ -174,18 +180,16 @@ PREDICTION_RULES_TEXT = (
     "⚽ 世界杯预测规则\n\n"
     "玩法采用奖池制，萝卜只用于站内娱乐。\n\n"
     f"1. 单场总奖池 = 用户投入萝卜 + f1bb补贴的 {PLATFORM_SUBSIDY} 萝卜。\n"
-    "2. 胜平负池占 40%，比分池占 60%，两个池子独立结算。\n"
-    "3. 中奖票先按中奖者内部投入比例分池子，再按单票金额档位封顶。\n"
-    "4. 单票封顶：1萝卜=2%，10萝卜=10%，50萝卜=35%，100萝卜=70%，200萝卜及以上=100%。\n"
-    "5. 小奖池保护：只中胜平负最低按本张投入的 1.2 倍发，完整比分最低按本张投入的 1.5 倍发，优先用本场未释放留存补，完整比分优先。\n"
-    "6. 用户回流奖励：如果结算后平台留存超过 f1bb 补贴，超出部分继续发给中奖票；完整比分按投入×3，胜平负按投入×1 分配。\n"
-    "7. 单票最终发奖最多为本张投入的 10 倍，超过部分滚存到下一场比赛奖池。\n"
-    "8. 比赛开赛前 10 分钟停止预测。\n"
-    "9. 比赛取消或延期时，已投入萝卜退回。\n\n"
+    "2. 胜平负池占 40%，比分池占 60%。中奖先拿对应池子的本金，再分对应池子的剩余奖池。\n"
+    "3. 命中比分时，先拿比分本金，再按档位吃比分剩余池：1萝卜=5%，10萝卜=10%，50萝卜=50%，100萝卜及以上=100%。\n"
+    "4. 比分池没分完的部分全部补进胜平负中奖池，按胜平负中奖票投入比例分。\n"
+    "5. 没有滚存；如果本场应发超过总奖池，则由平台加池补足。\n"
+    "6. 比赛开赛前 10 分钟停止预测。\n"
+    "7. 比赛取消或延期时，已投入萝卜退回。\n\n"
     f"例：本场用户共下 3000，f1bb补贴 {PLATFORM_SUBSIDY}，总奖池 {3000 + PLATFORM_SUBSIDY}。\n"
     f"胜平负池 {int((3000 + PLATFORM_SUBSIDY) * 0.4)}，比分池 {int((3000 + PLATFORM_SUBSIDY) * 0.6)}。\n"
-    "如果某用户下 100 且比分命中，最多领取比分池的 70%。\n"
-    "如果无人猜中比分，比分池不发放，留在平台。\n\n"
+    "如果某用户下 50 且比分命中，先拿 50×60% 的比分本金，再最多领取比分剩余池的 50%。\n"
+    "比分池没分完会继续分给胜平负中奖票。\n\n"
     f"当前控赔：f1bb每场补贴 {PLATFORM_SUBSIDY} 萝卜，下注金额不设上限。"
 )
 
@@ -1326,6 +1330,72 @@ def apply_max_ticket_payout_cap(payouts, predictions):
     return capped
 
 
+def score_reward_cap_ratio(stake):
+    stake = max(0, int(stake or 0))
+    for threshold, ratio in SCORE_REWARD_CAP_TIERS:
+        if stake >= threshold:
+            return ratio
+    return 0.0
+
+
+def distribute_amount_by_stake(amount, winners):
+    return distribute_pool(int(amount or 0), winners)
+
+
+def pay_principal_then_share(pool_amount, winners, principal_ratio):
+    payouts = {}
+    if pool_amount <= 0 or not winners:
+        return payouts, int(pool_amount or 0)
+
+    principal_sum = 0
+    for item in winners:
+        principal = int(math.floor(max(0, int(item.get("stake") or 0)) * principal_ratio))
+        if principal <= 0:
+            continue
+        payouts[item["id"]] = payouts.get(item["id"], 0) + principal
+        principal_sum += principal
+
+    remaining_pool = int(pool_amount) - principal_sum
+    if remaining_pool <= 0:
+        return payouts, 0
+
+    for prediction_id, amount in distribute_amount_by_stake(remaining_pool, winners).items():
+        payouts[prediction_id] = payouts.get(prediction_id, 0) + amount
+    return payouts, 0
+
+
+def pay_score_pool_with_tiers(score_pool, score_winners):
+    payouts = {}
+    if score_pool <= 0 or not score_winners:
+        return payouts, int(score_pool or 0)
+
+    principal_sum = 0
+    for item in score_winners:
+        principal = int(math.floor(max(0, int(item.get("stake") or 0)) * 0.6))
+        if principal <= 0:
+            continue
+        payouts[item["id"]] = payouts.get(item["id"], 0) + principal
+        principal_sum += principal
+
+    remaining_pool = int(score_pool) - principal_sum
+    if remaining_pool <= 0:
+        return payouts, 0
+
+    raw_rewards = distribute_amount_by_stake(remaining_pool, score_winners)
+    paid_reward = 0
+    for item in score_winners:
+        stake = max(0, int(item.get("stake") or 0))
+        cap = int(math.floor(remaining_pool * score_reward_cap_ratio(stake)))
+        reward = min(int(raw_rewards.get(item["id"], 0) or 0), cap)
+        if reward <= 0:
+            continue
+        payouts[item["id"]] = payouts.get(item["id"], 0) + reward
+        paid_reward += reward
+
+    score_leftover = max(0, remaining_pool - paid_reward)
+    return payouts, score_leftover
+
+
 def calculate_settlement_payouts(predictions, actual_result, actual_score, platform_subsidy=None):
     total_stake = sum(int(item["stake"]) for item in predictions)
     if platform_subsidy is None and predictions:
@@ -1337,39 +1407,22 @@ def calculate_settlement_payouts(predictions, actual_result, actual_score, platf
 
     result_pool = int(total_pool * 0.4)
     score_pool = total_pool - result_pool
-    release_ratio = 1.0 if total_stake > 0 else 0.0
-    result_released_pool = result_pool if result_winners else 0
-    score_released_pool = score_pool if score_winners else 0
-
     payouts = {item["id"]: 0 for item in predictions}
-    for prediction_id, amount in distribute_capped_pool(
-        result_released_pool,
-        result_winners,
-    ).items():
+    result_payouts, result_leftover = pay_principal_then_share(result_pool, result_winners, 0.4)
+    for prediction_id, amount in result_payouts.items():
         payouts[prediction_id] = payouts.get(prediction_id, 0) + amount
-    for prediction_id, amount in distribute_capped_pool(
-        score_released_pool,
-        score_winners,
-    ).items():
+
+    score_payouts, score_leftover = pay_score_pool_with_tiers(score_pool, score_winners)
+    for prediction_id, amount in score_payouts.items():
         payouts[prediction_id] = payouts.get(prediction_id, 0) + amount
-    payouts = apply_hit_minimum_payouts(
-        payouts,
-        predictions,
-        actual_result,
-        actual_score,
-        total_pool,
-    )
-    payouts = apply_user_stake_recycle_payouts(
-        payouts,
-        predictions,
-        actual_result,
-        actual_score,
-        total_stake,
-        total_pool,
-    )
-    payouts = apply_max_ticket_payout_cap(payouts, predictions)
+
+    result_bonus_pool = result_leftover + score_leftover
+    if result_bonus_pool > 0 and result_winners:
+        for prediction_id, amount in distribute_amount_by_stake(result_bonus_pool, result_winners).items():
+            payouts[prediction_id] = payouts.get(prediction_id, 0) + amount
+
     payout_total = sum(int(value or 0) for value in payouts.values())
-    rollover_amount = max(0, total_pool - payout_total - platform_subsidy)
+    platform_extra = max(0, payout_total - total_pool)
 
     return {
         "total_stake": total_stake,
@@ -1377,13 +1430,15 @@ def calculate_settlement_payouts(predictions, actual_result, actual_score, platf
         "total_pool": total_pool,
         "result_pool": result_pool,
         "score_pool": score_pool,
-        "release_ratio": release_ratio,
+        "release_ratio": 1.0 if total_stake > 0 else 0.0,
         "release_base_stake": POOL_RELEASE_BASE_STAKE,
-        "result_released_pool": result_released_pool,
-        "score_released_pool": score_released_pool,
+        "result_released_pool": result_pool if result_winners else 0,
+        "score_released_pool": score_pool if score_winners else 0,
+        "score_leftover_to_result_pool": score_leftover,
         "payout_total": payout_total,
-        "rollover_amount": rollover_amount,
-        "platform_retained": max(0, total_pool - payout_total - rollover_amount),
+        "rollover_amount": 0,
+        "platform_extra": platform_extra,
+        "platform_retained": max(0, total_pool - payout_total),
         "payouts": payouts,
         "result_winner_count": len(result_winners),
         "score_winner_count": len(score_winners),
@@ -1647,11 +1702,7 @@ async def settle_prediction_match_with_result(match_id, actual_result, actual_sc
 
     payout_plan = calculate_settlement_payouts(predictions, actual_result, actual_score)
     payouts = payout_plan["payouts"]
-    rollover_info = await apply_rollover_to_next_match(
-        match_id,
-        predictions,
-        payout_plan.get("rollover_amount", 0),
-    )
+    rollover_info = None
     paid_count = 0
     failed_count = 0
     failed_payouts = []
@@ -1723,6 +1774,7 @@ async def settle_prediction_match_with_result(match_id, actual_result, actual_sc
         "payout_total": payout_plan.get("payout_total", 0),
         "rollover_amount": payout_plan.get("rollover_amount", 0),
         "rollover_info": rollover_info,
+        "platform_extra": payout_plan.get("platform_extra", 0),
         "platform_retained": payout_plan.get("platform_retained", 0),
         "paid_count": paid_count,
         "failed_count": failed_count,
@@ -1762,7 +1814,8 @@ def format_settlement_preview(preview, title="🏁 请求结算"):
         f"用户下注：{preview['total_stake']} 萝卜\n"
         f"总奖池：{preview['total_pool']} 萝卜\n"
         f"本场释放：{preview.get('payout_total', 0)} 萝卜\n"
-        f"预计滚存：{preview.get('rollover_amount', 0)} 萝卜\n"
+        f"比分剩余补胜负池：{preview.get('score_leftover_to_result_pool', 0)} 萝卜\n"
+        f"平台加池：{preview.get('platform_extra', 0)} 萝卜\n"
         f"平台留存：{preview.get('platform_retained', 0)} 萝卜\n"
         f"胜平负中奖票：{preview['result_winner_count']} 张\n"
         f"比分中奖票：{preview['score_winner_count']} 张\n\n"
@@ -3160,16 +3213,13 @@ def format_settlement_result_text(result):
         f"赛果：{result['actual_result']} {bold_alnum(result['actual_score'])}",
         f"总奖池：{bold_alnum(result['total_pool'])} 萝卜",
         f"本场应发：{bold_alnum(result.get('payout_total', 0))} 萝卜",
-        f"滚存下场：{bold_alnum(result.get('rollover_amount', 0))} 萝卜",
+        f"平台加池：{bold_alnum(result.get('platform_extra', 0))} 萝卜",
         f"平台留存：{bold_alnum(result.get('platform_retained', 0))} 萝卜",
         f"胜平负中奖票：{bold_alnum(result['result_winner_count'])} 张",
         f"比分中奖票：{bold_alnum(result['score_winner_count'])} 张",
         f"转账成功：{bold_alnum(result['paid_count'])} 笔",
         f"转账失败：{bold_alnum(result['failed_count'])} 笔",
     ]
-    rollover_info = result.get("rollover_info")
-    if rollover_info:
-        lines.append(f"已叠加到：{bold_alnum(rollover_info.get('match_label') or rollover_info.get('match_id') or '-')}")
     failed_payouts = result.get("failed_payouts") or []
     if failed_payouts:
         lines.extend(["", "⚠️ 手动补发清单："])
@@ -4218,50 +4268,41 @@ async def show_match_bet_details(query, match_id, page=1):
 
 async def show_payout_history_matches(query, page=1):
     page = max(1, int(page or 1))
-    page_size = 8
+    page_size = 10
     rows, total = get_payout_history_matches(limit=page_size, offset=(page - 1) * page_size)
     total_pages = max(1, (total + page_size - 1) // page_size)
     if page > total_pages:
         page = total_pages
         rows, total = get_payout_history_matches(limit=page_size, offset=(page - 1) * page_size)
-    keyboard = [[InlineKeyboardButton("🔙 返回预测面板", callback_data="menu_prediction_main")]]
+    keyboard = [[InlineKeyboardButton("返回预测面板", callback_data="menu_prediction_main")]]
     if not rows:
         await query.edit_message_text(
-            "🏆 发奖历史\n\n还没有已结算的比赛。",
+            "发奖历史\n\n还没有已结算的比赛。",
             reply_markup=InlineKeyboardMarkup(keyboard),
         )
         return
 
     lines = [
-        "🏆 世界杯预测发奖历史",
-        "━━━━━━━━━━━━━━",
-        f"📄 第 {bold_alnum(f'{page}/{total_pages}')} 页    共 {bold_alnum(total)} 场",
-        "🕒 最新结算排在最前面",
+        "世界杯预测发奖历史",
+        "------------------",
+        f"第 {bold_alnum(f'{page}/{total_pages}')} 页，共 {bold_alnum(total)} 场",
+        "请选择一场查看发奖明细：",
     ]
     keyboard = []
     for item in rows:
-        settled_text = format_history_time(item.get("settled_at") or item.get("match_time"))
         result_text = f"{item.get('settled_result') or '未记录'} {item.get('settled_score') or ''}".strip()
         paid_amount = int(item.get("paid_amount") or 0)
         failed_amount = int(item.get("failed_amount") or 0)
-        winner_count = int(item.get("winner_count") or 0)
-        failed_text = f"\n   ⚠️ 待补：{failed_amount} 萝卜" if failed_amount else ""
-        lines.append(
-            "------------------\n"
-            f"⚽ {bold_alnum(item['match_label'])}\n"
-            f"📌 赛果：{bold_alnum(result_text)}\n"
-            f"🕒 结算：{bold_alnum(settled_text)}\n"
-            f"🎯 中奖票：{bold_alnum(winner_count)}    💰 已发：{bold_alnum(paid_amount)} 萝卜"
-            f"{bold_alnum(failed_text)}"
-        )
+        failed_suffix = f" 待补{failed_amount}" if failed_amount else ""
+        button_text = f"{item['match_label'][:18]} | {result_text} | 发{paid_amount}{failed_suffix}"
         keyboard.append([
             InlineKeyboardButton(
-                item["match_label"][:32],
+                button_text[:60],
                 callback_data=f"prediction_payout_match:{item['match_id']}",
             )
         ])
     keyboard.extend(build_page_button_rows("prediction_payout_history", page, total_pages))
-    keyboard.append([InlineKeyboardButton("🔙 返回预测面板", callback_data="menu_prediction_main")])
+    keyboard.append([InlineKeyboardButton("返回预测面板", callback_data="menu_prediction_main")])
     await query.edit_message_text(
         "\n".join(lines),
         reply_markup=InlineKeyboardMarkup(keyboard),
@@ -4323,8 +4364,8 @@ async def show_payout_history_detail(query, match_id, page=1):
     visible_winners = winner_rows[page_start:page_start + page_size] if record_page > 0 else []
     result_text = f"{first.get('settled_result') or '未记录'} {first.get('settled_score') or ''}".strip()
     planned_amount = paid_amount + failed_amount
-    rollover_amount = get_match_rollover_out(match_id)
-    retained_amount = max(0, total_pool - planned_amount - rollover_amount)
+    platform_extra = max(0, planned_amount - total_pool)
+    retained_amount = max(0, total_pool - planned_amount)
 
     if page == 1:
         lines = [
@@ -4338,7 +4379,7 @@ async def show_payout_history_detail(query, match_id, page=1):
             f"f1bb补贴：{bold_alnum(platform_subsidy)} 萝卜",
             f"总奖池：{bold_alnum(total_pool)} 萝卜",
             f"本场应发：{bold_alnum(planned_amount)} 萝卜",
-            f"滚存下场：{bold_alnum(rollover_amount)} 萝卜",
+            f"平台加池：{bold_alnum(platform_extra)} 萝卜",
             f"实际已发奖励：{bold_alnum(paid_amount)} 萝卜",
             f"平台留存：{bold_alnum(retained_amount)} 萝卜",
         ]
