@@ -4268,7 +4268,7 @@ async def show_match_bet_details(query, match_id, page=1):
 
 async def show_payout_history_matches(query, page=1):
     page = max(1, int(page or 1))
-    page_size = 10
+    page_size = 5
     rows, total = get_payout_history_matches(limit=page_size, offset=(page - 1) * page_size)
     total_pages = max(1, (total + page_size - 1) // page_size)
     if page > total_pages:
@@ -4294,7 +4294,10 @@ async def show_payout_history_matches(query, page=1):
         paid_amount = int(item.get("paid_amount") or 0)
         failed_amount = int(item.get("failed_amount") or 0)
         failed_suffix = f" 待补{failed_amount}" if failed_amount else ""
-        button_text = f"{item['match_label'][:18]} | {result_text} | 发{paid_amount}{failed_suffix}"
+        match_text = item["match_label"]
+        if len(match_text) > 14:
+            match_text = match_text[:13] + "…"
+        button_text = f"{match_text} | {result_text} | 发{paid_amount}{failed_suffix}"
         keyboard.append([
             InlineKeyboardButton(
                 button_text[:60],
