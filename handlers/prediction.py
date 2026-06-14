@@ -128,6 +128,8 @@ STAKE_POOL_CAP_TIERS = [
     (10, 0.10),
     (1, 0.02),
 ]
+RESULT_HIT_MIN_PAYOUT_MULTIPLIER = float(os.getenv("PREDICTION_RESULT_HIT_MIN_PAYOUT_MULTIPLIER", "1.2"))
+SCORE_HIT_MIN_PAYOUT_MULTIPLIER = float(os.getenv("PREDICTION_SCORE_HIT_MIN_PAYOUT_MULTIPLIER", "1.5"))
 STAKE_OPTIONS = [10, 50, 100, 500, 1000]
 CUSTOM_MATCH_CREATE_FEE = int(os.getenv("PREDICTION_CUSTOM_MATCH_CREATE_FEE", "50"))
 CUSTOM_MATCH_FEE_RECEIVER_USER_ID = os.getenv("PREDICTION_FEE_RECEIVER_USER_ID", "")
@@ -172,8 +174,9 @@ PREDICTION_RULES_TEXT = (
     "2. 胜平负池占 40%，比分池占 60%，两个池子独立结算。\n"
     "3. 中奖票先按中奖者内部投入比例分池子，再按单票金额档位封顶。\n"
     "4. 单票封顶：1萝卜=2%，10萝卜=10%，50萝卜=35%，100萝卜=70%，200萝卜及以上=100%。\n"
-    "5. 比赛开赛前 10 分钟停止预测。\n"
-    "6. 比赛取消或延期时，已投入萝卜退回。\n\n"
+    "5. 小奖池保护：只中胜平负最低按本张投入的 1.2 倍发，完整比分最低按本张投入的 1.5 倍发，优先用本场未释放留存补，完整比分优先。\n"
+    "6. 比赛开赛前 10 分钟停止预测。\n"
+    "7. 比赛取消或延期时，已投入萝卜退回。\n\n"
     f"例：本场用户共下 3000，f1bb补贴 {PLATFORM_SUBSIDY}，总奖池 {3000 + PLATFORM_SUBSIDY}。\n"
     f"胜平负池 {int((3000 + PLATFORM_SUBSIDY) * 0.4)}，比分池 {int((3000 + PLATFORM_SUBSIDY) * 0.6)}。\n"
     "如果某用户下 100 且比分命中，最多领取比分池的 70%。\n"
@@ -1142,6 +1145,40 @@ def distribute_capped_pool(pool_amount, winners):
     return payouts
 
 
+def apply_hit_minimum_payouts(payouts, predictions, actual_result, actual_score, total_pool):
+    max_assignable = int(total_pool or 0)
+    assigned = sum(int(value or 0) for value in payouts.values())
+    remaining = max(0, max_assignable - assigned)
+    if remaining <= 0:
+        return payouts
+
+    candidates = []
+    for item in predictions:
+        hit_result = item["result_pick"] == actual_result
+        hit_score = item["score_pick"] == actual_score
+        if not hit_result and not hit_score:
+            continue
+        stake = max(0, int(item["stake"] or 0))
+        prediction_id = item["id"]
+        current = int(payouts.get(prediction_id, 0) or 0)
+        multiplier = SCORE_HIT_MIN_PAYOUT_MULTIPLIER if hit_score else RESULT_HIT_MIN_PAYOUT_MULTIPLIER
+        minimum_payout = int(math.ceil(stake * multiplier))
+        if minimum_payout <= current:
+            continue
+        priority = 0 if hit_score else 1
+        candidates.append((priority, -stake, prediction_id, minimum_payout - current))
+
+    for _, _, prediction_id, needed in sorted(candidates):
+        if remaining <= 0:
+            break
+        addition = min(needed, remaining)
+        if addition <= 0:
+            continue
+        payouts[prediction_id] = int(payouts.get(prediction_id, 0) or 0) + addition
+        remaining -= addition
+    return payouts
+
+
 def calculate_settlement_payouts(predictions, actual_result, actual_score, platform_subsidy=None):
     total_stake = sum(int(item["stake"]) for item in predictions)
     if platform_subsidy is None and predictions:
@@ -1168,6 +1205,13 @@ def calculate_settlement_payouts(predictions, actual_result, actual_score, platf
         score_winners,
     ).items():
         payouts[prediction_id] = payouts.get(prediction_id, 0) + amount
+    payouts = apply_hit_minimum_payouts(
+        payouts,
+        predictions,
+        actual_result,
+        actual_score,
+        total_pool,
+    )
     payout_total = sum(int(value or 0) for value in payouts.values())
 
     return {
