@@ -731,7 +731,27 @@ def get_payout_history_matches(limit=8, offset=0):
             )
             """
         ).fetchone()["total"]
-    return [dict(row) for row in rows], int(total or 0)
+        result = [dict(row) for row in rows]
+        if result:
+            placeholders = ",".join("?" for _ in result)
+            manual_totals = conn.execute(
+                f"""
+                SELECT
+                    match_id,
+                    SUM(CASE WHEN transfer_status = 'paid' THEN payout_amount ELSE 0 END) AS paid_amount,
+                    SUM(CASE WHEN transfer_status = 'failed' THEN payout_amount ELSE 0 END) AS failed_amount
+                FROM prediction_manual_payouts
+                WHERE match_id IN ({placeholders})
+                GROUP BY match_id
+                """,
+                [item["match_id"] for item in result],
+            ).fetchall()
+            manual_by_match = {row["match_id"]: dict(row) for row in manual_totals}
+            for item in result:
+                manual = manual_by_match.get(item["match_id"]) or {}
+                item["paid_amount"] = int(item.get("paid_amount") or 0) + int(manual.get("paid_amount") or 0)
+                item["failed_amount"] = int(item.get("failed_amount") or 0) + int(manual.get("failed_amount") or 0)
+    return result, int(total or 0)
 
 
 def get_payout_history_for_match(match_id):
@@ -4049,6 +4069,17 @@ async def show_payout_history_detail(query, match_id, page=1):
     data = get_payout_history_for_match(match_id)
     rows = data["predictions"]
     manual_rows = data["manual_payouts"]
+    manual_paid_by_prediction = {}
+    manual_failed_by_prediction = {}
+    for manual in manual_rows:
+        prediction_id = manual.get("prediction_id")
+        if prediction_id is None:
+            continue
+        amount = int(manual.get("payout_amount") or 0)
+        if manual.get("transfer_status") == "paid":
+            manual_paid_by_prediction[prediction_id] = manual_paid_by_prediction.get(prediction_id, 0) + amount
+        elif manual.get("transfer_status") == "failed":
+            manual_failed_by_prediction[prediction_id] = manual_failed_by_prediction.get(prediction_id, 0) + amount
     page = max(1, int(page or 1))
     page_size = 6
     if not rows:
@@ -4067,13 +4098,19 @@ async def show_payout_history_detail(query, match_id, page=1):
         int(item.get("payout_amount") or 0)
         for item in rows
         if item.get("payout_status") == "paid"
-    )
+    ) + sum(manual_paid_by_prediction.values())
     failed_amount = sum(
         int(item.get("payout_amount") or 0)
         for item in rows
         if item.get("payout_status") == "failed"
-    )
-    winner_rows = [item for item in rows if int(item.get("payout_amount") or 0) > 0]
+    ) + sum(manual_failed_by_prediction.values())
+    winner_rows = [
+        item
+        for item in rows
+        if int(item.get("payout_amount") or 0) > 0
+        or int(manual_paid_by_prediction.get(item.get("id"), 0) or 0) > 0
+        or int(manual_failed_by_prediction.get(item.get("id"), 0) or 0) > 0
+    ]
     winner_pages = (len(winner_rows) + page_size - 1) // page_size
     total_pages = max(1, 1 + winner_pages)
     if page > total_pages:
@@ -4117,12 +4154,26 @@ async def show_payout_history_detail(query, match_id, page=1):
     if page > 1 and winner_rows:
         for item in visible_winners:
             username = item.get("username") or str(item.get("telegram_user_id"))
-            actual_payout = int(item.get("payout_amount") or 0)
+            base_payout = int(item.get("payout_amount") or 0)
+            manual_paid = int(manual_paid_by_prediction.get(item.get("id"), 0) or 0)
+            manual_failed = int(manual_failed_by_prediction.get(item.get("id"), 0) or 0)
+            actual_payout = base_payout + manual_paid
+            failed_payout = manual_failed
+            if item.get("payout_status") == "failed":
+                failed_payout += base_payout
+            payout_parts = [f"原发 {bold_alnum(base_payout)}"]
+            if manual_paid:
+                payout_parts.append(f"补发 {bold_alnum(manual_paid)}")
+            if failed_payout:
+                payout_parts.append(f"待补 {bold_alnum(failed_payout)}")
+            status = payout_status_text(item.get("payout_status"))
+            if manual_paid:
+                status = f"{status}/含补发"
             lines.append(
                 f"------------------\n"
                 f"• {bold_alnum(username)}\n"
                 f"  预测：{item['result_pick']} {bold_alnum(item['score_pick'])} | 投入：{bold_alnum(item['stake'])} 萝卜\n"
-                f"  发奖：{bold_alnum(actual_payout)} 萝卜 | 状态：{payout_status_text(item.get('payout_status'))}"
+                f"  发奖：{bold_alnum(actual_payout)} 萝卜 | {' + '.join(payout_parts)} | 状态：{status}"
             )
             if item.get("payout_error"):
                 lines.append(f"  失败原因：{bold_alnum(str(item['payout_error'])[:80])}")
@@ -4130,18 +4181,14 @@ async def show_payout_history_detail(query, match_id, page=1):
         lines.append("• 这场没有中奖票。")
 
     if page == 1 and manual_rows:
-        lines.extend(["", "手动补账记录："])
-        for item in manual_rows[:4]:
-            username = item.get("username") or str(item.get("telegram_user_id"))
-            notified = "已通知" if int(item.get("notified") or 0) else "未通知"
-            lines.append(
-                f"------------------\n"
-                f"• {bold_alnum(username)} | {bold_alnum(item.get('score_pick') or '-')} | "
-                f"{bold_alnum(item.get('payout_amount') or 0)} 萝卜 | "
-                f"{payout_status_text(item.get('transfer_status'))} | {notified}"
-            )
-        if len(manual_rows) > 4:
-            lines.append(f"• 还有 {bold_alnum(len(manual_rows) - 4)} 条补账记录未显示")
+        manual_paid_total = sum(manual_paid_by_prediction.values())
+        manual_failed_total = sum(manual_failed_by_prediction.values())
+        lines.extend([
+            "",
+            f"补发已合并到中奖记录：{bold_alnum(manual_paid_total)} 萝卜",
+        ])
+        if manual_failed_total:
+            lines.append(f"补发失败待处理：{bold_alnum(manual_failed_total)} 萝卜")
 
     keyboard = []
     keyboard.extend(build_page_button_rows(f"prediction_payout_match:{match_id}", page, total_pages))
