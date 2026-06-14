@@ -130,6 +130,8 @@ STAKE_POOL_CAP_TIERS = [
 ]
 RESULT_HIT_MIN_PAYOUT_MULTIPLIER = float(os.getenv("PREDICTION_RESULT_HIT_MIN_PAYOUT_MULTIPLIER", "1.2"))
 SCORE_HIT_MIN_PAYOUT_MULTIPLIER = float(os.getenv("PREDICTION_SCORE_HIT_MIN_PAYOUT_MULTIPLIER", "1.5"))
+RESULT_RECYCLE_WEIGHT = float(os.getenv("PREDICTION_RESULT_RECYCLE_WEIGHT", "1"))
+SCORE_RECYCLE_WEIGHT = float(os.getenv("PREDICTION_SCORE_RECYCLE_WEIGHT", "3"))
 STAKE_OPTIONS = [10, 50, 100, 500, 1000]
 CUSTOM_MATCH_CREATE_FEE = int(os.getenv("PREDICTION_CUSTOM_MATCH_CREATE_FEE", "50"))
 CUSTOM_MATCH_FEE_RECEIVER_USER_ID = os.getenv("PREDICTION_FEE_RECEIVER_USER_ID", "")
@@ -175,8 +177,9 @@ PREDICTION_RULES_TEXT = (
     "3. 中奖票先按中奖者内部投入比例分池子，再按单票金额档位封顶。\n"
     "4. 单票封顶：1萝卜=2%，10萝卜=10%，50萝卜=35%，100萝卜=70%，200萝卜及以上=100%。\n"
     "5. 小奖池保护：只中胜平负最低按本张投入的 1.2 倍发，完整比分最低按本张投入的 1.5 倍发，优先用本场未释放留存补，完整比分优先。\n"
-    "6. 比赛开赛前 10 分钟停止预测。\n"
-    "7. 比赛取消或延期时，已投入萝卜退回。\n\n"
+    "6. 用户回流奖励：如果结算后平台留存超过 f1bb 补贴，超出部分继续发给中奖票；完整比分按投入×3，胜平负按投入×1 分配。\n"
+    "7. 比赛开赛前 10 分钟停止预测。\n"
+    "8. 比赛取消或延期时，已投入萝卜退回。\n\n"
     f"例：本场用户共下 3000，f1bb补贴 {PLATFORM_SUBSIDY}，总奖池 {3000 + PLATFORM_SUBSIDY}。\n"
     f"胜平负池 {int((3000 + PLATFORM_SUBSIDY) * 0.4)}，比分池 {int((3000 + PLATFORM_SUBSIDY) * 0.6)}。\n"
     "如果某用户下 100 且比分命中，最多领取比分池的 70%。\n"
@@ -1199,6 +1202,67 @@ def apply_hit_minimum_payouts(payouts, predictions, actual_result, actual_score,
     return payouts
 
 
+def apply_user_stake_recycle_payouts(payouts, predictions, actual_result, actual_score, total_stake, total_pool):
+    assigned = sum(int(value or 0) for value in payouts.values())
+    target_payout = min(int(total_pool or 0), int(total_stake or 0))
+    recycle_amount = max(0, target_payout - assigned)
+    if recycle_amount <= 0:
+        return payouts
+
+    weighted_winners = []
+    total_weight = 0.0
+    for item in predictions:
+        hit_score = item["score_pick"] == actual_score
+        hit_result = item["result_pick"] == actual_result
+        if not hit_score and not hit_result:
+            continue
+        stake = max(0, int(item["stake"] or 0))
+        if stake <= 0:
+            continue
+        weight_multiplier = SCORE_RECYCLE_WEIGHT if hit_score else RESULT_RECYCLE_WEIGHT
+        weight = stake * max(0.0, float(weight_multiplier or 0))
+        if weight <= 0:
+            continue
+        weighted_winners.append((item["id"], weight, stake))
+        total_weight += weight
+
+    if total_weight <= 0:
+        return payouts
+
+    additions = {}
+    assigned_recycle = 0
+    remainders = []
+    for prediction_id, weight, stake in weighted_winners:
+        exact = recycle_amount * weight / total_weight
+        base = int(exact)
+        if exact > 0 and base <= 0:
+            base = 1
+        additions[prediction_id] = additions.get(prediction_id, 0) + base
+        assigned_recycle += base
+        remainders.append((exact - int(exact), stake, prediction_id))
+
+    overflow = assigned_recycle - recycle_amount
+    if overflow > 0:
+        for _, _, prediction_id in sorted(remainders):
+            if overflow <= 0:
+                break
+            current = additions.get(prediction_id, 0)
+            if current <= 0:
+                continue
+            removable = min(current, overflow)
+            additions[prediction_id] -= removable
+            overflow -= removable
+    else:
+        leftover = recycle_amount - assigned_recycle
+        for _, _, prediction_id in sorted(remainders, reverse=True)[:leftover]:
+            additions[prediction_id] = additions.get(prediction_id, 0) + 1
+
+    for prediction_id, amount in additions.items():
+        if amount > 0:
+            payouts[prediction_id] = int(payouts.get(prediction_id, 0) or 0) + amount
+    return payouts
+
+
 def calculate_settlement_payouts(predictions, actual_result, actual_score, platform_subsidy=None):
     total_stake = sum(int(item["stake"]) for item in predictions)
     if platform_subsidy is None and predictions:
@@ -1230,6 +1294,14 @@ def calculate_settlement_payouts(predictions, actual_result, actual_score, platf
         predictions,
         actual_result,
         actual_score,
+        total_pool,
+    )
+    payouts = apply_user_stake_recycle_payouts(
+        payouts,
+        predictions,
+        actual_result,
+        actual_score,
+        total_stake,
         total_pool,
     )
     payout_total = sum(int(value or 0) for value in payouts.values())
